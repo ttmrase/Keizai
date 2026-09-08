@@ -33,6 +33,7 @@ func _ready() -> void:
 
 	EventBus.power_recalculated.connect(_on_power_recalculated)
 	EventBus.game_loaded.connect(_rebuild)
+	EventBus.world_reset.connect(_rebuild)
 	_sync_tabs()
 	_rebuild()
 

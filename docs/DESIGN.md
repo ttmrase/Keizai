@@ -400,3 +400,67 @@ Each phase's own "Definition of done" (Section F) is the primary verification un
 2. **Full observation loop (after Phase 6):** play manually for several in-game "years" at 2x/4x speed, occasionally pausing to (a) trigger a disaster from `GodPowerPanel`, (b) confirm the thematically-linked archetype's power rises in `PowerDashboard` within a couple epochs, (c) find the resulting chronicle entry in `ChronicleTimeline`, (d) if a schism resulted, confirm the new branch is visible and correctly rooted in `OrgLineageView`.
 3. **Release gate (Phase 7):** `godot --headless --export-release "Android" build/keizai-release.apk` exits 0; install on a real device from a clean state; full Section H invariant suite passes at 200,000+ ticks; soak-test save load time meets the ~3s target.
 4. **Regression safety net throughout:** run `godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit` after every phase's changes before moving on — this is cheap once GUT exists (Phase 1+) and is what keeps an 8-phase incremental build from silently regressing earlier phases' guarantees (especially the lineage invariants, which are easy to break unnoticed while iterating on rule content in Phase 4 and beyond).
+
+---
+
+## Where the implementation diverged from this plan
+
+The plan above is kept as written for the record. These are the places the build
+deliberately went another way, and why.
+
+**Specialised institutions are invented, not seeded.** The plan listed seven
+archetypes as the starting roster. The implementation starts with *four* root
+organizations — one guild, one house, one faction, one political system — and
+lets the monster-hunting order, artisan and merchant guilds, mage circle, temple
+and farmers' movement appear later, as branches, when world conditions call for
+them (`data/rules/specialize_*.tres`). This satisfies "最初の本流は一つ" literally
+rather than approximately, and it turns the roster into the thing the game is
+actually about: the society inventing what it needs. Their power profiles are
+unchanged from the plan.
+
+**One `Organization` class instead of four subclasses.** GDScript cannot let a
+base class construct its own subclasses without a cyclic `class_name`
+dependency, which would have meant a separate factory file purely to work around
+the language. Since every system handles the four kinds uniformly — the same
+lineage walk, the same power calculator, the same schism rules — a `kind`
+discriminator with six kind-specific fields serves the design's actual goal
+better than the subclass hierarchy would have.
+
+**A small custom test runner instead of GUT.** What the plan actually required
+was headless fast-forward plus invariant assertions plus an exit code. That is
+about a hundred lines (`tests/spec.gd`, `tests/test_runner.gd`), and it avoids
+vendoring a large addon whose doubles, stubs and editor panel this project never
+uses. The invariant suite itself is as specified, and larger: 22,000 checks.
+
+**Lineage trees are drawn directly rather than with `GraphEdit`.** These are
+trees, not general graphs, and they are read on a phone. A layered layout with
+its own touch handling gave a far more legible result than `GraphEdit`'s
+editor-flavoured nodes, and focus mode, collapsing and search all needed custom
+behaviour regardless. In the whole-tree view the four root trees stack
+vertically, because side by side they do not fit a portrait screen.
+
+**Save history is buffered in memory and written in segments on save**, rather
+than appended continuously. The guarantees are the same — segmented, compressed,
+with an uncompactable lineage backbone — and compaction keeps the buffer bounded,
+so the simpler scheme costs nothing. Note the segment files use Godot's own
+compressed container (deflate), so they are not readable by `gunzip`; the
+extension is `.jsonl.z` rather than the plan's `.jsonl.gz` to avoid implying
+otherwise.
+
+**Balance work the plan could not anticipate.** Playtesting through the
+diagnostic tool surfaced several problems that needed model changes, not tuning:
+monsters could be driven to exactly zero and never return (multiplicative growth
+from nothing), so a small additive baseline spawn was added; unrest accumulated
+rather than tracking conditions, so it pinned at maximum and never recovered;
+organizations only ever lost members at a schism, so the world decayed into
+five-member remnants, and membership now follows influence and population;
+ideological schisms repeated forever because the split never resolved the drift
+that caused it, so a parent now re-baselines its ideology after one; and a
+single well-connected claimant could end up ruling several rival states at once,
+so nobody may now hold two seats of the same kind.
+
+**Not verified: the APK on a real device.** Both APKs build and their signatures
+verify (debug 32MB, release 30MB, arm64-v8a, no permissions requested, min SDK
+24 / target SDK 36), and every screen was rendered and inspected under a virtual
+display. But no Android device or emulator was available, so touch feel, pinch
+gestures, resume-from-background and on-device load times remain unchecked.

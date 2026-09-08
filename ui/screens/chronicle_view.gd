@@ -39,6 +39,7 @@ func _ready() -> void:
 	_more.pressed.connect(_on_more)
 	EventBus.event_recorded.connect(_on_event_recorded)
 	EventBus.game_loaded.connect(_rebuild)
+	EventBus.world_reset.connect(_rebuild)
 	_sync_tabs()
 	_rebuild()
 

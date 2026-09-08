@@ -18,11 +18,17 @@ func _ready() -> void:
 		_start_new_world()
 
 	var shell := preload("res://ui/main/ObservationShell.tscn").instantiate()
+	shell.new_world_requested.connect(_on_new_world_requested)
 	_screen_host.add_child(shell)
 
 
-func _start_new_world() -> void:
-	var world_seed := DEFAULT_SEED
+## World creation lives here rather than in a screen: the UI may ask for a new
+## world, but it does not get to build one.
+func _on_new_world_requested() -> void:
+	_start_new_world(randi())
+
+
+func _start_new_world(world_seed: int = DEFAULT_SEED) -> void:
 	WorldGenerator.generate(world_seed)
 	SimClock.start(0)
 	SimClock.set_time_scale(0.0)

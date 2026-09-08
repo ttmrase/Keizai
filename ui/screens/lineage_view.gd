@@ -28,6 +28,7 @@ func _ready() -> void:
 	_search.text_changed.connect(_on_search_changed)
 	_graph.node_selected.connect(_on_node_selected)
 	EventBus.game_loaded.connect(_rebuild)
+	EventBus.world_reset.connect(_rebuild)
 
 	_detail.visible = false
 	_results.visible = false

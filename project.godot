@@ -8,6 +8,7 @@ config_version=5
 config/name="Keizai"
 config/description="A god-game where you shape the environment and watch a civilization organize itself around it."
 run/main_scene="res://main/Main.tscn"
+run/max_fps=30
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -38,3 +39,4 @@ window/stretch/aspect="expand"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true

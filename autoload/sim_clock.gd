@@ -89,8 +89,14 @@ func format_tick(tick: int) -> String:
 
 
 func _notification(what: int) -> void:
-	# Android can kill a backgrounded app without any graceful-quit signal, so
-	# the pause notification is the last reliable moment to persist progress.
-	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if running:
-			SaveManager.autosave()
+	match what:
+		# Android can kill a backgrounded app without any graceful-quit signal, so
+		# the pause notification is the last reliable moment to persist progress.
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST:
+			if running:
+				SaveManager.autosave()
+		NOTIFICATION_APPLICATION_RESUMED:
+			# The world does not run while the app is backgrounded. Clearing the
+			# accumulator stops the time spent away from arriving as a burst of
+			# ticks the moment the player comes back.
+			_accumulator = 0.0

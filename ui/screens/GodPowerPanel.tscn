@@ -58,6 +58,21 @@ theme_override_colors/font_color = Color(0.415686, 0.388235, 0.341176, 1)
 theme_override_font_sizes/font_size = 15
 text = "神が触れられるのは世界だけであり、人の営みではない。誰が王となり、どの組織が興り、どこで袂を分かつかは、すべて人の側が決める。"
 
+[node name="NewWorld" type="Button" parent="Scroll/Rows"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.603922, 0.588235, 0.505882, 1)
+theme_override_font_sizes/font_size = 18
+text = "新しい世界を興す"
+
+[node name="NewWorldConfirm" type="ConfirmationDialog" parent="."]
+title = "新しい世界"
+initial_position = 2
+size = Vector2i(460, 200)
+ok_button_text = "興す"
+cancel_button_text = "やめる"
+dialog_text = "今の世界とその年代記は失われ、別の歴史が始まる。よろしいか。"
+
 [node name="Confirm" type="ConfirmationDialog" parent="."]
 title = "確認"
 initial_position = 2

@@ -19,6 +19,7 @@ func _ready() -> void:
 	_canvas.canvas_tapped.connect(_on_tapped)
 	EventBus.tick_advanced.connect(_on_tick)
 	EventBus.game_loaded.connect(_refresh)
+	EventBus.world_reset.connect(_refresh)
 	_detail.visible = false
 	await get_tree().process_frame
 	_frame_world()

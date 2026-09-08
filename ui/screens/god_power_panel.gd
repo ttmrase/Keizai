@@ -23,6 +23,8 @@ var _values: Array[Label] = []
 @onready var _dial_rows: VBoxContainer = $Scroll/Rows/Dials
 @onready var _disaster_grid: GridContainer = $Scroll/Rows/Disasters
 @onready var _confirm: ConfirmationDialog = $Confirm
+@onready var _new_world: Button = $Scroll/Rows/NewWorld
+@onready var _new_world_confirm: ConfirmationDialog = $NewWorldConfirm
 
 var _pending_disaster: StringName = &""
 
@@ -31,6 +33,8 @@ func _ready() -> void:
 	_build_dials()
 	_build_disasters()
 	_confirm.confirmed.connect(_on_confirmed)
+	_new_world.pressed.connect(_on_new_world_pressed)
+	_new_world_confirm.confirmed.connect(_on_new_world_confirmed)
 	EventBus.game_loaded.connect(_sync_dials)
 	EventBus.world_reset.connect(_sync_dials)
 	_sync_dials()
@@ -120,3 +124,17 @@ func _on_confirmed() -> void:
 		return
 	GodPowerAPI.trigger_disaster(_pending_disaster, &"", 1.0)
 	_pending_disaster = &""
+
+
+func _on_new_world_pressed() -> void:
+	_new_world_confirm.popup_centered()
+
+
+## Asks for a world rather than making one: creating it belongs to main, not to
+## a screen.
+func _on_new_world_confirmed() -> void:
+	var shell := get_parent()
+	while shell != null and not shell.has_method("request_new_world"):
+		shell = shell.get_parent()
+	if shell != null:
+		shell.request_new_world()
