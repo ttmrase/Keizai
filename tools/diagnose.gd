@@ -128,13 +128,18 @@ func _print_org_branch(org: Organization, depth: int) -> void:
 
 func _print_power_table() -> void:
 	print("\n--- 勢力 ---")
+	const BUILT_IN_LABELS := {
+		PowerCalculator.BASE_KEY: "基礎",
+		PowerCalculator.MEMBERSHIP_KEY: "規模",
+		PowerCalculator.LEADERSHIP_KEY: "指導者の力量",
+	}
 	for org in PowerCalculator.ranked():
 		var top_key := PowerCalculator.top_driver(org)
-		var label := String(top_key)
+		var label: String = BUILT_IN_LABELS.get(top_key, String(top_key))
 		var profile := ContentRegistry.get_power_profile(org.archetype_id)
 		if profile != null:
 			for d in profile.drivers:
-				if d.world_var_path == top_key:
+				if d.world_var_path == top_key and not d.label.is_empty():
 					label = d.label
 		print("  %-26s %5.1f  主因: %s" % [org.display_name, org.power_score, label])
 
