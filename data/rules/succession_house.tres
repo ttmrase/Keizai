@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"succession_house"
+rule_type = 1
+applies_to_kind = 1
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([])
+cooldown_ticks = 0
+priority = 10
+method = 0
+allow_dispute = true
+schism_probability_on_loss = 0.38

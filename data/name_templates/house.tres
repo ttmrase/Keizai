@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="NameTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/name_template.gd" id="1_template"]
+
+[resource]
+script = ExtResource("1_template")
+applies_to_kind = 1
+archetype_filter = Array[StringName]([])
+name_pattern = "{stem}家"
+description_pattern = "{adjective}{legitimacy}の家系。イデオロギー:{ideology}"
+branch_name_pattern = "{stem}家"
+branch_description_pattern = "{parent}より分かれた家系。イデオロギー:{ideology}"
+word_bank = {}

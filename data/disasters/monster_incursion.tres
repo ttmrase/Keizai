@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"monster_incursion"
+display_name = "魔物の大侵攻"
+duration_ticks = 16
+effects = {
+"monster_influx": 42.0,
+"monster_spawn": 0.9
+}
+envelope = 1
+chronicle_template = "{place}へ{name}が押し寄せた。"
+is_benevolent = false
+targeted = false

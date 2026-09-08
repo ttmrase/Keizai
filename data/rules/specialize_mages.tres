@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_threat"]
+script = ExtResource("2_cond")
+world_var_path = &"global_monster_threat_level"
+op = 0
+threshold = 0.42
+describe_as = "人の手に余る脅威"
+
+[sub_resource type="Resource" id="c_wealth"]
+script = ExtResource("2_cond")
+world_var_path = &"global_wealth"
+op = 0
+threshold = 1100.0
+describe_as = "研究を支える富"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"specialize_mages"
+rule_type = 0
+applies_to_kind = 0
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_threat"), SubResource("c_wealth")])
+cooldown_ticks = 700
+priority = 40
+chance_per_tick = 0.06
+schism_kind = &"specialization"
+branch_archetype_id = &"mage_guild"
+inherited_member_fraction = Vector2(0.08, 0.2)
+ideology_drift_bias = {
+"centralization": -0.2,
+"secular_theocratic": -0.3,
+"tradition_reform": 0.5
+}
+min_parent_members = 40
+max_instances_of_archetype = 1
+branch_leadership_title = "大導師"
+chronicle_template = "{reason}に対し、{parent}の学徒たちは剣ではなく理を選び{branch}を開いた。"

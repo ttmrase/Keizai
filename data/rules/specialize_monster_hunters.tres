@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_threat"]
+script = ExtResource("2_cond")
+world_var_path = &"global_monster_threat_level"
+op = 0
+threshold = 0.32
+describe_as = "魔物の跋扈"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"specialize_monster_hunters"
+rule_type = 0
+applies_to_kind = 0
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_threat")])
+cooldown_ticks = 500
+priority = 50
+chance_per_tick = 0.09
+schism_kind = &"specialization"
+branch_archetype_id = &"monster_hunters_guild"
+inherited_member_fraction = Vector2(0.18, 0.4)
+ideology_drift_bias = {
+"centralization": 0.2,
+"militarism_pacifism": 0.55
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "団長"
+chronicle_template = "{reason}に耐えかね、{parent}の一部が武器を取り{branch}を興した。"

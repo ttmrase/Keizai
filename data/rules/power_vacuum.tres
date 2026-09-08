@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_legit"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.legitimacy"
+op = 1
+threshold = 0.45
+describe_as = "揺らぐ正当性"
+
+[sub_resource type="Resource" id="c_unrest"]
+script = ExtResource("2_cond")
+world_var_path = &"org.governed.avg_unrest"
+op = 0
+threshold = 0.42
+describe_as = "領内の騒擾"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"power_vacuum"
+rule_type = 3
+applies_to_kind = 3
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_legit"), SubResource("c_unrest")])
+cooldown_ticks = 400
+priority = 60
+chance_per_tick = 0.08
+chronicle_template = "{reason}により、{place}は{from}の手を離れ{to}に従った。"

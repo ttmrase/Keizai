@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"wildfire"
+display_name = "大火"
+duration_ticks = 12
+effects = {
+"wood": -0.85,
+"harvest": -0.2
+}
+envelope = 1
+chronicle_template = "{place}の森を{name}が焼き払った。"
+is_benevolent = false
+targeted = false

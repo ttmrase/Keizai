@@ -1,0 +1,17 @@
+# Godot 4+ engine cache and imported resources
+.godot/
+/android/
+export_presets.local.cfg
+
+# Build output
+build/
+*.apk
+*.aab
+
+# Signing material — never commit
+*.keystore
+*.jks
+
+# OS / editor noise
+.DS_Store
+Thumbs.db

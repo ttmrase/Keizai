@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="NameTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/name_template.gd" id="1_template"]
+
+[resource]
+script = ExtResource("1_template")
+applies_to_kind = 0
+archetype_filter = Array[StringName]([])
+name_pattern = "{place}の{noun}"
+description_pattern = "{adjective}{legitimacy}の組織。イデオロギー:{ideology}"
+branch_name_pattern = "{epithet}{noun}"
+branch_description_pattern = "{parent}より分かれた。イデオロギー:{ideology}"
+word_bank = {
+"epithet": ["新", "自由", "真", "鉄", "銀", "白", "黒", "暁の", "月影の"]
+}

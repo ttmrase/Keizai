@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv_seat"]
+script = ExtResource("2_driver")
+world_var_path = &"org.governed.avg_wealth"
+weight = 22.0
+expected_max = 2500.0
+invert = false
+label = "本拠の富"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"crown_house"
+display_label = "王家"
+drivers = Array[Resource]([SubResource("drv_seat")])
+max_score = 100.0
+base_score = 12.0
+membership_weight = 0.12
+monster_suppression_factor = 0.0
+default_leadership_title = "当主"
+noun_bank = Array[String](["家"])

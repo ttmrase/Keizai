@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"plague"
+display_name = "疫病"
+duration_ticks = 20
+effects = {
+"mortality": 1.6
+}
+envelope = 1
+chronicle_template = "{place}に{name}が広がり、多くの命が失われた。"
+is_benevolent = false
+targeted = false

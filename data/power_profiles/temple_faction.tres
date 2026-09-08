@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv_calamity"]
+script = ExtResource("2_driver")
+world_var_path = &"recent_disaster_pressure"
+weight = 46.0
+expected_max = 4.0
+invert = false
+label = "打ち続く災厄"
+
+[sub_resource type="Resource" id="drv_unrest"]
+script = ExtResource("2_driver")
+world_var_path = &"world.settlements.avg_unrest"
+weight = 20.0
+expected_max = 0.7
+invert = false
+label = "民の不安"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"temple_faction"
+display_label = "神殿派閥"
+drivers = Array[Resource]([SubResource("drv_calamity"), SubResource("drv_unrest")])
+max_score = 100.0
+base_score = 6.0
+membership_weight = 0.25
+monster_suppression_factor = 0.0
+default_leadership_title = "祭司長"
+noun_bank = Array[String](["神殿派", "聖堂教団", "祈りの会"])

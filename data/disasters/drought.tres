@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"drought"
+display_name = "干魃"
+duration_ticks = 28
+effects = {
+"harvest": -0.65
+}
+envelope = 0
+chronicle_template = "{place}を{name}が襲い、畑が干上がった。"
+is_benevolent = false
+targeted = false

@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_ore"]
+script = ExtResource("2_cond")
+world_var_path = &"global_ore"
+op = 0
+threshold = 1400.0
+describe_as = "あふれる鉱石"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"specialize_artisans"
+rule_type = 0
+applies_to_kind = 0
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_ore")])
+cooldown_ticks = 500
+priority = 45
+chance_per_tick = 0.08
+schism_kind = &"specialization"
+branch_archetype_id = &"artisans_guild"
+inherited_member_fraction = Vector2(0.2, 0.42)
+ideology_drift_bias = {
+"isolationism_commerce": 0.3,
+"tradition_reform": 0.2
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "親方"
+chronicle_template = "{reason}を前に、{parent}から鍛冶と細工の徒が離れ{branch}となった。"

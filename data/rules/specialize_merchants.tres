@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_wealth"]
+script = ExtResource("2_cond")
+world_var_path = &"global_wealth"
+op = 0
+threshold = 1800.0
+describe_as = "満ちる富"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"specialize_merchants"
+rule_type = 0
+applies_to_kind = 0
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_wealth")])
+cooldown_ticks = 500
+priority = 44
+chance_per_tick = 0.08
+schism_kind = &"specialization"
+branch_archetype_id = &"merchants_guild"
+inherited_member_fraction = Vector2(0.15, 0.38)
+ideology_drift_bias = {
+"isolationism_commerce": 0.6,
+"militarism_pacifism": -0.25
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "会頭"
+chronicle_template = "{reason}に目をつけ、{parent}から商いの者が分かれて{branch}を立てた。"

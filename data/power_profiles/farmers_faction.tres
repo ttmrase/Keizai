@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv_famine"]
+script = ExtResource("2_driver")
+world_var_path = &"global_harvest_modifier"
+weight = 42.0
+expected_max = 1.2
+invert = true
+label = "凶作"
+
+[sub_resource type="Resource" id="drv_unrest"]
+script = ExtResource("2_driver")
+world_var_path = &"world.settlements.avg_unrest"
+weight = 30.0
+expected_max = 0.7
+invert = false
+label = "農村の不満"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"farmers_faction"
+display_label = "農民派閥"
+drivers = Array[Resource]([SubResource("drv_famine"), SubResource("drv_unrest")])
+max_score = 100.0
+base_score = 5.0
+membership_weight = 0.3
+monster_suppression_factor = 0.0
+default_leadership_title = "肝煎"
+noun_bank = Array[String](["農民派", "農村同盟", "耕す者の集い"])

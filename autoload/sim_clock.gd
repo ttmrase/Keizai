@@ -1,0 +1,96 @@
+extends Node
+
+## Drives simulation time from wall-clock seconds, independent of frame rate.
+##
+## Uses _process with its own accumulator rather than _physics_process, and
+## never touches get_tree().paused — so a paused world still has a fully
+## interactive UI, which matters in a game where pausing is how you read the
+## chronicle and the family trees.
+
+var seconds_per_tick: float = SimConfig.DEFAULT_SECONDS_PER_TICK
+var time_scale: float = 0.0        # 0 = paused
+var current_tick: int = 0
+var running: bool = false
+
+var _accumulator: float = 0.0
+
+const SPEED_STEPS: Array[float] = [0.0, 1.0, 2.0, 4.0]
+
+
+func _process(delta: float) -> void:
+	if not running or time_scale <= 0.0:
+		return
+	_accumulator += delta * time_scale
+	var steps := 0
+	while _accumulator >= seconds_per_tick and steps < SimConfig.MAX_TICKS_PER_FRAME:
+		_accumulator -= seconds_per_tick
+		_advance_one_tick()
+		steps += 1
+	if steps >= SimConfig.MAX_TICKS_PER_FRAME:
+		# Too far behind to catch up; drop the backlog rather than compounding it.
+		_accumulator = 0.0
+
+
+func _advance_one_tick() -> void:
+	current_tick += 1
+	GameState.step_resources(current_tick)
+	Demography.step(current_tick)
+	if current_tick % SimConfig.POWER_RECALC_EPOCH_TICKS == 0:
+		PowerCalculator.recalculate_all(current_tick)
+		EventBus.power_recalculated.emit(current_tick)
+	if current_tick % SimConfig.IDEOLOGY_DRIFT_EPOCH_TICKS == 0:
+		PoliticalSystemGenerator.drift_all(current_tick)
+	RulesEngine.evaluate_tick(current_tick)
+	EventBus.tick_advanced.emit(current_tick)
+
+
+## Fast-forwards without waiting for real time. Used by the headless invariant
+## suite and the debug panel; never by normal play.
+func advance_n_ticks_instant(n: int) -> void:
+	for i in n:
+		_advance_one_tick()
+
+
+func set_time_scale(scale: float) -> void:
+	time_scale = maxf(0.0, scale)
+	_accumulator = 0.0
+	EventBus.speed_changed.emit(time_scale)
+
+
+func toggle_pause() -> void:
+	set_time_scale(0.0 if time_scale > 0.0 else 1.0)
+
+
+func is_paused() -> bool:
+	return time_scale <= 0.0
+
+
+func start(at_tick: int = 0) -> void:
+	current_tick = at_tick
+	_accumulator = 0.0
+	running = true
+
+
+func stop() -> void:
+	running = false
+	time_scale = 0.0
+
+
+func year() -> int:
+	return int(current_tick / SimConfig.TICKS_PER_YEAR)
+
+
+## Formats a tick as an in-world date for the chronicle.
+func format_tick(tick: int) -> String:
+	var seasons := ["春", "夏", "秋", "冬"]
+	var y := int(tick / SimConfig.TICKS_PER_YEAR)
+	var s: int = tick % SimConfig.TICKS_PER_YEAR
+	return "%d年%s" % [y, seasons[s]]
+
+
+func _notification(what: int) -> void:
+	# Android can kill a backgrounded app without any graceful-quit signal, so
+	# the pause notification is the last reliable moment to persist progress.
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if running:
+			SaveManager.autosave()

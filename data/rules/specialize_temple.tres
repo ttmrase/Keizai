@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_calamity"]
+script = ExtResource("2_cond")
+world_var_path = &"recent_disaster_pressure"
+op = 0
+threshold = 1.4
+describe_as = "打ち続く災厄"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"specialize_temple"
+rule_type = 0
+applies_to_kind = 2
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_calamity")])
+cooldown_ticks = 600
+priority = 48
+chance_per_tick = 0.1
+schism_kind = &"specialization"
+branch_archetype_id = &"temple_faction"
+inherited_member_fraction = Vector2(0.2, 0.45)
+ideology_drift_bias = {
+"secular_theocratic": 0.75,
+"tradition_reform": -0.3
+}
+min_parent_members = 60
+max_instances_of_archetype = 1
+branch_leadership_title = "祭司長"
+chronicle_template = "{reason}に人々は天を仰ぎ、{parent}から{branch}が生まれた。"

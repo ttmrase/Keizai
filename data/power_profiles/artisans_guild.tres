@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv_ore"]
+script = ExtResource("2_driver")
+world_var_path = &"global_ore"
+weight = 46.0
+expected_max = 6000.0
+invert = false
+label = "鉱石"
+
+[sub_resource type="Resource" id="drv_wood"]
+script = ExtResource("2_driver")
+world_var_path = &"global_wood"
+weight = 16.0
+expected_max = 6000.0
+invert = false
+label = "木材"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"artisans_guild"
+display_label = "職人ギルド"
+drivers = Array[Resource]([SubResource("drv_ore"), SubResource("drv_wood")])
+max_score = 100.0
+base_score = 5.0
+membership_weight = 0.25
+monster_suppression_factor = 0.0
+default_leadership_title = "親方"
+noun_bank = Array[String](["職人ギルド", "鍛冶組合", "工匠会"])

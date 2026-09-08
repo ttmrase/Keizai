@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"mineral_strike"
+display_name = "大鉱脈の発見"
+duration_ticks = 40
+effects = {
+"ore": 1.5
+}
+envelope = 0
+chronicle_template = "{place}で{name}があった。"
+is_benevolent = true
+targeted = false

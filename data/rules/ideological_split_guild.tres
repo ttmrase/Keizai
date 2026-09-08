@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_drift"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.ideology_drift"
+op = 0
+threshold = 0.28
+describe_as = "変わりゆく組合の気風"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"ideological_split_guild"
+rule_type = 0
+applies_to_kind = 0
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_drift")])
+cooldown_ticks = 900
+priority = 28
+chance_per_tick = 0.045
+schism_kind = &"ideological_split"
+branch_archetype_id = &""
+inherited_member_fraction = Vector2(0.2, 0.4)
+ideology_drift_bias = {
+"tradition_reform": -0.55
+}
+min_parent_members = 55
+max_instances_of_archetype = 0
+chronicle_template = "{reason}に古参が反発し、{parent}は{branch}と袂を分かった。"

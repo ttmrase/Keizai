@@ -1,0 +1,36 @@
+; Engine configuration file.
+; Generated for the Keizai project. See docs/DESIGN.md for architecture.
+
+config_version=5
+
+[application]
+
+config/name="Keizai"
+config/description="A god-game where you shape the environment and watch a civilization organize itself around it."
+run/main_scene="res://main/Main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+EventBus="*res://autoload/event_bus.gd"
+RngService="*res://autoload/rng_service.gd"
+GameState="*res://autoload/game_state.gd"
+HistoryLog="*res://autoload/history_log.gd"
+RulesEngine="*res://autoload/rules_engine.gd"
+GodPowerAPI="*res://autoload/god_power_api.gd"
+SaveManager="*res://autoload/save_manager.gd"
+SimClock="*res://autoload/sim_clock.gd"
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv_threat"]
+script = ExtResource("2_driver")
+world_var_path = &"global_monster_threat_level"
+weight = 58.0
+expected_max = 0.75
+invert = false
+label = "魔物の脅威"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"monster_hunters_guild"
+display_label = "討伐ギルド"
+drivers = Array[Resource]([SubResource("drv_threat")])
+max_score = 100.0
+base_score = 5.0
+membership_weight = 0.2
+monster_suppression_factor = 0.35
+default_leadership_title = "団長"
+noun_bank = Array[String](["討伐者ギルド", "魔物狩り組合", "討伐団"])

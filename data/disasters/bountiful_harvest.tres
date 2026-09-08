@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"bountiful_harvest"
+display_name = "豊穣"
+duration_ticks = 24
+effects = {
+"harvest": 0.8
+}
+envelope = 0
+chronicle_template = "{place}に{name}の年が訪れた。"
+is_benevolent = true
+targeted = false

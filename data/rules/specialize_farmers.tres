@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c_unrest"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.avg_unrest"
+op = 0
+threshold = 0.3
+describe_as = "農村の困窮"
+
+[sub_resource type="Resource" id="c_harvest"]
+script = ExtResource("2_cond")
+world_var_path = &"global_harvest_modifier"
+op = 1
+threshold = 0.85
+describe_as = "続く凶作"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"specialize_farmers"
+rule_type = 0
+applies_to_kind = 2
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c_unrest"), SubResource("c_harvest")])
+cooldown_ticks = 600
+priority = 47
+chance_per_tick = 0.1
+schism_kind = &"specialization"
+branch_archetype_id = &"farmers_faction"
+inherited_member_fraction = Vector2(0.25, 0.5)
+ideology_drift_bias = {
+"centralization": -0.45,
+"tradition_reform": 0.35
+}
+min_parent_members = 60
+max_instances_of_archetype = 1
+branch_leadership_title = "肝煎"
+chronicle_template = "{reason}のなか、{parent}から耕す者たちが{branch}としてまとまった。"

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DisasterDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/disaster_definition.gd" id="1_disaster"]
+
+[resource]
+script = ExtResource("1_disaster")
+definition_id = &"blessed_grove"
+display_name = "祝福の森"
+duration_ticks = 36
+effects = {
+"wood": 1.2
+}
+envelope = 0
+chronicle_template = "{place}の森が{name}となり、木々が豊かに茂った。"
+is_benevolent = true
+targeted = false
