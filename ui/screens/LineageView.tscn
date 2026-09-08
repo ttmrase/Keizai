@@ -1,0 +1,153 @@
+[gd_scene load_steps=5 format=3 uid="uid://bkeizailin001"]
+
+[ext_resource type="Script" path="res://ui/screens/lineage_view.gd" id="1_lineage"]
+[ext_resource type="Script" path="res://ui/lineage/lineage_graph_view.gd" id="2_graph"]
+
+[sub_resource type="StyleBoxFlat" id="panel_style"]
+bg_color = Color(0.117647, 0.105882, 0.086275, 0.97)
+border_width_top = 1
+border_color = Color(0.227451, 0.207843, 0.172549, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+
+[sub_resource type="StyleBoxFlat" id="results_style"]
+bg_color = Color(0.164706, 0.14902, 0.125490, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.227451, 0.207843, 0.172549, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="LineageView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lineage")
+
+[node name="Graph" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 104.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_graph")
+
+[node name="Top" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = -12.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_constants/separation = 6
+
+[node name="Modes" type="HBoxContainer" parent="Top"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Orgs" type="Button" parent="Top/Modes"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "組織の系譜"
+
+[node name="People" type="Button" parent="Top/Modes"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "人物の家系"
+
+[node name="SearchRow" type="HBoxContainer" parent="Top"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Search" type="LineEdit" parent="Top/SearchRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "探す"
+
+[node name="ToRoot" type="Button" parent="Top/SearchRow"]
+custom_minimum_size = Vector2(96, 44)
+layout_mode = 2
+text = "源流へ"
+
+[node name="FocusNote" type="Label" parent="Top"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
+theme_override_font_sizes/font_size = 14
+
+[node name="Results" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 12.0
+offset_top = 100.0
+offset_right = -12.0
+offset_bottom = 420.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("results_style")
+
+[node name="Scroll" type="ScrollContainer" parent="Results"]
+layout_mode = 2
+
+[node name="List" type="VBoxContainer" parent="Results/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Detail" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -250.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("panel_style")
+
+[node name="Margin" type="MarginContainer" parent="Detail"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="Rows" type="VBoxContainer" parent="Detail/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Detail/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
+theme_override_font_sizes/font_size = 23
+
+[node name="Scroll" type="ScrollContainer" parent="Detail/Margin/Rows"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Body" type="RichTextLabel" parent="Detail/Margin/Rows/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_colors/default_color = Color(0.909804, 0.878431, 0.815686, 1)
+theme_override_font_sizes/normal_font_size = 18

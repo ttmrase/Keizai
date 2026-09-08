@@ -1,0 +1,66 @@
+[gd_scene load_steps=2 format=3 uid="uid://bkeizaigod001"]
+
+[ext_resource type="Script" path="res://ui/screens/god_power_panel.gd" id="1_god"]
+
+[node name="GodPowerPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_god")
+
+[node name="Scroll" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = -16.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+
+[node name="Rows" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 14
+
+[node name="DialsTitle" type="Label" parent="Scroll/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
+theme_override_font_sizes/font_size = 22
+text = "世界の理"
+
+[node name="Dials" type="VBoxContainer" parent="Scroll/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="DisastersTitle" type="Label" parent="Scroll/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
+theme_override_font_sizes/font_size = 22
+text = "災厄と恵み"
+
+[node name="Disasters" type="GridContainer" parent="Scroll/Rows"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="Note" type="Label" parent="Scroll/Rows"]
+layout_mode = 2
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.415686, 0.388235, 0.341176, 1)
+theme_override_font_sizes/font_size = 15
+text = "神が触れられるのは世界だけであり、人の営みではない。誰が王となり、どの組織が興り、どこで袂を分かつかは、すべて人の側が決める。"
+
+[node name="Confirm" type="ConfirmationDialog" parent="."]
+title = "確認"
+initial_position = 2
+size = Vector2i(420, 200)
+ok_button_text = "行う"
+cancel_button_text = "やめる"

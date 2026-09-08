@@ -12,7 +12,7 @@ extends RefCounted
 ## single origin, and it is also the point of the game: the player never founds
 ## anything, they only make the world that makes founding necessary.
 
-const SETTLEMENT_COUNT := 5
+const SETTLEMENT_COUNT := 8
 
 const ROOT_GUILD := &"founders_guild"
 const ROOT_HOUSE := &"crown_house"
@@ -56,8 +56,28 @@ static func _create_settlements() -> void:
 		s.local_ore = rng.randf_range(20.0, 90.0)
 		s.local_wood = rng.randf_range(20.0, 90.0)
 		s.wealth = rng.randf_range(60.0, 180.0)
-		s.position = Vector2(rng.randf_range(0.12, 0.88), rng.randf_range(0.14, 0.86))
+		s.position = _spread_position(rng)
 		GameState.world.settlements[s.id] = s
+
+
+## Rejection-samples a spot away from the settlements already placed, so the map
+## does not end up with two towns drawn on top of each other.
+static func _spread_position(rng: RandomNumberGenerator) -> Vector2:
+	var best := Vector2.ZERO
+	var best_clearance := -1.0
+	for attempt in 24:
+		var candidate := Vector2(rng.randf_range(0.10, 0.90), rng.randf_range(0.08, 0.92))
+		var clearance := INF
+		for id in GameState.world.settlements:
+			clearance = minf(clearance, candidate.distance_to(GameState.world.settlements[id].position))
+		if clearance == INF:
+			return candidate
+		if clearance > best_clearance:
+			best_clearance = clearance
+			best = candidate
+		if clearance > 0.24:
+			return candidate
+	return best
 
 
 static func _create_house() -> StringName:

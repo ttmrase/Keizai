@@ -7,7 +7,9 @@ extends Spec
 const UI_DIR := "res://ui"
 
 ## Writes that would let the interface reach past the boundary and set an outcome
-## directly instead of letting the simulation reach it.
+## directly instead of letting the simulation reach it. Screens may read anything
+## they need to display; what they may not do is change it, so these target
+## mutation specifically rather than any mention of a political field.
 const FORBIDDEN := [
 	"HistoryLog.record(",
 	"HistoryLog.emit_event(",
@@ -15,11 +17,16 @@ const FORBIDDEN := [
 	".power_score =",
 	".member_count =",
 	".legitimacy =",
-	".ideology.",
+	".dissolved_tick =",
+	".ideology =",
+	".set_axis(",
+	".nudge_axis(",
 	"GameState.apply(",
 	"RulesEngine.",
 	"SchismResolver.",
 	"SuccessionResolver.",
+	"Demography.",
+	"WorldGenerator.generate(",
 ]
 
 ## Anything on GodPowerAPI naming one of these would be a way to command society

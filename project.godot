@@ -22,6 +22,10 @@ GodPowerAPI="*res://autoload/god_power_api.gd"
 SaveManager="*res://autoload/save_manager.gd"
 SimClock="*res://autoload/sim_clock.gd"
 
+[gui]
+
+theme/custom_font="res://assets/fonts/NotoSansJP-Regular.ttf"
+
 [display]
 
 window/size/viewport_width=720
