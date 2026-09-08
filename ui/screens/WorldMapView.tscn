@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://ui/widgets/pannable_canvas.gd" id="2_canvas"]
 
 [sub_resource type="StyleBoxFlat" id="panel_style"]
-bg_color = Color(0.117647, 0.105882, 0.086275, 0.96)
+bg_color = Color(0.117647, 0.105882, 0.086275, 1)
 border_width_top = 1
 border_color = Color(0.227451, 0.207843, 0.172549, 1)
 corner_radius_top_left = 10

@@ -4,14 +4,14 @@
 [ext_resource type="Script" path="res://ui/lineage/lineage_graph_view.gd" id="2_graph"]
 
 [sub_resource type="StyleBoxFlat" id="panel_style"]
-bg_color = Color(0.117647, 0.105882, 0.086275, 0.97)
+bg_color = Color(0.117647, 0.105882, 0.086275, 1)
 border_width_top = 1
 border_color = Color(0.227451, 0.207843, 0.172549, 1)
 corner_radius_top_left = 10
 corner_radius_top_right = 10
 
 [sub_resource type="StyleBoxFlat" id="results_style"]
-bg_color = Color(0.164706, 0.14902, 0.125490, 0.98)
+bg_color = Color(0.164706, 0.14902, 0.125490, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1

@@ -118,24 +118,31 @@ func _on_tapped(world_position: Vector2) -> void:
 		return
 	_selected_id = closest
 	_show_detail(closest)
-	_keep_selection_clear_of_detail(closest)
 	_canvas.queue_redraw()
+	_keep_selection_clear_of_detail(closest)
 
 
 ## The detail sheet covers the bottom of the screen, so a settlement tapped down
 ## there would disappear behind the panel describing it.
+##
+## The sheet's height is only true after the frame in which its text was set —
+## asked in the same frame it reports the height of the unwrapped text, which on
+## the first tap was 2991px against a 1120px screen and scrolled the entire map
+## out of view. So: wait for the layout, then never believe more than half the
+## screen is covered.
 func _keep_selection_clear_of_detail(id: StringName) -> void:
 	var s: SettlementState = GameState.world.settlements.get(id)
 	if s == null:
 		return
-	# Before the first layout pass the canvas has no size, and "below the panel"
-	# would then mean everything — which scrolls the whole map out of view.
-	if _canvas.size.y < 1.0:
+	await get_tree().process_frame
+	if _selected_id != id or _canvas.size.y < 1.0:
 		return
 	var screen_y := _canvas.to_screen(s.position * MAP_SIZE).y
-	var panel_top: float = _canvas.size.y - _detail.size.y - 40.0
+	var panel_top: float = maxf(_canvas.size.y * 0.5,
+		_canvas.size.y - _detail.size.y - 40.0)
 	if screen_y > panel_top:
 		_canvas.view_offset.y -= screen_y - panel_top
+		_canvas.queue_redraw()
 
 
 func _show_detail(id: StringName) -> void:
