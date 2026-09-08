@@ -54,13 +54,32 @@ static func _settle_membership(active: Array[Organization], tick: int) -> void:
 	for org in active:
 		power_by_kind[org.kind] = float(power_by_kind.get(org.kind, 0.0)) + maxf(1.0, org.power_score)
 
-	for org in active:
-		var share: float = maxf(1.0, org.power_score) / maxf(1.0, float(power_by_kind[org.kind]))
-		var target: float = population * float(SimConfig.MEMBERSHIP_SHARE.get(org.kind, 0.05)) * share
-		var step: float = maxf(1.0, target * SimConfig.MEMBERSHIP_ADJUST_FRACTION)
-		org.member_count = int(move_toward(float(org.member_count), target, step))
+	# One pass over the population, rather than one per house.
+	var living_by_house := {}
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		if p.is_alive() and p.house_org_id != &"":
+			living_by_house[p.house_org_id] = int(living_by_house.get(p.house_org_id, 0)) + 1
 
-		if org.member_count < SimConfig.ORG_DISSOLVE_MEMBERS and not org.is_root():
+	for org in active:
+		if org.kind == Organization.OrgKind.HOUSE:
+			# A house is not a share of the population — it is a family, and its
+			# size is however many of it are currently alive. That is also what
+			# makes a house able to die out, which a share-based figure never could.
+			org.member_count = int(living_by_house.get(org.org_id, 0))
+		else:
+			var share: float = maxf(1.0, org.power_score) / maxf(1.0, float(power_by_kind[org.kind]))
+			var target: float = population * float(SimConfig.MEMBERSHIP_SHARE.get(org.kind, 0.05)) * share
+			var step: float = maxf(1.0, target * SimConfig.MEMBERSHIP_ADJUST_FRACTION)
+			org.member_count = int(move_toward(float(org.member_count), target, step))
+
+		# A house ends when the last of its blood does — even the first house in
+		# the world, which is why this is the one dissolution a root is not spared.
+		# Its record stays in the lineage tree; it simply has no more members.
+		var floor_size: int = 1 if org.kind == Organization.OrgKind.HOUSE \
+			else SimConfig.ORG_DISSOLVE_MEMBERS
+		var may_dissolve: bool = not org.is_root() or org.kind == Organization.OrgKind.HOUSE
+		if org.member_count < floor_size and may_dissolve:
 			HistoryLog.emit_event(
 				HistoryEvent.EventType.DISSOLVED,
 				tick,

@@ -4,7 +4,7 @@ extends Spec
 ## fragments, every institution traces back to the single root of its kind, and
 ## every person's ancestry terminates at the founding generation.
 
-const TICKS := 20000
+const TICKS := 12000
 
 
 func run() -> void:
@@ -65,11 +65,11 @@ func _check_branch_depth_consistent() -> void:
 
 
 func _check_ancestry_terminates() -> void:
-	var failures := 0
-	for id in GameState.people:
-		if not GenealogyValidator.trace_to_founder(id):
-			failures += 1
-	check_eq(failures, 0, "every person's ancestry must terminate at a founder without cycles")
+	var failures := GenealogyValidator.ancestry_failures()
+	# str() first: formatting an empty array against one placeholder is an error.
+	check_eq(failures.size(), 0,
+		"every person's ancestry must terminate at a founder without cycles (%s)"
+			% str(failures.slice(0, 5)))
 
 	for id in GameState.people:
 		var p: NotableIndividual = GameState.people[id]

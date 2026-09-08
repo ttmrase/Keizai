@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.legitimacy_basis"
+op = 2
+threshold = 2.0
+threshold_high = 2.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"meritocratic_state"
+display_name = "実力主義国家"
+description = "家柄ではなく登用された才が官を占める。"
+conditions = Array[Resource]([SubResource("c0")])
+priority = 50
+ruler_title = "執政"
+local_ruler_title = "代官"
+council_label = "登用院"

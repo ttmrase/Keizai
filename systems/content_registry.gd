@@ -11,11 +11,13 @@ const DISASTER_DIR := "res://data/disasters"
 const POWER_PROFILE_DIR := "res://data/power_profiles"
 const NAME_TEMPLATE_DIR := "res://data/name_templates"
 const RULE_DIR := "res://data/rules"
+const POLITY_FORM_DIR := "res://data/polity_forms"
 
 static var _disasters: Dictionary[StringName, DisasterDefinition] = {}
 static var _power_profiles: Dictionary[StringName, PowerProfile] = {}
 static var _name_templates: Array[NameTemplate] = []
 static var _rules: Array[TriggerRule] = []
+static var _polity_forms: Array[PolityForm] = []
 static var _loaded := false
 
 
@@ -39,7 +41,12 @@ static func ensure_loaded() -> void:
 		var r := res as TriggerRule
 		if r != null:
 			_rules.append(r)
+	for res in _load_dir(POLITY_FORM_DIR):
+		var f := res as PolityForm
+		if f != null:
+			_polity_forms.append(f)
 	_rules.sort_custom(func(a, b): return a.priority > b.priority)
+	_polity_forms.sort_custom(func(a, b): return a.priority > b.priority)
 
 
 static func reload() -> void:
@@ -47,6 +54,7 @@ static func reload() -> void:
 	_power_profiles.clear()
 	_name_templates.clear()
 	_rules.clear()
+	_polity_forms.clear()
 	_loaded = false
 	ensure_loaded()
 
@@ -83,6 +91,19 @@ static func name_templates() -> Array[NameTemplate]:
 static func rules() -> Array[TriggerRule]:
 	ensure_loaded()
 	return _rules
+
+
+static func polity_forms() -> Array[PolityForm]:
+	ensure_loaded()
+	return _polity_forms
+
+
+static func get_polity_form(form_id: StringName) -> PolityForm:
+	ensure_loaded()
+	for f in _polity_forms:
+		if f.form_id == form_id:
+			return f
+	return null
 
 
 static func _load_dir(path: String) -> Array:

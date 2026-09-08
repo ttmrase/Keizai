@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.legitimacy_basis"
+op = 2
+threshold = 1.0
+threshold_high = 1.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"elective_monarchy"
+display_name = "選挙王政"
+description = "王冠は世襲されず、有力者の投票で次の頭に渡る。"
+conditions = Array[Resource]([SubResource("c0")])
+priority = 55
+ruler_title = "国王"
+local_ruler_title = "領伯"
+council_label = "選定侯会議"

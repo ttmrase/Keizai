@@ -94,6 +94,31 @@ static func drift_all(tick: int) -> void:
 		org.ideology.nudge_axis(&"secular_theocratic", faith * 2.0 - 0.7, rate)
 		# Hardship discredits the old way of doing things.
 		org.ideology.nudge_axis(&"tradition_reform", (scarcity + unrest) - 0.75, rate * 0.8)
+		_drift_toward_character(org, rate)
+
+
+## How far an institution's own character can pull it away from what the world
+## is pushing everyone toward.
+const CHARACTER_STRENGTH := 0.62
+
+
+## Every institution feels the same world. Pulled only by that, they all converge
+## on the same position and stay there, and two houses under identical
+## circumstances never find anything to disagree about. Each therefore has a
+## fixed character of its own — derived from its identity, so it is stable for
+## the life of the organization and survives save and reload — that it drifts
+## toward alongside the common pull.
+static func _drift_toward_character(org: Organization, rate: float) -> void:
+	for a in PoliticalSystemAxes.AXIS_NAMES:
+		var bias := character_bias(org.org_id, a)
+		org.ideology.nudge_axis(a, bias * CHARACTER_STRENGTH, rate * 0.7)
+
+
+## A stable value in -1..1 for this organization and axis. Derived rather than
+## stored: it must be identical on every replay of the same world.
+static func character_bias(org_id: StringName, axis: StringName) -> float:
+	var h := absi(hash(str(org_id, ":", axis)))
+	return float(h % 2001) / 1000.0 - 1.0
 
 
 ## Chooses a legitimacy basis that fits an archetype's character. Used when a
@@ -253,10 +278,7 @@ static func _archetype_noun(org: Organization, rng: RandomNumberGenerator) -> St
 
 static func _founder_given_name(org: Organization) -> String:
 	var leader := GameState.get_person(org.leader_person_id)
-	if leader == null:
-		return ""
-	var parts := leader.full_name.split("・")
-	return parts[parts.size() - 1]
+	return leader.given_name if leader != null else ""
 
 
 static func _seat_name(org: Organization) -> String:

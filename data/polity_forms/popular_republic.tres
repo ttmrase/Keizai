@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.decision_structure"
+op = 2
+threshold = 2.0
+threshold_high = 2.0
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.legitimacy_basis"
+op = 0
+threshold = 0.5
+threshold_high = 6.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"popular_republic"
+display_name = "民衆共和国"
+description = "統治者は民に選ばれ、任期とともに去る。"
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+priority = 65
+ruler_title = "統領"
+local_ruler_title = "市長"
+council_label = "民会"

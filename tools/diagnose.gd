@@ -22,9 +22,13 @@ func _ready() -> void:
 
 	print("\n=== after %d ticks (%d年) ===" % [SimClock.current_tick, SimClock.year()])
 	_print_world_numbers()
+	_print_government()
+	_print_regions()
 	_print_org_tree()
+	_print_house_relations()
 	_print_power_table()
 	_print_chronicle_highlights()
+	_print_people_census()
 	_print_family_tree()
 	_print_invariants()
 
@@ -79,10 +83,15 @@ func _print_phase_summary() -> void:
 	var leader := "なし"
 	if not top.is_empty():
 		leader = "%s (%.0f)" % [top[0].display_name, top[0].power_score]
-	print("  %d年: 人口%.0f 魔物脅威%.2f 不満%.2f 収穫%.2f | 最有力: %s | 組織数%d"
+	var adults := 0
+	for p in GameState.living_people():
+		if p.is_adult(SimClock.current_tick):
+			adults += 1
+	print("  %d年: 人口%.0f 魔物脅威%.2f 不満%.2f 収穫%.2f | 最有力: %s | 組織数%d | 名士%d名(成人%d)"
 		% [SimClock.year(), w.global_population, w.global_monster_threat_level,
 			w.global_unrest, w.global_harvest_modifier, leader,
-			GameState.active_organizations().size()])
+			GameState.active_organizations().size(),
+			GameState.living_people().size(), adults])
 
 
 func _print_world_opening() -> void:
@@ -205,12 +214,72 @@ func _print_invariants() -> void:
 		else:
 			org_bad += 1
 			print("  !! %s の系譜が根に到達しない" % org.display_name)
-	var people_ok := 0
-	var people_bad := 0
-	for id in GameState.people:
-		if GenealogyValidator.trace_to_founder(id):
-			people_ok += 1
-		else:
-			people_bad += 1
+	var people_bad := GenealogyValidator.ancestry_failures().size()
+	var people_ok := GameState.people.size() - people_bad
 	print("  組織の系譜: %d件が根に到達 / %d件が不正" % [org_ok, org_bad])
 	print("  人物の家系: %d件が始祖に到達 / %d件が不正" % [people_ok, people_bad])
+
+
+func _print_people_census() -> void:
+	var living := GameState.living_people().size()
+	var leaderless := 0
+	for org in GameState.active_organizations():
+		if GameState.get_current_leader(org.org_id) == null:
+			leaderless += 1
+	var adults := 0
+	var free_adults := 0
+	for p in GameState.living_people():
+		if p.is_adult(SimClock.current_tick):
+			adults += 1
+			if p.current_tenure() == null:
+				free_adults += 1
+	print("\n--- 人物 ---")
+	print("  存命 %d名 / 成人 %d名 / 無役の成人 %d名 / 指導者不在の組織 %d"
+		% [living, adults, free_adults, leaderless])
+
+
+func _print_government() -> void:
+	print("\n--- 統治のかたち ---")
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		var form := PolityFormEvaluator.form_of(polity)
+		var ruler := GameState.get_current_leader(polity.org_id)
+		print("  %s … %s" % [polity.display_name, form.display_name if form != null else "不明"])
+		print("      %s" % (form.description if form != null else ""))
+		print("      %s: %s / %s / 領地%d"
+			% [polity.leadership_title,
+				ruler.full_name if ruler != null else "空位",
+				form.council_label if form != null else "",
+				polity.governs_settlement_ids.size()])
+
+
+func _print_regions() -> void:
+	print("\n--- 地域 ---")
+	for id in GameState.world.settlements:
+		var s: SettlementState = GameState.world.settlements[id]
+		var guild := GameState.get_organization(s.dominant_guild_id)
+		var lord := RegionalStanding.local_ruler(id)
+		var lord_text := "領主不在"
+		if not lord.is_empty():
+			var person: NotableIndividual = lord.get("person")
+			lord_text = "%s %s(%s)" % [lord.get("title", ""),
+				person.full_name if person != null else "空位",
+				lord["house"].display_name]
+		print("  %-10s %-6s 人口%-6d %-18s %s"
+			% [s.display_name, Industry.label(s.industry), int(s.population),
+				guild.display_name if guild != null else "ギルドなし", lord_text])
+
+
+func _print_house_relations() -> void:
+	print("\n--- 家同士の関係 ---")
+	var houses := GameState.organizations_of_kind(Organization.OrgKind.HOUSE)
+	for a in houses:
+		var parts: Array[String] = []
+		for b in houses:
+			if a.org_id == b.org_id:
+				continue
+			var value := HouseRelations.relation(a.org_id, b.org_id)
+			if absf(value) < 0.18:
+				continue
+			parts.append("%s:%s(%+.2f)" % [b.display_name, HouseRelations.describe(value), value])
+		if not parts.is_empty():
+			print("  %-10s %s" % [a.display_name, "  ".join(parts)])

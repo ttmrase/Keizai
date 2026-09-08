@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"power_share.guild"
+op = 0
+threshold = 0.45
+threshold_high = 1.0
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.decision_structure"
+op = 2
+threshold = 1.0
+threshold_high = 1.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"guild_council"
+display_name = "職能評議国"
+description = "諸ギルドの評議が国政を担い、腕と実績が発言力になる。"
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+priority = 75
+ruler_title = "議長"
+local_ruler_title = "組合頭"
+council_label = "職能評議会"

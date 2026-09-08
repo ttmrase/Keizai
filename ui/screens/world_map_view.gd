@@ -10,8 +10,10 @@ const MAP_SIZE := Vector2(1000, 1450)
 @onready var _detail: PanelContainer = $Detail
 @onready var _detail_title: Label = $Detail/Margin/Rows/Title
 @onready var _detail_body: RichTextLabel = $Detail/Margin/Rows/Body
+@onready var _rename_button: Button = $Detail/Margin/Rows/Rename
 
 var _selected_id: StringName = &""
+var _rename_dialog: RenameDialog
 
 
 func _ready() -> void:
@@ -21,8 +23,20 @@ func _ready() -> void:
 	EventBus.game_loaded.connect(_refresh)
 	EventBus.world_reset.connect(_refresh)
 	_detail.visible = false
+
+	_rename_dialog = RenameDialog.new()
+	add_child(_rename_dialog)
+	_rename_dialog.name_applied.connect(func(_id): _refresh())
+	_rename_button.pressed.connect(_on_rename_pressed)
+
 	await get_tree().process_frame
 	_frame_world()
+
+
+func _on_rename_pressed() -> void:
+	var s: SettlementState = GameState.world.settlements.get(_selected_id)
+	if s != null:
+		_rename_dialog.open_for_settlement(_selected_id, s.display_name)
 
 
 func on_shown() -> void:
@@ -114,6 +128,10 @@ func _keep_selection_clear_of_detail(id: StringName) -> void:
 	var s: SettlementState = GameState.world.settlements.get(id)
 	if s == null:
 		return
+	# Before the first layout pass the canvas has no size, and "below the panel"
+	# would then mean everything — which scrolls the whole map out of view.
+	if _canvas.size.y < 1.0:
+		return
 	var screen_y := _canvas.to_screen(s.position * MAP_SIZE).y
 	var panel_top: float = _canvas.size.y - _detail.size.y - 40.0
 	if screen_y > panel_top:
@@ -126,18 +144,34 @@ func _show_detail(id: StringName) -> void:
 		_detail.visible = false
 		return
 	var holder := GameState.get_organization(s.controlling_org_id)
-	var holder_name := holder.display_name if holder != null else "支配者なし"
-	var leader := GameState.get_current_leader(s.controlling_org_id)
+	var guild := GameState.get_organization(s.dominant_guild_id)
+	var lord := RegionalStanding.local_ruler(id)
 
 	_detail_title.text = s.display_name
 	var lines := [
-		"[color=#9a9080]統治[/color]  %s" % holder_name,
-		"[color=#9a9080]為政者[/color]  %s" % (leader.full_name if leader != null else "不在"),
-		"[color=#9a9080]人口[/color]  %d　[color=#9a9080]富[/color]  %d" % [int(s.population), int(s.wealth)],
-		"[color=#9a9080]食料[/color]  %d%s" % [int(s.food_stock),
-			"　[color=#c85a4a]飢饉[/color]" if s.starving else ""],
-		"[color=#9a9080]鉱石[/color]  %d　[color=#9a9080]木材[/color]  %d" % [int(s.local_ore), int(s.local_wood)],
-		"[color=#9a9080]不満[/color]  %d%%" % int(s.unrest * 100.0),
+		"[color=#9a9080]産業[/color]  %s　%s"
+			% [Industry.label(s.industry), Industry.description(s.industry)],
+		"[color=#9a9080]主なギルド[/color]  %s" % (guild.display_name if guild != null else "なし"),
 	]
+
+	# Who holds this place locally, under whatever the realm currently calls them.
+	if lord.is_empty():
+		lines.append("[color=#9a9080]領主[/color]  不在")
+	else:
+		var person: NotableIndividual = lord.get("person")
+		lines.append("[color=#9a9080]%s[/color]  %s（%s）"
+			% [lord.get("title", "領主"),
+				person.full_name if person != null else "空位",
+				lord["house"].display_name])
+	lines.append("[color=#9a9080]属する国[/color]  %s"
+		% (holder.display_name if holder != null else "なし"))
+	lines.append("[color=#9a9080]人口[/color]  %d　[color=#9a9080]富[/color]  %d"
+		% [int(s.population), int(s.wealth)])
+	lines.append("[color=#9a9080]食料[/color]  %d%s" % [int(s.food_stock),
+		"　[color=#c85a4a]飢饉[/color]" if s.starving else ""])
+	lines.append("[color=#9a9080]鉱石[/color]  %d　[color=#9a9080]木材[/color]  %d"
+		% [int(s.local_ore), int(s.local_wood)])
+	lines.append("[color=#9a9080]不満[/color]  %d%%" % int(s.unrest * 100.0))
+
 	_detail_body.text = "\n".join(lines)
 	_detail.visible = true

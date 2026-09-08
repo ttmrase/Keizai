@@ -9,11 +9,17 @@ extends Resource
 ## at someone flagged `is_founder_generation`.
 
 @export var person_id: StringName = &""
-@export var full_name: String = ""
-## Inherited surname. Members of a house take the house's name; commoner lines
-## (guild masters, faction leaders) carry their own and pass it down the same way.
+## The given name is the person's own and never changes. The surname is the
+## house's, so it changes with the house — on renaming, and when a cadet branch
+## takes a name of its own.
+@export var given_name: String = ""
 @export var family_name: String = ""
 @export var sex: String = "f"          # "f" / "m"
+
+## Cached "surname・given". Rebuilt whenever the surname changes.
+var full_name: String:
+	get:
+		return "%s・%s" % [family_name, given_name] if family_name != "" else given_name
 
 @export var birth_tick: int = 0
 @export var birth_event_id: StringName = &""
@@ -71,7 +77,7 @@ func to_dict() -> Dictionary:
 		roles.append(r.to_dict())
 	var d := {
 		"person_id": String(person_id),
-		"full_name": full_name,
+		"given_name": given_name,
 		"family_name": family_name,
 		"sex": sex,
 		"birth_tick": birth_tick,
@@ -97,7 +103,7 @@ func to_dict() -> Dictionary:
 static func from_dict(d: Dictionary) -> NotableIndividual:
 	var p := NotableIndividual.new()
 	p.person_id = StringName(d.get("person_id", ""))
-	p.full_name = d.get("full_name", "")
+	p.given_name = d.get("given_name", "")
 	p.family_name = d.get("family_name", "")
 	p.sex = d.get("sex", "f")
 	p.birth_tick = int(d.get("birth_tick", 0))

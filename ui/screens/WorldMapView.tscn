@@ -20,6 +20,7 @@ grow_vertical = 2
 script = ExtResource("1_map")
 
 [node name="Canvas" type="Control" parent="."]
+clip_contents = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -34,7 +35,7 @@ anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -196.0
+offset_top = -318.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("panel_style")
@@ -55,6 +56,13 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
 theme_override_font_sizes/font_size = 24
 text = "集落"
+
+[node name="Rename" type="Button" parent="Detail/Margin/Rows"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "地名を改める"
 
 [node name="Body" type="RichTextLabel" parent="Detail/Margin/Rows"]
 layout_mode = 2

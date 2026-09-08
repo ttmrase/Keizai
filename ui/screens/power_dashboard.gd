@@ -74,11 +74,70 @@ func _rebuild() -> void:
 		_list.add_child(empty)
 		return
 
+	# The balance below is what produces the form of government above it, so the
+	# two belong on the same screen.
+	if _filter < 0:
+		for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+			_list.add_child(_government_banner(polity))
+
 	var strongest: float = maxf(1.0, ranked[0].power_score)
 	for org in ranked:
 		_list.add_child(_row(org, strongest))
 		if org.org_id == _expanded:
 			_list.add_child(_breakdown(org))
+
+
+## What this country currently is, in its own words — read off the balance of
+## power rather than set anywhere.
+func _government_banner(polity: Organization) -> Control:
+	var form := PolityFormEvaluator.form_of(polity)
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Palette.PANEL_RAISED
+	style.border_color = Palette.POLITY
+	style.border_width_left = 4
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", style)
+
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 4)
+	panel.add_child(rows)
+
+	var heading := Label.new()
+	heading.text = "%s　—　%s" % [polity.display_name,
+		form.display_name if form != null else "統治のかたち不明"]
+	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_theme_font_size_override("font_size", 21)
+	heading.add_theme_color_override("font_color", Palette.ACCENT)
+	rows.add_child(heading)
+
+	if form != null:
+		var blurb := Label.new()
+		blurb.text = form.description
+		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		blurb.add_theme_font_size_override("font_size", 16)
+		blurb.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		rows.add_child(blurb)
+
+	var ruler := GameState.get_current_leader(polity.org_id)
+	var line := Label.new()
+	line.text = "%s %s　／　%s　／　領地 %d" % [
+		polity.leadership_title,
+		ruler.full_name if ruler != null else "空位",
+		form.council_label if form != null else "",
+		polity.governs_settlement_ids.size()]
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	line.add_theme_font_size_override("font_size", 17)
+	line.add_theme_color_override("font_color", Palette.TEXT)
+	rows.add_child(line)
+	return panel
 
 
 func _row(org: Organization, strongest: float) -> Control:

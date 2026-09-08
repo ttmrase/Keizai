@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"dominant_archetype.temple_faction"
+op = 0
+threshold = 0.5
+threshold_high = 1.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"theocracy"
+display_name = "神権国家"
+description = "神殿が国の背骨となり、統治の正当性は信仰から降りてくる。"
+conditions = Array[Resource]([SubResource("c0")])
+priority = 100
+ruler_title = "教皇"
+local_ruler_title = "大司祭"
+council_label = "神殿会議"

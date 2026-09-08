@@ -24,6 +24,10 @@ const FOOD_CONSUMPTION_PER_CAPITA := 0.060
 const ORE_USE_PER_CAPITA := 0.008
 const WOOD_USE_PER_CAPITA := 0.011
 const STOCK_SPOILAGE := 0.010
+## How much of the realm's spare food is moved to where it is needed each tick,
+## and how much of it survives the journey.
+const FOOD_SHARING_FRACTION := 0.35
+const FOOD_TRANSPORT_EFFICIENCY := 0.85
 const WEALTH_PER_ORE := 0.35
 const WEALTH_PER_WOOD := 0.20
 const WEALTH_DECAY := 0.004
@@ -82,6 +86,9 @@ const ORG_DISSOLVE_MEMBERS := 3
 ## a ceiling, drift-driven schisms compound into a crowd of indistinguishable
 ## splinters and the lineage tree stops being readable.
 const MAX_ACTIVE_ORGS_PER_KIND := 7
+
+## Longest name the player may give a place or an institution.
+const MAX_NAME_LENGTH := 24
 
 # --- History log / saves ---
 const HISTORY_SEGMENT_EVENT_CAP := 5000

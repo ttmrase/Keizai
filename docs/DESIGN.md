@@ -464,3 +464,68 @@ verify (debug 32MB, release 30MB, arm64-v8a, no permissions requested, min SDK
 24 / target SDK 36), and every screen was rendered and inspected under a virtual
 display. But no Android device or emulator was available, so touch feel, pinch
 gestures, resume-from-background and on-device load times remain unchecked.
+
+---
+
+## Second iteration: houses as the substrate
+
+A round of changes after the first build, in response to the parts of the world
+that did not yet mean anything.
+
+**People come only from houses.** Previously, when a guild needed a master and
+nobody suitable was alive, one was invented — flagged founding-generation so the
+ancestry walk still terminated. That kept the invariant but hollowed out the
+family tree: half the cast had no relations. Now the world begins with one house
+per region and *nothing* creates a person afterwards. Every guild master, every
+monarch, is somebody's child. A house that stops producing heirs dies out, and
+what it held is taken over by whoever is standing.
+
+This made the demographic model load-bearing in a way it had not been, and three
+things had to change before the world could survive its own history: widows could
+never remarry, which alone was enough to extinguish the entire notable population
+within four centuries; the crowding cap only ever pushed fertility down, so a bad
+century had no recovery; and famine reached the great houses as hard as it
+reached the fields. Marriage after widowhood, a fertility floor that rises as the
+houses thin, and a ceiling on how far catastrophe can raise notable mortality
+between them keep the cast stable around fifty to a hundred and fifty people
+without anyone being conjured up.
+
+**A surname is a house's name, not a person's.** `given_name` is stored;
+`family_name` mirrors whichever house the person currently belongs to. A bride
+joins her husband's house and takes its name — unless she heads a house herself,
+in which case he marries in, which is how a house with no sons survives. A cadet
+branch takes its founder's line with it, and they take the new name, so a 分家 is
+legible in the family tree without reading the edges. Renaming a house renames
+every living member.
+
+**Regions have industry.** Each has one of mining, forestry, farming, trade or
+frontier work, which bends what it produces and decides which guild has a claim
+there — a mining valley lifts the artisans and ignores the farmers. Since
+production is now lopsided, the realm shares food between the regions it governs;
+without that, any region whose industry is not food starves to the floor and
+stays there, which is eight unrelated villages rather than a country.
+
+**The form of government is derived, not set.** Factions and political systems
+were each legible on their own but did not add up to anything. Now the balance
+between houses, guilds and factions is read every epoch against the forms in
+`data/polity_forms/` and produces one: a dominant temple faction makes a
+theocracy, a merchants' guild with an assembly makes a merchant republic, houses
+holding their own land make a feudal kingdom. The form decides what the head of
+state is called and what a house head holding a region is called — count,
+high priest, mayor. Nobody declares any of it; the country simply becomes
+something else, and the chronicle notes that it has.
+
+**Houses regard each other.** Standing between two houses is recomputed from
+what is currently true rather than accumulated: marriage ties and shared blood
+draw them together, a contested office or a widening gap in ideals pushes them
+apart, and the house wearing the crown is resented by the ones that are not.
+Because it is read rather than remembered, a feud ends when its cause does. This
+also required giving each institution a fixed character of its own — derived from
+its identity, so it survives save and reload — since pulled only by world
+conditions every house drifted to the same position and none of them ever found
+anything to disagree about.
+
+**Naming is the player's, and is not a god power.** `NamingService` is separate
+from `GodPowerAPI` on purpose: naming a place changes no number and shifts no
+outcome, so it does not belong behind the boundary that keeps the player out of
+politics. That boundary is unchanged and still checked mechanically.

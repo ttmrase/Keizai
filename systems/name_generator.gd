@@ -45,11 +45,3 @@ static func place_name() -> String:
 	var rng := RngService.stream(&"naming")
 	var stem: String = _HEAD[rng.randi_range(0, _HEAD.size() - 1)] + _MID[rng.randi_range(0, _MID.size() - 1)]
 	return stem + _PLACE_SUFFIX[rng.randi_range(0, _PLACE_SUFFIX.size() - 1)]
-
-
-## Full display name for a person, taking the surname from their house.
-static func person_display_name(given: String, house_org_id: StringName) -> String:
-	var house: Organization = GameState.get_organization(house_org_id)
-	if house == null or house.display_name.is_empty():
-		return given
-	return "%s・%s" % [house.display_name.trim_suffix("家"), given]

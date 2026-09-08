@@ -60,8 +60,18 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 
 	var leader := leader_override
 	if leader == null:
-		leader = _recruit_founder(parent, tick, rng)
+		leader = _find_leader(parent, tick, rng)
+	if leader == null:
+		# A breakaway needs somebody to lead it, and nobody is invented for the
+		# purpose. With no willing figure, the split simply does not happen.
+		return null
 	branch.leader_person_id = leader.person_id
+
+	# A cadet branch takes a line of the family with it, and that line takes the
+	# new house's name — which is what makes a 分家 legible in the family tree.
+	var moved: Array[StringName] = []
+	if parent.kind == Organization.OrgKind.HOUSE:
+		moved = _line_of(leader)
 
 	var named := PoliticalSystemGenerator.name_and_describe(branch, true, parent)
 	branch.display_name = named["display_name"]
@@ -88,6 +98,7 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 			"rule_id": String(rule.rule_id),
 			"reason": reason,
 			"seceded_settlements": Organization._names_to_strings(seceded),
+			"moved_person_ids": Organization._names_to_strings(moved),
 		},
 		branch.org_id,
 		leader.person_id,
@@ -102,39 +113,41 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 	return GameState.get_organization(branch.org_id)
 
 
-## A branch needs someone to lead it. Preference goes to an existing member of
-## the parent's world; failing that a new figure rises from the ranks, flagged as
-## founding generation so their ancestry terminates cleanly.
-static func _recruit_founder(parent: Organization, tick: int,
+## A branch needs someone to lead it, and it has to be somebody who already
+## exists: an adult who is not already holding an office elsewhere. Ambition
+## makes a person likelier to be the one who walks out.
+static func _find_leader(parent: Organization, tick: int,
 		rng: RandomNumberGenerator) -> NotableIndividual:
 	var candidates: Array[NotableIndividual] = []
+	var weights: Array = []
 	for p in GameState.living_people():
 		if not p.is_adult(tick) or p.current_tenure() != null:
 			continue
-		if p.age_years(tick) > 60:
+		if p.age_years(tick) > 62:
 			continue
+		var weight := 1.0
+		if p.has_tag(&"ambitious"):
+			weight += 2.0
+		# Somebody already inside the organization's own house is the likeliest
+		# person to lead a split from it.
+		if parent.kind == Organization.OrgKind.HOUSE and p.house_org_id == parent.org_id:
+			weight += 2.5
 		candidates.append(p)
+		weights.append(weight)
+	if candidates.is_empty():
+		return null
+	return RngService.pick_weighted(&"rules", candidates, weights)
 
-	if not candidates.is_empty() and rng.randf() < 0.5:
-		var weights: Array = []
-		for c in candidates:
-			weights.append(2.0 if c.has_tag(&"ambitious") else 1.0)
-		var chosen: NotableIndividual = RngService.pick_weighted(&"rules", candidates, weights)
-		if chosen != null:
-			return chosen
 
-	var founder := NotableIndividual.new()
-	founder.person_id = GameState.mint_person_id()
-	founder.sex = "f" if rng.randf() < 0.5 else "m"
-	founder.family_name = NameGenerator.family_stem()
-	founder.full_name = "%s・%s" % [founder.family_name, NameGenerator.given_name(founder.sex)]
-	founder.birth_tick = tick - rng.randi_range(28, 46) * SimConfig.TICKS_PER_YEAR
-	founder.is_founder_generation = true
-	founder.personality_tags = Demography.roll_personality(rng)
-	HistoryLog.emit_event(
-		HistoryEvent.EventType.BIRTH,
-		founder.birth_tick,
-		"%sが生まれた。" % founder.full_name,
-		{"person": founder.to_dict()},
-		&"", founder.person_id)
-	return GameState.get_person(founder.person_id)
+## The leader, their spouse, and everyone descended from them — the people who
+## leave with a cadet branch.
+static func _line_of(leader: NotableIndividual) -> Array[StringName]:
+	var out: Array[StringName] = [leader.person_id]
+	for spouse_id in leader.spouse_ids:
+		var spouse := GameState.get_person(spouse_id)
+		if spouse != null and spouse.is_alive():
+			out.append(spouse_id)
+	for descendant in GenealogyValidator.descendants(leader.person_id, 6):
+		if not out.has(descendant.person_id):
+			out.append(descendant.person_id)
+	return out

@@ -83,7 +83,49 @@ func detail(id: StringName) -> String:
 	if org.ideology != null:
 		lines.append("[color=#9a9080]思想[/color]  %s"
 			% PoliticalSystemGenerator.ideology_summary(org.ideology))
+
+	if org.kind == Organization.OrgKind.POLITICAL_SYSTEM:
+		var form := PolityFormEvaluator.form_of(org)
+		if form != null:
+			lines.append("[color=#9a9080]統治のかたち[/color]  %s — %s"
+				% [form.display_name, form.description])
+
+	if org.kind == Organization.OrgKind.HOUSE:
+		if not org.held_settlement_ids.is_empty():
+			var places: Array[String] = []
+			for settlement_id in org.held_settlement_ids:
+				var s: SettlementState = GameState.world.settlements.get(settlement_id)
+				if s != null:
+					places.append(s.display_name)
+			if not places.is_empty():
+				lines.append("[color=#9a9080]所領[/color]  %s" % "、".join(places))
+		var standing := _relations_text(org)
+		if not standing.is_empty():
+			lines.append("[color=#9a9080]他家との関係[/color]  %s" % standing)
+
 	return "\n".join(lines)
+
+
+## Who this house gets on with, and who it does not. Only ties strong enough to
+## have a name are worth listing.
+func _relations_text(house: Organization) -> String:
+	var warm: Array[String] = []
+	var cold: Array[String] = []
+	for other_id in house.house_relations:
+		var other := GameState.get_organization(other_id)
+		if other == null or not other.is_active():
+			continue
+		var value: float = house.house_relations[other_id]
+		if value > 0.2:
+			warm.append("%s（%s）" % [other.display_name, HouseRelations.describe(value)])
+		elif value < -0.2:
+			cold.append("%s（%s）" % [other.display_name, HouseRelations.describe(value)])
+	var parts: Array[String] = []
+	if not warm.is_empty():
+		parts.append("[color=#7ab87a]%s[/color]" % "、".join(warm))
+	if not cold.is_empty():
+		parts.append("[color=#c85a4a]%s[/color]" % "、".join(cold))
+	return "　".join(parts)
 
 
 func search(query: String) -> Array[StringName]:

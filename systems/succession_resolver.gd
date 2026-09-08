@@ -13,7 +13,10 @@ static func resolve(org: Organization, tick: int) -> void:
 	var rule := _rule_for(org)
 	var candidates := _eligible(_candidates(org, tick, rule), org)
 	if candidates.is_empty():
-		candidates = [_raise_successor(org, tick)]
+		# Nobody alive can take it. The seat stays empty until some house
+		# produces an heir who can — people are never conjured up to fill a post,
+		# so an institution really can outlive everyone willing to lead it.
+		return
 
 	var rng := RngService.stream(&"rules")
 	var weights: Array = []
@@ -92,6 +95,12 @@ static func _candidates(org: Organization, tick: int, rule: TriggerRule) -> Arra
 		_:
 			pass
 
+	# A house can only be headed by its own blood. If none of it is left standing,
+	# the house has no head and will shortly have no house either — an outsider is
+	# never brought in to keep the name alive.
+	if org.kind == Organization.OrgKind.HOUSE:
+		return _house_candidates(org, tick)
+
 	if org.kind == Organization.OrgKind.POLITICAL_SYSTEM \
 			and method == TriggerRule.SuccessionMethod.PRIMOGENITURE:
 		var from_house := _ruling_house_candidates(org, tick)
@@ -104,6 +113,21 @@ static func _candidates(org: Organization, tick: int, rule: TriggerRule) -> Arra
 			return heirs
 
 	return _open_candidates(org, tick)
+
+
+## The house's own adults, children of the late head first.
+static func _house_candidates(org: Organization, tick: int) -> Array[NotableIndividual]:
+	var previous := GameState.get_person(_previous_leader_id(org))
+	var direct: Array[NotableIndividual] = []
+	var kin: Array[NotableIndividual] = []
+	for member in GameState.house_members(org.org_id):
+		if not member.is_adult(tick) or member.current_tenure() != null:
+			continue
+		if previous != null and previous.children_ids.has(member.person_id):
+			direct.append(member)
+		else:
+			kin.append(member)
+	return direct if not direct.is_empty() else kin
 
 
 static func _bloodline_heirs(org: Organization, tick: int) -> Array[NotableIndividual]:
@@ -241,24 +265,3 @@ static func _previous_leader_id(org: Organization) -> StringName:
 				best_tick = t.end_tick
 				best_id = p.person_id
 	return best_id
-
-
-## Nobody left to take the seat, so a new figure steps forward out of the ranks.
-static func _raise_successor(org: Organization, tick: int) -> NotableIndividual:
-	var rng := RngService.stream(&"rules")
-	var p := NotableIndividual.new()
-	p.person_id = GameState.mint_person_id()
-	p.sex = "f" if rng.randf() < 0.5 else "m"
-	p.family_name = NameGenerator.family_stem()
-	p.full_name = "%s・%s" % [p.family_name, NameGenerator.given_name(p.sex)]
-	p.birth_tick = tick - rng.randi_range(26, 44) * SimConfig.TICKS_PER_YEAR
-	p.is_founder_generation = true
-	p.house_org_id = org.org_id if org.kind == Organization.OrgKind.HOUSE else &""
-	p.personality_tags = Demography.roll_personality(rng)
-	HistoryLog.emit_event(
-		HistoryEvent.EventType.BIRTH,
-		p.birth_tick,
-		"%sが生まれた。" % p.full_name,
-		{"person": p.to_dict()},
-		&"", p.person_id)
-	return GameState.get_person(p.person_id)

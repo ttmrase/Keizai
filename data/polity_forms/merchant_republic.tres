@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"dominant_archetype.merchants_guild"
+op = 0
+threshold = 0.5
+threshold_high = 1.0
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.decision_structure"
+op = 0
+threshold = 0.5
+threshold_high = 3.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"merchant_republic"
+display_name = "商人共和国"
+description = "富が票を持ち、商館の合意が国の意思となる。"
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+priority = 85
+ruler_title = "総裁"
+local_ruler_title = "市長"
+council_label = "商人評議会"

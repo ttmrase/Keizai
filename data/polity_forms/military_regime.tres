@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.legitimacy_basis"
+op = 2
+threshold = 4.0
+threshold_high = 4.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"military_regime"
+display_name = "軍事政権"
+description = "力を握る者が統べる。位は血ではなく戦功で決まる。"
+conditions = Array[Resource]([SubResource("c0")])
+priority = 95
+ruler_title = "総統"
+local_ruler_title = "守将"
+council_label = "軍務評定"

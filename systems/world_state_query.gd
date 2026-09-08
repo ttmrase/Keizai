@@ -36,6 +36,12 @@ static func get_value(path: StringName, org: Organization = null) -> float:
 			return org.ideology.get_axis(StringName(field.substr("ideology.".length())))
 		if field == "governed_count":
 			return float(org.governs_settlement_ids.size())
+		if field == "held_count":
+			return float(org.held_settlement_ids.size())
+		if field == "legitimacy_basis":
+			return 0.0 if org.ideology == null else float(org.ideology.legitimacy_basis)
+		if field == "decision_structure":
+			return 0.0 if org.ideology == null else float(org.ideology.decision_structure)
 		var v = org.get(field)
 		return float(v) if v != null else 0.0
 
@@ -61,12 +67,59 @@ static func get_value(path: StringName, org: Organization = null) -> float:
 	if p == "count.children":
 		return 0.0 if org == null else float(org.child_org_ids.size())
 
+	# Share of all standing held by one kind of institution, 0..1. This is how a
+	# form of government reads whether the houses, the guilds or the factions are
+	# the ones actually holding the country up.
+	if p.begins_with("power_share."):
+		return _power_share(p.substr("power_share.".length()))
+
+	# 1.0 when this archetype leads its own kind, 0.0 otherwise — "the temple is
+	# the strongest faction", rather than any particular score.
+	if p.begins_with("dominant_archetype."):
+		return 1.0 if _dominant_archetype(StringName(p.substr("dominant_archetype.".length()))) else 0.0
+
 	# Anything else is a plain WorldState field, which is most of them.
 	var v = world.get(p)
 	if v == null:
 		push_warning("WorldStateQuery: unknown path '%s'" % p)
 		return 0.0
 	return float(v)
+
+
+const _KIND_BY_NAME := {
+	"guild": Organization.OrgKind.GUILD,
+	"house": Organization.OrgKind.HOUSE,
+	"faction": Organization.OrgKind.FACTION,
+	"polity": Organization.OrgKind.POLITICAL_SYSTEM,
+}
+
+
+static func _power_share(kind_name: String) -> float:
+	if not _KIND_BY_NAME.has(kind_name):
+		push_warning("WorldStateQuery: unknown kind '%s'" % kind_name)
+		return 0.0
+	var wanted: int = _KIND_BY_NAME[kind_name]
+	var total := 0.0
+	var mine := 0.0
+	for o in GameState.active_organizations():
+		total += o.power_score
+		if o.kind == wanted:
+			mine += o.power_score
+	return 0.0 if total <= 0.0 else mine / total
+
+
+static func _dominant_archetype(archetype_id: StringName) -> bool:
+	var subject: Organization = null
+	for o in GameState.active_organizations():
+		if o.archetype_id == archetype_id:
+			subject = o
+			break
+	if subject == null:
+		return false
+	for o in GameState.active_organizations():
+		if o.kind == subject.kind and o.power_score > subject.power_score:
+			return false
+	return true
 
 
 static func _all_settlements() -> Array[SettlementState]:

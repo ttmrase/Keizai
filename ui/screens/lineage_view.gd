@@ -18,6 +18,9 @@ var _showing_orgs := true
 @onready var _detail_title: Label = $Detail/Margin/Rows/Title
 @onready var _detail_body: RichTextLabel = $Detail/Margin/Rows/Scroll/Body
 @onready var _focus_note: Label = $Top/FocusNote
+@onready var _rename_button: Button = $Detail/Margin/Rows/Rename
+
+var _rename_dialog: RenameDialog
 
 
 func _ready() -> void:
@@ -30,9 +33,30 @@ func _ready() -> void:
 	EventBus.game_loaded.connect(_rebuild)
 	EventBus.world_reset.connect(_rebuild)
 
+	_rename_dialog = RenameDialog.new()
+	add_child(_rename_dialog)
+	_rename_dialog.name_applied.connect(_on_renamed)
+	_rename_button.pressed.connect(_on_rename_pressed)
+
 	_detail.visible = false
 	_results.visible = false
 	_show_orgs()
+
+
+## Only organizations carry a name of their own — a person's surname belongs to
+## their house, so renaming the house is what renames them.
+func _on_rename_pressed() -> void:
+	if not _showing_orgs:
+		return
+	var org := GameState.get_organization(_graph.selected_id)
+	if org != null:
+		_rename_dialog.open_for_organization(org.org_id, org.display_name)
+
+
+func _on_renamed(_subject_id: StringName) -> void:
+	_graph.rebuild()
+	if _graph.selected_id != &"":
+		_show_detail(_graph.selected_id)
 
 
 func on_shown() -> void:
@@ -181,4 +205,5 @@ func _show_detail(id: StringName) -> void:
 		return
 	_detail_title.text = source.label(id)
 	_detail_body.text = source.detail(id)
+	_rename_button.visible = _showing_orgs
 	_detail.visible = true

@@ -6,10 +6,26 @@ extends RefCounted
 ## for: enough individual detail to draw a real family tree, without simulating
 ## thousands of people.
 
-## Above this many living notables in one lineage group, fertility falls off
-## sharply. Without it the cast would grow without bound over a long game.
-const CROWDING_SOFT_CAP := 42
-const MAX_CHILDREN := 5
+## Above this many living notables, fertility falls off sharply. Without a cap
+## the cast grows without bound; set too low, and the houses cannot replace their
+## own dead — nobody is ever created from nothing to make up the shortfall.
+const CROWDING_SOFT_CAP := 90
+const MAX_CHILDREN := 6
+
+## The number of named figures the houses tend toward. Below it, families push
+## urgently for heirs; above it, they stop. Without the lower half of this the
+## population is only ever pushed downward, and one bad century ends the world —
+## there is nobody to invent a replacement.
+const NOTABLE_TARGET := 55
+const SCARCITY_FERTILITY_BOOST := 2.4
+
+## Famine and plague reach the great houses, but they eat before their tenants
+## do. Left uncapped, a long famine kills every named figure in the world.
+const MAX_MORTALITY_MODIFIER := 1.9
+
+## Named figures eat before their tenants do. Famine still reaches them, but a
+## bad harvest should not sterilise the aristocracy the way it starves the fields.
+const NOTABLE_FOOD_INSULATION := 0.55
 
 
 static func step(tick: int) -> void:
@@ -46,7 +62,7 @@ static func _mortality_modifier() -> float:
 		var def := ContentRegistry.get_disaster(inst.definition_id)
 		if def != null and def.effects.has("mortality"):
 			mod += float(def.effects["mortality"]) * inst.magnitude * 0.5
-	return maxf(0.2, mod)
+	return clampf(mod, 0.2, MAX_MORTALITY_MODIFIER)
 
 
 static func _record_death(p: NotableIndividual, tick: int, age: int) -> void:
@@ -73,11 +89,15 @@ static func _step_marriages(tick: int) -> void:
 	var singles := _eligible_singles(tick)
 	if singles.size() < 2:
 		return
+	# When the houses are thin, matches are made quickly rather than waited on.
+	var living := GameState.living_people().size()
+	var urgency: float = 1.0 if living >= NOTABLE_TARGET \
+		else 1.0 + (1.0 - float(living) / float(NOTABLE_TARGET)) * 3.0
 	for i in singles.size():
 		var a: NotableIndividual = singles[i]
-		if not a.spouse_ids.is_empty() or not a.is_alive():
+		if not a.is_alive() or living_spouse(a) != null:
 			continue
-		if rng.randf() > SimConfig.MARRIAGE_CHANCE_PER_TICK:
+		if rng.randf() > SimConfig.MARRIAGE_CHANCE_PER_TICK * urgency:
 			continue
 		var partner := _find_partner(a, singles, tick)
 		if partner == null:
@@ -93,12 +113,23 @@ static func _step_marriages(tick: int) -> void:
 			[a.person_id, partner.person_id] as Array[StringName])
 
 
+## Anyone grown, alive, and without a living spouse. Widowhood is not the end of
+## a line: remarriage is how houses survive a plague year, and forbidding it was
+## enough on its own to make the whole notable population die out.
 static func _eligible_singles(tick: int) -> Array[NotableIndividual]:
 	var out: Array[NotableIndividual] = []
 	for p in GameState.living_people():
-		if p.spouse_ids.is_empty() and p.is_adult(tick) and p.age_years(tick) < 60:
+		if p.is_adult(tick) and p.age_years(tick) < 62 and living_spouse(p) == null:
 			out.append(p)
 	return out
+
+
+static func living_spouse(person: NotableIndividual) -> NotableIndividual:
+	for spouse_id in person.spouse_ids:
+		var spouse := GameState.get_person(spouse_id)
+		if spouse != null and spouse.is_alive():
+			return spouse
+	return null
 
 
 static func _find_partner(a: NotableIndividual, pool: Array[NotableIndividual],
@@ -107,7 +138,7 @@ static func _find_partner(a: NotableIndividual, pool: Array[NotableIndividual],
 	for b in pool:
 		if b.person_id == a.person_id or b.sex == a.sex:
 			continue
-		if not b.spouse_ids.is_empty() or not b.is_alive():
+		if not b.is_alive() or living_spouse(b) != null:
 			continue
 		if _too_closely_related(a, b):
 			continue
@@ -141,19 +172,21 @@ static func _too_closely_related(a: NotableIndividual, b: NotableIndividual) -> 
 
 static func _step_births(tick: int) -> void:
 	var rng := RngService.stream(&"demography")
-	var food_security: float = clampf(GameState.world.global_harvest_modifier, 0.0, 1.5)
+	var harvest: float = clampf(GameState.world.global_harvest_modifier, 0.0, 1.5)
+	var food_security: float = lerpf(harvest, 1.0, NOTABLE_FOOD_INSULATION)
 	var crowding := _crowding_factor()
 
 	for mother in GameState.living_people():
-		if mother.sex != "f" or mother.spouse_ids.is_empty():
+		if mother.sex != "f":
 			continue
 		var age := mother.age_years(tick)
-		if age < SimConfig.ADULT_AGE_YEARS or age > 44:
+		if age < SimConfig.ADULT_AGE_YEARS or age > 45:
 			continue
 		if mother.children_ids.size() >= MAX_CHILDREN:
 			continue
-		var father := GameState.get_person(mother.spouse_ids[0])
-		if father == null or not father.is_alive():
+		# The current husband, not the first one she ever had.
+		var father := living_spouse(mother)
+		if father == null:
 			continue
 
 		var fertility: float = SimConfig.BASE_FERTILITY_PER_TICK \
@@ -172,11 +205,16 @@ static func _age_fertility(age: int) -> float:
 	return 0.3
 
 
+## Pushes fertility down when there are too many named figures to follow, and up
+## when the houses are close to dying out.
 static func _crowding_factor() -> float:
 	var living := GameState.living_people().size()
-	if living <= CROWDING_SOFT_CAP:
-		return 1.0
-	return maxf(0.08, float(CROWDING_SOFT_CAP) / float(living))
+	if living > CROWDING_SOFT_CAP:
+		return maxf(0.08, float(CROWDING_SOFT_CAP) / float(living))
+	if living < NOTABLE_TARGET:
+		var scarcity: float = 1.0 - float(living) / float(NOTABLE_TARGET)
+		return 1.0 + scarcity * SCARCITY_FERTILITY_BOOST
+	return 1.0
 
 
 static func _record_birth(mother: NotableIndividual, father: NotableIndividual, tick: int) -> void:
@@ -187,11 +225,12 @@ static func _record_birth(mother: NotableIndividual, father: NotableIndividual, 
 	child.birth_tick = tick
 	child.father_id = father.person_id
 	child.mother_id = mother.person_id
-	# Houses and commoner lines both pass the name down the paternal side.
+	# The child belongs to its father's house, and takes that house's name.
 	child.house_org_id = father.house_org_id if father.house_org_id != &"" else mother.house_org_id
-	child.family_name = father.family_name if father.family_name != "" else mother.family_name
-	var given := NameGenerator.given_name(child.sex)
-	child.full_name = "%s・%s" % [child.family_name, given] if child.family_name != "" else given
+	child.given_name = NameGenerator.given_name(child.sex)
+	child.family_name = HouseNaming.surname_of(child.house_org_id)
+	if child.family_name == "":
+		child.family_name = father.family_name if father.family_name != "" else mother.family_name
 	child.personality_tags = roll_personality(rng)
 
 	HistoryLog.emit_event(

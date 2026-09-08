@@ -37,6 +37,11 @@ func _advance_one_tick() -> void:
 	Demography.step(current_tick)
 	if current_tick % SimConfig.POWER_RECALC_EPOCH_TICKS == 0:
 		PowerCalculator.recalculate_all(current_tick)
+		# Standing decides the rest: which guild matters where, who each house
+		# gets on with, and what form of government all of it adds up to.
+		RegionalStanding.refresh_all(current_tick)
+		HouseRelations.refresh_all(current_tick)
+		PolityFormEvaluator.refresh_all(current_tick)
 		EventBus.power_recalculated.emit(current_tick)
 	if current_tick % SimConfig.IDEOLOGY_DRIFT_EPOCH_TICKS == 0:
 		PoliticalSystemGenerator.drift_all(current_tick)

@@ -43,31 +43,47 @@ static func root_ancestor(org_id: StringName) -> Organization:
 ## True when the person's ancestry terminates properly: every path upward ends at
 ## an empty parent id or at someone marked as founding generation, with no cycles.
 static func trace_to_founder(person_id: StringName) -> bool:
-	var seen := {}
-	var frontier: Array[StringName] = [person_id]
-	var steps := 0
-	while not frontier.is_empty() and steps < MAX_WALK:
-		steps += 1
-		var id: StringName = frontier.pop_back()
-		if id == &"":
-			continue
-		if seen.has(id):
-			continue           # already validated this branch of the tree
-		seen[id] = true
-		var p := GameState.get_person(id)
-		if p == null:
-			return false       # dangling parent reference
-		if p.is_founder_generation:
-			continue
-		if p.father_id != &"":
-			if p.father_id == id:
-				return false
-			frontier.append(p.father_id)
-		if p.mother_id != &"":
-			if p.mother_id == id:
-				return false
-			frontier.append(p.mother_id)
-	return steps < MAX_WALK
+	return _resolve(person_id, {})
+
+
+## The people whose ancestry does not terminate, checked in a single memoized
+## pass. Doing this per person means re-walking the same ancestors thousands of
+## times over — on a world with several thousand recorded lives that is not just
+## slow, it used to exceed its own step limit and report failures that were not
+## there.
+static func ancestry_failures() -> Array[StringName]:
+	var state := {}
+	var out: Array[StringName] = []
+	for id in GameState.people:
+		if not _resolve(id, state):
+			out.append(id)
+	return out
+
+
+## Depth-first with three states per person: in progress, sound, unsound. Meeting
+## a person who is still in progress means the ancestry loops back on itself.
+static func _resolve(person_id: StringName, state: Dictionary) -> bool:
+	if person_id == &"":
+		return true          # an unrecorded parent is a valid place to stop
+	var known: int = state.get(person_id, -1)
+	if known == 1:
+		return true
+	if known == 2:
+		return false
+	if known == 0:
+		state[person_id] = 2
+		return false         # a cycle: somebody is their own ancestor
+
+	var p := GameState.get_person(person_id)
+	if p == null:
+		return false         # a parent that does not exist
+	state[person_id] = 0
+
+	var ok := true
+	if not p.is_founder_generation:
+		ok = _resolve(p.father_id, state) and _resolve(p.mother_id, state)
+	state[person_id] = 1 if ok else 2
+	return ok
 
 
 ## Every ancestor of a person, nearest first. Used by the family tree's focus mode.

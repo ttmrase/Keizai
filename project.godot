@@ -20,6 +20,7 @@ GameState="*res://autoload/game_state.gd"
 HistoryLog="*res://autoload/history_log.gd"
 RulesEngine="*res://autoload/rules_engine.gd"
 GodPowerAPI="*res://autoload/god_power_api.gd"
+NamingService="*res://autoload/naming_service.gd"
 SaveManager="*res://autoload/save_manager.gd"
 SimClock="*res://autoload/sim_clock.gd"
 

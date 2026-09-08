@@ -17,6 +17,12 @@ func parents(_id: StringName) -> Array[StringName]:
 	return []
 
 
+## People a node is married to. Organizations have none; the family tree draws
+## them beside their partner and hangs the children off the pair.
+func spouses(_id: StringName) -> Array[StringName]:
+	return []
+
+
 func label(_id: StringName) -> String:
 	return ""
 

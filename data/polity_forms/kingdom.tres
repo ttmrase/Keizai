@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"kingdom"
+display_name = "王国"
+description = "一人の頭を戴く、ごく普通のかたちの国。"
+conditions = Array[Resource]([])
+priority = 0
+ruler_title = "国王"
+local_ruler_title = "領主"
+council_label = "宮廷"

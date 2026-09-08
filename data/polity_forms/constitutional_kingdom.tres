@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PolityForm" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/polity_form.gd" id="1_form"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.legitimacy_basis"
+op = 2
+threshold = 0.0
+threshold_high = 0.0
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"org.self.decision_structure"
+op = 2
+threshold = 2.0
+threshold_high = 2.0
+
+[resource]
+script = ExtResource("1_form")
+form_id = &"constitutional_kingdom"
+display_name = "議会制王国"
+description = "王は在るが、決めるのは議会である。"
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+priority = 60
+ruler_title = "国王"
+local_ruler_title = "州知事"
+council_label = "議会"

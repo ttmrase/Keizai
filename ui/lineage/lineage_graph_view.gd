@@ -14,6 +14,8 @@ signal node_selected(id: StringName)
 ## like — to fit without clipping at reading zoom.
 const NODE_SIZE := Vector2(330.0, 62.0)
 const H_GAP := 26.0
+## Spouses sit shoulder to shoulder, close enough to read as one household.
+const SPOUSE_GAP := 10.0
 const ROW_HEIGHT := 116.0
 const CHEVRON_WIDTH := 46.0
 
@@ -27,6 +29,10 @@ var _collapsed: Dictionary = {}
 
 var _positions: Dictionary = {}      # id -> Vector2 (top-left, world space)
 var _edges: Array = []               # [parent_id, child_id]
+var _spouse_edges: Array = []        # [id, partner_id]
+var _partner_of: Dictionary = {}     # id -> the spouse drawn beside them
+## Where a node's children hang from: the midpoint of the couple, if there is one.
+var _child_anchor: Dictionary = {}
 var _hidden_counts: Dictionary = {}  # id -> descendants folded away
 var _cursor_x := 0.0
 var _bounds := Rect2()
@@ -64,6 +70,9 @@ func rebuild() -> void:
 		return
 	_positions.clear()
 	_edges.clear()
+	_spouse_edges.clear()
+	_partner_of.clear()
+	_child_anchor.clear()
 	_hidden_counts.clear()
 	_cursor_x = 0.0
 
@@ -117,6 +126,18 @@ func _place(id: StringName, depth: int, visited: Dictionary) -> float:
 	visited[id] = true
 	_deepest_row = maxi(_deepest_row, depth)
 
+	# A married pair is laid out as one unit, with their children hanging from
+	# between them — which is what makes the tree read as a family rather than as
+	# two unrelated lines that happen to produce the same child.
+	var partner := _partner_to_draw(id, visited)
+	if partner != &"":
+		visited[partner] = true
+		_partner_of[id] = partner
+		_spouse_edges.append([id, partner])
+
+	var unit_width: float = NODE_SIZE.x if partner == &"" \
+		else NODE_SIZE.x * 2.0 + SPOUSE_GAP
+
 	var child_centres: Array[float] = []
 	if not _collapsed.has(id):
 		for child_id in source.children(id):
@@ -129,15 +150,35 @@ func _place(id: StringName, depth: int, visited: Dictionary) -> float:
 
 	var centre_x: float
 	if child_centres.is_empty():
-		centre_x = _cursor_x + NODE_SIZE.x * 0.5
-		_cursor_x += NODE_SIZE.x + H_GAP
+		centre_x = _cursor_x + unit_width * 0.5
+		_cursor_x += unit_width + H_GAP
 	else:
 		centre_x = (child_centres[0] + child_centres[child_centres.size() - 1]) * 0.5
 		# A parent narrower than its children must not overlap the row beside it.
-		_cursor_x = maxf(_cursor_x, centre_x + NODE_SIZE.x * 0.5 + H_GAP)
+		_cursor_x = maxf(_cursor_x, centre_x + unit_width * 0.5 + H_GAP)
 
-	_positions[id] = Vector2(centre_x - NODE_SIZE.x * 0.5, depth * ROW_HEIGHT)
+	var left := centre_x - unit_width * 0.5
+	_positions[id] = Vector2(left, depth * ROW_HEIGHT)
+	if partner != &"":
+		_positions[partner] = Vector2(left + NODE_SIZE.x + SPOUSE_GAP, depth * ROW_HEIGHT)
+	_child_anchor[id] = centre_x
 	return centre_x
+
+
+## The spouse to draw beside this person: one that exists, is not already placed
+## elsewhere in the tree, and is visible under the current focus.
+func _partner_to_draw(id: StringName, visited: Dictionary) -> StringName:
+	for spouse_id in source.spouses(id):
+		if visited.has(spouse_id) or not source.exists(spouse_id):
+			continue
+		if _focus_active and not _visible_ids.has(spouse_id):
+			continue
+		# Somebody with descendants of their own belongs at the head of their own
+		# line rather than tucked beside a partner.
+		if not source.children(spouse_id).is_empty():
+			continue
+		return spouse_id
+	return &""
 
 
 func _count_descendants(id: StringName) -> int:
@@ -191,6 +232,12 @@ func focus_on(id: StringName, ancestor_depth: int = 12, descendant_depth: int = 
 			if source.exists(sibling_id):
 				_visible_ids[sibling_id] = true
 
+	# Nobody visible should be shown without the person they married.
+	for visible_id in _visible_ids.keys():
+		for spouse_id in source.spouses(visible_id):
+			if source.exists(spouse_id):
+				_visible_ids[spouse_id] = true
+
 	_focus_active = true
 	selected_id = id
 	rebuild()
@@ -211,10 +258,20 @@ func is_focused() -> bool:
 	return _focus_active
 
 
+## Puts a node in the upper part of the view rather than the exact middle: the
+## detail sheet covers the bottom, and a focused person's children are drawn
+## below them, so dead-centring hides the half worth looking at.
+const FOCUS_VERTICAL_ANCHOR := 0.30
+
+
 func center_on_node(id: StringName) -> void:
 	if not _positions.has(id):
 		return
-	center_on(_positions[id] + NODE_SIZE * 0.5)
+	# Centre the household, not one of its two halves.
+	var anchor_x: float = _child_anchor.get(id, _positions[id].x + NODE_SIZE.x * 0.5)
+	var target := Vector2(anchor_x, _positions[id].y + NODE_SIZE.y * 0.5)
+	view_offset = Vector2(size.x * 0.5, size.y * FOCUS_VERTICAL_ANCHOR) - target * view_zoom
+	queue_redraw()
 
 
 ## Fits the tree, but never shrinks it past the point where the names can be
@@ -252,17 +309,28 @@ func toggle_collapse(id: StringName) -> void:
 func _draw_tree() -> void:
 	if source == null:
 		return
+	# Marriages first, so descent lines cross over them rather than under.
+	for pair in _spouse_edges:
+		if not _positions.has(pair[0]) or not _positions.has(pair[1]):
+			continue
+		var a: Vector2 = _positions[pair[0]]
+		var b: Vector2 = _positions[pair[1]]
+		var left := to_screen(a + Vector2(NODE_SIZE.x, NODE_SIZE.y * 0.5))
+		var right := to_screen(b + Vector2(0, NODE_SIZE.y * 0.5))
+		draw_line(left, right, Palette.ACCENT, maxf(1.5, 3.0 * view_zoom))
+
 	for edge in _edges:
 		var from_pos: Vector2 = _positions.get(edge[0], Vector2.ZERO)
 		var to_pos: Vector2 = _positions.get(edge[1], Vector2.ZERO)
 		if not _positions.has(edge[0]) or not _positions.has(edge[1]):
 			continue
-		var start := to_screen(from_pos + Vector2(NODE_SIZE.x * 0.5, NODE_SIZE.y))
+		# Children descend from between their parents, not from one of them.
+		var anchor_x: float = _child_anchor.get(edge[0], from_pos.x + NODE_SIZE.x * 0.5)
+		var start := to_screen(Vector2(anchor_x, from_pos.y + NODE_SIZE.y))
 		var end := to_screen(to_pos + Vector2(NODE_SIZE.x * 0.5, 0))
 		var mid_y := (start.y + end.y) * 0.5
-		var colour: Color = Palette.LINE
 		draw_polyline([start, Vector2(start.x, mid_y), Vector2(end.x, mid_y), end],
-			colour, maxf(1.0, 2.0 * view_zoom))
+			Palette.LINE, maxf(1.0, 2.0 * view_zoom))
 
 	for id in _positions:
 		_draw_node(id)

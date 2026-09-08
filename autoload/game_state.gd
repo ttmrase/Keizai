@@ -185,6 +185,13 @@ func _apply_org_created(e: HistoryEvent) -> void:
 		org.branch_depth = 0
 	organizations[org.org_id] = org
 
+	# A cadet branch takes a line of the family with it. Those people change
+	# house, and therefore change surname — the split is visible in the names.
+	for raw_id in e.payload.get("moved_person_ids", []):
+		var person: NotableIndividual = people.get(StringName(raw_id))
+		if person != null:
+			HouseNaming.adopt_into_house(person, org.org_id)
+
 	var leader: NotableIndividual = people.get(org.leader_person_id)
 	if leader != null:
 		_open_tenure(leader, org, e)
@@ -211,6 +218,26 @@ func _apply_marriage(e: HistoryEvent) -> void:
 		a.spouse_ids.append(b.person_id)
 	if not b.spouse_ids.has(a.person_id):
 		b.spouse_ids.append(a.person_id)
+
+	# Marriage is how houses acquire each other's blood: normally the bride joins
+	# her husband's house and takes its name, so the surname on the family tree
+	# always says which house someone belongs to now. The exception is a woman who
+	# already heads a house — she does not leave it, and her husband marries in
+	# instead, which is how a house with no sons survives.
+	var husband: NotableIndividual = a if a.sex == "m" else b
+	var wife: NotableIndividual = b if a.sex == "m" else a
+	if husband.sex != "m" or wife.sex != "f":
+		return
+	if _heads_house(wife) and not _heads_house(husband):
+		HouseNaming.adopt_into_house(husband, wife.house_org_id)
+	elif husband.house_org_id != &"" and wife.house_org_id != husband.house_org_id \
+			and not _heads_house(wife):
+		HouseNaming.adopt_into_house(wife, husband.house_org_id)
+
+
+func _heads_house(person: NotableIndividual) -> bool:
+	var house: Organization = organizations.get(person.house_org_id)
+	return house != null and house.is_active() and house.leader_person_id == person.person_id
 
 
 func _apply_death(e: HistoryEvent) -> void:
@@ -323,13 +350,22 @@ func step_resources(tick: int) -> void:
 	var unrest_weighted := 0.0
 
 	var threat := world.global_monster_threat_level
+	# A realm feeds its mining towns from its farming ones. Without this, any
+	# region whose industry is not food simply starves to the floor and stays
+	# there, which is not a country so much as eight unrelated villages.
+	_redistribute_food()
 	for id in world.settlements:
 		var s: SettlementState = world.settlements[id]
 		var pop := s.population
 
-		var ore_gain: float = SimConfig.ORE_YIELD_PER_CAPITA * pop * world.ore_supply_rate * float(mods.get("ore", 1.0))
-		var wood_gain: float = SimConfig.WOOD_YIELD_PER_CAPITA * pop * world.wood_supply_rate * float(mods.get("wood", 1.0))
-		var food_gain: float = SimConfig.FOOD_YIELD_PER_CAPITA * pop * world.global_harvest_modifier
+		# What a region produces depends on what it lives on: a mining valley
+		# yields ore and little food, a farming one the reverse.
+		var ore_gain: float = SimConfig.ORE_YIELD_PER_CAPITA * pop * world.ore_supply_rate \
+			* float(mods.get("ore", 1.0)) * Industry.yield_modifier(s.industry, "ore")
+		var wood_gain: float = SimConfig.WOOD_YIELD_PER_CAPITA * pop * world.wood_supply_rate \
+			* float(mods.get("wood", 1.0)) * Industry.yield_modifier(s.industry, "wood")
+		var food_gain: float = SimConfig.FOOD_YIELD_PER_CAPITA * pop * world.global_harvest_modifier \
+			* Industry.yield_modifier(s.industry, "food")
 		var food_use: float = SimConfig.FOOD_CONSUMPTION_PER_CAPITA * pop
 
 		var ore_use: float = pop * SimConfig.ORE_USE_PER_CAPITA + s.local_ore * SimConfig.STOCK_SPOILAGE
@@ -337,7 +373,6 @@ func step_resources(tick: int) -> void:
 		s.local_ore = clampf(s.local_ore + ore_gain - ore_use, 0.0, SimConfig.MAX_LOCAL_STOCK)
 		s.local_wood = clampf(s.local_wood + wood_gain - wood_use, 0.0, SimConfig.MAX_LOCAL_STOCK)
 		s.food_stock += food_gain - food_use
-
 		s.starving = s.food_stock < 0.0
 		var starvation_severity := 0.0
 		if s.starving:
@@ -346,7 +381,8 @@ func step_resources(tick: int) -> void:
 		s.food_stock = minf(s.food_stock, SimConfig.MAX_FOOD_STOCK)
 
 		s.wealth = clampf(
-			s.wealth + ore_gain * SimConfig.WEALTH_PER_ORE + wood_gain * SimConfig.WEALTH_PER_WOOD
+			s.wealth + (ore_gain * SimConfig.WEALTH_PER_ORE + wood_gain * SimConfig.WEALTH_PER_WOOD)
+				* Industry.yield_modifier(s.industry, "wealth")
 				- s.wealth * SimConfig.WEALTH_DECAY,
 			0.0, SimConfig.MAX_WEALTH)
 
@@ -382,6 +418,46 @@ func step_resources(tick: int) -> void:
 	_step_monsters(mods)
 	_expire_disasters(tick)
 	world.recent_disaster_pressure = maxf(0.0, world.recent_disaster_pressure * 0.9965)
+
+
+## Moves food from regions with a surplus to regions running short, keeping some
+## back for the effort. Only settlements under the same ruler share.
+func _redistribute_food() -> void:
+	var by_realm := {}
+	for id in world.settlements:
+		var s: SettlementState = world.settlements[id]
+		var realm: StringName = s.controlling_org_id
+		if not by_realm.has(realm):
+			by_realm[realm] = []
+		by_realm[realm].append(s)
+
+	for realm in by_realm:
+		var members: Array = by_realm[realm]
+		if members.size() < 2:
+			continue
+		var needy: Array = []
+		var donors: Array = []
+		for s in members:
+			var reserve: float = s.population * SimConfig.FOOD_CONSUMPTION_PER_CAPITA * 12.0
+			if s.food_stock < reserve:
+				needy.append([s, reserve - s.food_stock])
+			elif s.food_stock > reserve:
+				donors.append([s, s.food_stock - reserve])
+		if needy.is_empty() or donors.is_empty():
+			continue
+
+		var available := 0.0
+		for d in donors:
+			available += d[1]
+		var wanted := 0.0
+		for n in needy:
+			wanted += n[1]
+		var moved: float = minf(available, wanted) * SimConfig.FOOD_SHARING_FRACTION
+
+		for d in donors:
+			d[0].food_stock -= moved * (d[1] / available)
+		for n in needy:
+			n[0].food_stock += moved * (n[1] / wanted) * SimConfig.FOOD_TRANSPORT_EFFICIENCY
 
 
 func _step_monsters(mods: Dictionary) -> void:

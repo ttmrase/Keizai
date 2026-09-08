@@ -64,6 +64,14 @@ const KIND_NAMES := {
 @export var cause_tags: Array[StringName] = []                 # FACTION
 @export var governs_settlement_ids: Array[StringName] = []     # POLITICAL_SYSTEM
 @export var legitimacy: float = 0.7                            # POLITICAL_SYSTEM
+## HOUSE: standing with each other house, -1 (feud) .. +1 (alliance). Driven by
+## marriage ties, shared or contested guilds, and how far apart their ideals are.
+@export var house_relations: Dictionary[StringName, float] = {}
+## HOUSE: settlements this house holds locally, independent of who reigns above.
+@export var held_settlement_ids: Array[StringName] = []
+## POLITICAL_SYSTEM: the form of government currently derived from the balance
+## between houses, guilds and factions. Recomputed each power epoch.
+@export var polity_form_id: StringName = &""
 
 
 func kind_name() -> String:
@@ -114,6 +122,12 @@ func to_dict() -> Dictionary:
 		d["cause_tags"] = _names_to_strings(cause_tags)
 	if not governs_settlement_ids.is_empty():
 		d["governs_settlement_ids"] = _names_to_strings(governs_settlement_ids)
+	if not house_relations.is_empty():
+		d["house_relations"] = _name_keyed_to_strings(house_relations)
+	if not held_settlement_ids.is_empty():
+		d["held_settlement_ids"] = _names_to_strings(held_settlement_ids)
+	if polity_form_id != &"":
+		d["polity_form_id"] = String(polity_form_id)
 	return d
 
 
@@ -156,6 +170,12 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.cause_tags = _strings_to_names(d.get("cause_tags", []))
 	o.governs_settlement_ids = _strings_to_names(d.get("governs_settlement_ids", []))
 	o.legitimacy = float(d.get("legitimacy", 0.7))
+	var relations: Dictionary[StringName, float] = {}
+	for k in d.get("house_relations", {}):
+		relations[StringName(k)] = float(d["house_relations"][k])
+	o.house_relations = relations
+	o.held_settlement_ids = _strings_to_names(d.get("held_settlement_ids", []))
+	o.polity_form_id = StringName(d.get("polity_form_id", ""))
 	return o
 
 

@@ -29,9 +29,10 @@ func children(id: StringName) -> Array[StringName]:
 		var child := GameState.get_person(child_id)
 		if child == null:
 			continue
-		# Claim the child under one parent only: the father if he is known, so a
-		# couple's children are not drawn twice.
-		if child.father_id != &"" and child.father_id != id and GameState.get_person(child.father_id) != null:
+		# Claim each child under one parent only — the father where he is known —
+		# so a couple's children are drawn once, beneath the pair.
+		if child.father_id != &"" and child.father_id != id \
+				and GameState.get_person(child.father_id) != null:
 			continue
 		out.append(child_id)
 	return out
@@ -46,6 +47,17 @@ func parents(id: StringName) -> Array[StringName]:
 		out.append(p.father_id)
 	if p.mother_id != &"":
 		out.append(p.mother_id)
+	return out
+
+
+func spouses(id: StringName) -> Array[StringName]:
+	var p := GameState.get_person(id)
+	if p == null:
+		return []
+	var out: Array[StringName] = []
+	for spouse_id in p.spouse_ids:
+		if GameState.get_person(spouse_id) != null:
+			out.append(spouse_id)
 	return out
 
 

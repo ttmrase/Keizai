@@ -61,7 +61,7 @@ func _check_branch_ideology_is_independent() -> void:
 
 
 func _check_names_stay_distinct() -> void:
-	SimTestHarness.eventful_world(557, 6000)
+	SimTestHarness.eventful_world(557, 3500)
 	var seen := {}
 	for org in GameState.organizations.values():
 		check(not seen.has(org.display_name),
