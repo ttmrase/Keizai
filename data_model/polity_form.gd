@@ -25,3 +25,11 @@ extends Resource
 @export var local_ruler_title: String = "領主"
 ## What the assembly or court of this form is called, for flavour in the UI.
 @export var council_label: String = "宮廷"
+## How much pedigree counts under this form, 0..1. A hereditary monarchy runs on
+## it; a popular republic barely notices a family name. Read by HouseRank, so the
+## same 家格 is worth a great deal in one century and nothing in the next.
+@export var rank_weight: float = 0.6
+## How many seats the chamber of this form holds. A court is a handful of people
+## around a throne; an assembly is a room full of them, which is what makes the
+## division of seats between factions worth reading at all.
+@export var chamber_seats: int = 12

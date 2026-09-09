@@ -279,6 +279,9 @@ func _apply_power_transfer(e: HistoryEvent) -> void:
 	var settlement_id := StringName(e.payload.get("settlement_id", ""))
 	if to_org == null:
 		return
+	if bool(e.payload.get("regime_change", false)):
+		_apply_regime_change(to_org, e)
+		return
 	if settlement_id != &"":
 		var s: SettlementState = world.settlements.get(settlement_id)
 		if s != null:
@@ -290,6 +293,46 @@ func _apply_power_transfer(e: HistoryEvent) -> void:
 			to_org.governs_settlement_ids.append(settlement_id)
 	if from_org != null:
 		from_org.legitimacy = clampf(from_org.legitimacy - float(e.payload.get("legitimacy_cost", 0.1)), 0.0, 1.0)
+
+
+## A regime is overturned. What a country rests on and who decides in it are
+## discrete institutional facts, not drifting values, so unlike ideology axes
+## they change here — through the record — and nowhere else.
+func _apply_regime_change(polity: Organization, e: HistoryEvent) -> void:
+	if polity.ideology == null:
+		return
+	polity.ideology.legitimacy_basis = PoliticalSystemAxes.legitimacy_from_name(
+		e.payload.get("legitimacy_basis", ""), polity.ideology.legitimacy_basis)
+	polity.ideology.decision_structure = PoliticalSystemAxes.structure_from_name(
+		e.payload.get("decision_structure", ""), polity.ideology.decision_structure)
+
+	# The new order drags the country's ideals a long way toward its own — this
+	# is a seizure, not a season's drift.
+	var shift: Dictionary = e.payload.get("axis_shift", {})
+	for key in shift:
+		var axis := StringName(key)
+		polity.ideology.set_axis(axis, lerpf(polity.ideology.get_axis(axis),
+			float(shift[key]), RegimeShift.AXIS_SEIZURE))
+
+	# What it was founded on is now this. Otherwise every later drift rule would
+	# keep measuring the new regime against the beliefs of the one it replaced.
+	polity.ideology_baseline = polity.ideology.clone()
+	polity.legitimacy = RegimeShift.FRESH_LEGITIMACY
+
+	if bool(e.payload.get("depose_ruler", false)):
+		var ruler: NotableIndividual = people.get(polity.leader_person_id)
+		if ruler != null:
+			var tenure := ruler.current_tenure()
+			if tenure != null:
+				tenure.end_tick = e.tick
+				tenure.end_event_id = e.event_id
+		# Left empty on purpose: the seat is filled again next tick under
+		# whatever rules the country now runs on, which is the whole point.
+		polity.leader_person_id = &""
+
+	var named := PoliticalSystemGenerator.name_and_describe(polity)
+	polity.display_name = named["display_name"]
+	polity.description = named["description"]
 
 
 func _apply_dissolution(e: HistoryEvent) -> void:

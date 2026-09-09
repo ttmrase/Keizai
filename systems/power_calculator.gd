@@ -15,6 +15,7 @@ extends RefCounted
 const BASE_KEY := &"base"
 const MEMBERSHIP_KEY := &"membership"
 const LEADERSHIP_KEY := &"leadership"
+const PEDIGREE_KEY := &"pedigree"
 
 ## What each trait is worth to the organization a person leads. Two guilds with
 ## identical world conditions would otherwise always score identically; who is
@@ -112,6 +113,11 @@ static func calculate(org: Organization, profile: PowerProfile) -> float:
 		drivers[LEADERSHIP_KEY] = leader_term
 		score += leader_term
 
+	var pedigree_term := _pedigree_bonus(org, profile)
+	if pedigree_term != 0.0:
+		drivers[PEDIGREE_KEY] = pedigree_term
+		score += pedigree_term
+
 	org.power_drivers = drivers
 	org.power_score = clampf(score, 0.0, profile.max_score)
 	return org.power_score
@@ -131,6 +137,26 @@ static func _leadership_bonus(org: Organization) -> float:
 		var years: float = float(SimClock.current_tick - tenure.start_tick) / SimConfig.TICKS_PER_YEAR
 		bonus += clampf(years / 25.0, 0.0, 1.0) * 4.0
 	return bonus
+
+
+## What the family behind this body is worth to it. A trading house or a temple
+## gains from a well-born officer and says so; a hunters' lodge gains nothing
+## from one. And under a republic almost nobody gains much, however grand the
+## name — which is the whole point of 家格 being weighted rather than absolute.
+static func _pedigree_bonus(org: Organization, profile: PowerProfile) -> float:
+	if profile.rank_sensitivity <= 0.0:
+		return 0.0
+	var tier := 0
+	if org.kind == Organization.OrgKind.HOUSE:
+		tier = org.rank_tier
+	elif org.patron_house_id != &"":
+		tier = HouseRank.tier_of(org.patron_house_id)
+	else:
+		tier = HouseRank.tier_of_person(GameState.get_current_leader(org.org_id))
+	if tier <= 0:
+		return 0.0
+	var regard := HouseRank.regard_in_realm(HouseRank.dominant_realm())
+	return profile.rank_sensitivity * regard * float(tier) * 4.0
 
 
 ## Ranked snapshot for the dashboard.

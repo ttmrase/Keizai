@@ -20,3 +20,5 @@ priority = 100
 ruler_title = "教皇"
 local_ruler_title = "大司祭"
 council_label = "神殿会議"
+rank_weight = 0.35
+chamber_seats = 9

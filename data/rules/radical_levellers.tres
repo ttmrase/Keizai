@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.avg_unrest"
+op = 0
+threshold = 0.52
+describe_as = "収まらぬ民の怒り"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.starving_fraction"
+op = 0
+threshold = 0.3
+describe_as = "飢えた村々"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"radical_levellers"
+rule_type = 0
+applies_to_kind = 2
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 900
+priority = 92
+chance_per_tick = 0.09
+schism_kind = &"radical_break"
+branch_archetype_id = &"levellers_faction"
+inherited_member_fraction = Vector2(0.25, 0.5)
+ideology_drift_bias = {
+"tradition_reform": 0.95,
+"centralization": -0.85,
+"secular_theocratic": -0.3
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "総代"
+radicalism = 0.85
+branch_legitimacy_basis = 1
+branch_decision_structure = 2
+chronicle_template = "{reason}のなか、{leader}は身分そのものを否定し、{parent}を捨てて{branch}を旗揚げした。"

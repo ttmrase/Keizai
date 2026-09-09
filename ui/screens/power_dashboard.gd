@@ -137,6 +137,36 @@ func _government_banner(polity: Organization) -> Control:
 	line.add_theme_font_size_override("font_size", 17)
 	line.add_theme_color_override("font_color", Palette.TEXT)
 	rows.add_child(line)
+
+	# The division of the chamber is what a faction amounts to under a regime that
+	# has one, and it is also what the next upheaval will be decided on.
+	var seated := SocialTies.seat_order(polity)
+	if not seated.is_empty():
+		var parts: Array[String] = []
+		for faction in seated.slice(0, 4):
+			parts.append("%s %d" % [faction.display_name,
+				int(polity.faction_seats.get(faction.org_id, 0))])
+		var seats := Label.new()
+		seats.text = "%s（全%d議席）　%s" % [form.council_label if form != null else "議場",
+			polity.seat_total, "　".join(parts)]
+		seats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		seats.add_theme_font_size_override("font_size", 15)
+		seats.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		rows.add_child(seats)
+
+	var challenge := RegimeShift.standing_challenge(polity)
+	var pressure := Label.new()
+	if challenge.is_empty():
+		pressure.text = "正統性 %d%%　／　体制に挑む者なし" % int(polity.legitimacy * 100.0)
+		pressure.add_theme_color_override("font_color", Palette.TEXT_DIM)
+	else:
+		pressure.text = "正統性 %d%%　／　%sを背に%sが迫っている（掌握 %d%%）" % [
+			int(polity.legitimacy * 100.0), challenge.get("ground", ""),
+			challenge["org"].display_name, int(float(challenge.get("hold", 0.0)) * 100.0)]
+		pressure.add_theme_color_override("font_color", Palette.DANGER)
+	pressure.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pressure.add_theme_font_size_override("font_size", 15)
+	rows.add_child(pressure)
 	return panel
 
 
@@ -172,8 +202,9 @@ func _row(org: Organization, strongest: float) -> Control:
 
 	var leader := GameState.get_current_leader(org.org_id)
 	var sub := Label.new()
-	sub.text = "%s・%d名　%s" % [Palette.kind_label(org.kind), org.member_count,
-		leader.full_name if leader != null else "指導者不在"]
+	sub.text = "%s・%d名　%s%s" % [_kind_note(org), org.member_count,
+		leader.full_name if leader != null else "指導者不在",
+		"（%s）" % HouseRank.tier_name(org.rank_tier) if org.kind == Organization.OrgKind.HOUSE else ""]
 	sub.position = Vector2(14, 34)
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.add_theme_color_override("font_color", Palette.TEXT_MUTED)
@@ -191,6 +222,18 @@ func _row(org: Organization, strongest: float) -> Control:
 	score.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(score)
 	return button
+
+
+## What kind of body this is, and — for the ones that have offices to fill — how
+## it fills them. A guild one family has taken over says so here.
+func _kind_note(org: Organization) -> String:
+	var base := Palette.kind_label(org.kind)
+	if org.kind == Organization.OrgKind.HOUSE or org.kind == Organization.OrgKind.POLITICAL_SYSTEM:
+		return base
+	var patron := GameState.get_organization(org.patron_house_id)
+	if patron != null:
+		return "%s・%s(%s)" % [base, SocialTies.office_basis_label(org), patron.display_name]
+	return "%s・%s" % [base, SocialTies.office_basis_label(org)]
 
 
 ## Names each world condition feeding this organization's influence, so a player
@@ -219,6 +262,7 @@ func _breakdown(org: Organization) -> Control:
 	labels[PowerCalculator.BASE_KEY] = "基礎"
 	labels[PowerCalculator.MEMBERSHIP_KEY] = "規模"
 	labels[PowerCalculator.LEADERSHIP_KEY] = "指導者の力量"
+	labels[PowerCalculator.PEDIGREE_KEY] = "家格の重み"
 
 	var entries: Array = []
 	for key in org.power_drivers:
@@ -248,6 +292,36 @@ func _breakdown(org: Organization) -> Control:
 		ideology.add_theme_font_size_override("font_size", 16)
 		ideology.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		rows.add_child(ideology)
+
+	# Who stands behind it. This is the part that makes a faction more than a
+	# mood: it is backed by particular families and particular trades, and those
+	# are the ones that lose if it falls.
+	var backers := SocialTies.backers_of(org)
+	if not backers.is_empty():
+		var parts: Array[String] = []
+		for backer in backers.slice(0, 5):
+			parts.append("%s %d%%" % [backer.display_name,
+				int(float(org.support_base.get(backer.org_id, 0.0)) * 100.0)])
+		var support := Label.new()
+		support.text = "支持基盤：%s" % "　".join(parts)
+		support.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		support.add_theme_font_size_override("font_size", 16)
+		support.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		rows.add_child(support)
+
+	if org.kind == Organization.OrgKind.HOUSE:
+		var land: Array[String] = []
+		for settlement_id in org.held_settlement_ids:
+			var s: SettlementState = GameState.world.settlements.get(settlement_id)
+			if s != null:
+				land.append(s.display_name)
+		var standing := Label.new()
+		standing.text = "家格：%s　／　所領：%s" % [HouseRank.tier_name(org.rank_tier),
+			"、".join(land) if not land.is_empty() else "なし"]
+		standing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		standing.add_theme_font_size_override("font_size", 16)
+		standing.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		rows.add_child(standing)
 
 	return panel
 

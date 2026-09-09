@@ -20,3 +20,5 @@ priority = 50
 ruler_title = "執政"
 local_ruler_title = "代官"
 council_label = "登用院"
+rank_weight = 0.10
+chamber_seats = 13

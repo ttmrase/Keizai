@@ -28,5 +28,6 @@ max_score = 100.0
 base_score = 5.0
 membership_weight = 0.25
 monster_suppression_factor = 0.0
+rank_sensitivity = 0.75
 default_leadership_title = "会頭"
 noun_bank = Array[String](["商業ギルド", "交易組合", "商人会"])

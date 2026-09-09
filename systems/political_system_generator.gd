@@ -59,15 +59,25 @@ static func generate_root_axes() -> PoliticalSystemAxes:
 
 ## Ideology for a branch: a deep copy of the parent's, pushed by whatever the
 ## split was about, then jittered so no two schisms feel identical.
-static func generate_branch_axes(parent: Organization, drift_bias: Dictionary) -> PoliticalSystemAxes:
+##
+## `radicalism` decides how much of the parent survives the argument. At 0 this
+## is a quarrel between people who agree about nearly everything, which is what
+## most schisms are. At 1 the branch keeps the lineage and little else: the
+## unaffected axes are thrown wide and the contested ones are taken to their
+## limits. Crises produce the second kind, which is the only way a society ever
+## arrives at a politics it has not tried before.
+static func generate_branch_axes(parent: Organization, drift_bias: Dictionary,
+		radicalism: float = 0.0) -> PoliticalSystemAxes:
 	var rng := RngService.stream(&"ideology")
 	var axes: PoliticalSystemAxes = parent.ideology.clone() if parent.ideology != null \
 		else generate_root_axes()
+	var zeal := 1.0 + radicalism * 1.6
 	for key in drift_bias:
 		var axis := StringName(key)
-		axes.set_axis(axis, axes.get_axis(axis) + float(drift_bias[key]))
+		axes.set_axis(axis, axes.get_axis(axis) + float(drift_bias[key]) * zeal)
+	var spread := 0.12 + radicalism * 0.55
 	for a in PoliticalSystemAxes.AXIS_NAMES:
-		axes.set_axis(a, axes.get_axis(a) + rng.randf_range(-0.12, 0.12))
+		axes.set_axis(a, axes.get_axis(a) + rng.randf_range(-spread, spread))
 	return axes
 
 

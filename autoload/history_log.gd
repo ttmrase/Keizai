@@ -79,7 +79,12 @@ func _is_lineage_critical(e: HistoryEvent) -> bool:
 		var p: NotableIndividual = GameState.get_person(e.subject_person_id)
 		return p == null or p.ever_held_office() or p.is_founder_generation
 	if e.event_type == HistoryEvent.EventType.IDEOLOGY_SHIFT:
-		return true
+		# A change to a discrete institutional fact — what a regime rests on, who
+		# owns an office, what form the country takes — is permanent. A house
+		# sliding a rung down the peerage is worth chronicling but not worth
+		# keeping forever, or the backbone would grow with elapsed time rather
+		# than with the number of institutions.
+		return not bool(e.payload.get("transient", false))
 	return false
 
 

@@ -27,3 +27,5 @@ priority = 65
 ruler_title = "統領"
 local_ruler_title = "市長"
 council_label = "民会"
+rank_weight = 0.05
+chamber_seats = 25

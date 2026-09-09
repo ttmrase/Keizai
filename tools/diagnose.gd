@@ -23,10 +23,13 @@ func _ready() -> void:
 	print("\n=== after %d ticks (%d年) ===" % [SimClock.current_tick, SimClock.year()])
 	_print_world_numbers()
 	_print_government()
+	_print_chamber()
 	_print_regions()
+	_print_social_ties()
 	_print_org_tree()
 	_print_house_relations()
 	_print_power_table()
+	_print_upheavals()
 	_print_chronicle_highlights()
 	_print_people_census()
 	_print_family_tree()
@@ -153,6 +156,22 @@ func _print_power_table() -> void:
 		print("  %-26s %5.1f  主因: %s" % [org.display_name, org.power_score, label])
 
 
+func _print_upheavals() -> void:
+	print("\n--- 政変と統治形態の変遷 ---")
+	var shown := 0
+	for e in HistoryLog.backbone:
+		var is_coup: bool = e.event_type == HistoryEvent.EventType.POWER_TRANSFER \
+			and bool(e.payload.get("regime_change", false))
+		var is_form: bool = e.event_type == HistoryEvent.EventType.IDEOLOGY_SHIFT \
+			and e.payload.has("to_form")
+		if not is_coup and not is_form:
+			continue
+		print("  %-10s %s" % [SimClock.format_tick(e.tick), e.description])
+		shown += 1
+	if shown == 0:
+		print("  （体制はついに揺らがなかった）")
+
+
 func _print_chronicle_highlights() -> void:
 	print("\n--- 年代記(抜粋) ---")
 	var shown := 0
@@ -252,6 +271,41 @@ func _print_government() -> void:
 				polity.governs_settlement_ids.size()])
 
 
+func _print_chamber() -> void:
+	print("\n--- 議場 ---")
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		var form := PolityFormEvaluator.form_of(polity)
+		print("  %s（%s・全%d議席・正統性%.2f）"
+			% [polity.display_name, form.council_label if form != null else "議場",
+				polity.seat_total, polity.legitimacy])
+		for faction in SocialTies.seat_order(polity):
+			print("      %-22s %2d議席%s" % [faction.display_name,
+				int(polity.faction_seats.get(faction.org_id, 0)),
+				"　【第一党】" if SocialTies.has_majority(polity, faction) else ""])
+		var challenge := RegimeShift.standing_challenge(polity)
+		if challenge.is_empty():
+			print("      体制に挑む者なし")
+		else:
+			print("      挑戦: %s（%s・掌握%.2f）"
+				% [challenge["org"].display_name, challenge.get("ground", ""),
+					float(challenge.get("hold", 0.0))])
+
+
+func _print_social_ties() -> void:
+	print("\n--- 横のつながり ---")
+	for kind in [Organization.OrgKind.GUILD, Organization.OrgKind.FACTION]:
+		for org in GameState.organizations_of_kind(kind):
+			var patron := GameState.get_organization(org.patron_house_id)
+			var backers: Array[String] = []
+			for b in SocialTies.backers_of(org):
+				backers.append("%s(%.2f)" % [b.display_name, org.support_base.get(b.org_id, 0.0)])
+			print("  %-22s %s%s"
+				% [org.display_name, SocialTies.office_basis_label(org),
+					"・%s" % patron.display_name if patron != null else ""])
+			if not backers.is_empty():
+				print("      支持: %s" % "  ".join(backers.slice(0, 4)))
+
+
 func _print_regions() -> void:
 	print("\n--- 地域 ---")
 	for id in GameState.world.settlements:
@@ -264,9 +318,11 @@ func _print_regions() -> void:
 			lord_text = "%s %s(%s)" % [lord.get("title", ""),
 				person.full_name if person != null else "空位",
 				lord["house"].display_name]
-		print("  %-10s %-6s 人口%-6d %-18s %s"
+		var lean := GameState.get_organization(s.faction_lean_id)
+		print("  %-10s %-6s 人口%-6d %-18s %-16s %s"
 			% [s.display_name, Industry.label(s.industry), int(s.population),
-				guild.display_name if guild != null else "ギルドなし", lord_text])
+				guild.display_name if guild != null else "ギルドなし",
+				lean.display_name if lean != null else "無党派", lord_text])
 
 
 func _print_house_relations() -> void:

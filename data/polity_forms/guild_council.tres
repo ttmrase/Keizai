@@ -27,3 +27,5 @@ priority = 75
 ruler_title = "議長"
 local_ruler_title = "組合頭"
 council_label = "職能評議会"
+rank_weight = 0.20
+chamber_seats = 15

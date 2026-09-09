@@ -16,7 +16,11 @@ extends RefCounted
 ## contested successions alike — so this is the one place the ceiling holds.
 static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 		leader_override: NotableIndividual = null) -> Organization:
-	if GameState.organizations_of_kind(parent.kind).size() >= SimConfig.MAX_ACTIVE_ORGS_PER_KIND:
+	if GameState.organizations_of_kind(parent.kind).size() >= _ceiling_for(rule):
+		return null
+	var archetype: StringName = rule.branch_archetype_id if rule.branch_archetype_id != &"" \
+		else parent.archetype_id
+	if _count_of(archetype) >= SimConfig.MAX_ACTIVE_PER_ARCHETYPE:
 		return null
 
 	var rng := RngService.stream(&"rules")
@@ -36,10 +40,18 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 		branch.leadership_title = profile.default_leadership_title if profile != null \
 			else parent.leadership_title
 
-	branch.ideology = PoliticalSystemGenerator.generate_branch_axes(parent, rule.ideology_drift_bias)
+	branch.ideology = PoliticalSystemGenerator.generate_branch_axes(
+		parent, rule.ideology_drift_bias, rule.radicalism)
 	if rule.branch_archetype_id != &"":
 		branch.ideology.legitimacy_basis = PoliticalSystemGenerator.legitimacy_for_archetype(
 			branch.archetype_id, branch.ideology.legitimacy_basis)
+	# A movement born of a crisis does not merely disagree about degree. Where the
+	# rule says so, the branch rejects how the old body chooses its officers at
+	# all — which is what lets a society arrive at a shape it has never had.
+	if rule.branch_legitimacy_basis >= 0:
+		branch.ideology.legitimacy_basis = rule.branch_legitimacy_basis
+	if rule.branch_decision_structure >= 0:
+		branch.ideology.decision_structure = rule.branch_decision_structure
 	branch.ideology_baseline = branch.ideology.clone()
 
 	var fraction := rng.randf_range(rule.inherited_member_fraction.x, rule.inherited_member_fraction.y)
@@ -111,6 +123,24 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 		parent.ideology_baseline = parent.ideology.clone()
 
 	return GameState.get_organization(branch.org_id)
+
+
+## How many bodies of this kind the world will carry. A society always has room
+## for something it has never had before, so a branch that introduces a genuinely
+## new kind of institution is allowed past the ordinary ceiling — otherwise a
+## world that has already filled its quota with lookalike splinters could never
+## produce a new politics, however badly it needed one.
+static func _ceiling_for(rule: TriggerRule) -> int:
+	if rule.branch_archetype_id == &"":
+		return SimConfig.MAX_ACTIVE_ORGS_PER_KIND
+	if _count_of(rule.branch_archetype_id) > 0:
+		return SimConfig.MAX_ACTIVE_ORGS_PER_KIND
+	return SimConfig.MAX_ACTIVE_ORGS_PER_KIND + SimConfig.NEW_ARCHETYPE_HEADROOM
+
+
+static func _count_of(archetype_id: StringName) -> int:
+	return int(WorldStateQuery.get_value(
+		StringName("count.archetype." + String(archetype_id))))
 
 
 ## A branch needs someone to lead it, and it has to be somebody who already

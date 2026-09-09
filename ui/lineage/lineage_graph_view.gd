@@ -1,12 +1,12 @@
 class_name LineageGraphView
 extends PannableCanvas
 
-## Draws a lineage as a tidy layered tree.
+## Draws a lineage, either as a tidy layered tree or — for a family, which is a
+## graph rather than a forest — as one chart laid out by generation.
 ##
-## Written by hand rather than with GraphEdit: this is a tree, not a general
-## graph, so a layered layout is both simpler and far more readable — and the
-## touch handling, focus mode and collapsing all need to work on a phone screen,
-## which GraphEdit's editor-flavoured nodes do not.
+## Written by hand rather than with GraphEdit: the touch handling, focus mode and
+## collapsing all need to work on a phone screen, which GraphEdit's
+## editor-flavoured nodes do not, and neither layout is anything GraphEdit does.
 
 signal node_selected(id: StringName)
 
@@ -76,6 +76,11 @@ func rebuild() -> void:
 	_hidden_counts.clear()
 	_cursor_x = 0.0
 
+	if source.is_generational():
+		_layout_generational()
+		_settle_bounds()
+		return
+
 	var visited := {}
 	var row_roots := _layout_roots()
 	# Outside focus mode the roots are four unrelated trees — one per kind of
@@ -92,6 +97,10 @@ func rebuild() -> void:
 		if stack_vertically:
 			_row_base = _deepest_row + 2
 
+	_settle_bounds()
+
+
+func _settle_bounds() -> void:
 	_bounds = Rect2()
 	var first := true
 	for id in _positions:
@@ -99,6 +108,265 @@ func rebuild() -> void:
 		_bounds = rect if first else _bounds.merge(rect)
 		first = false
 	queue_redraw()
+
+
+# ------------------------------------------------------- generational layout
+
+## Horizontal room between two households on the same row.
+const GEN_H_GAP := 34.0
+## Sweeps spent reducing crossings, and then straightening descent lines. Both
+## are heuristics; a couple of passes buys most of the legibility.
+const ORDER_SWEEPS := 4
+const PLACE_PASSES := 4
+## Guard against a record where somebody is their own remote in-law, which would
+## otherwise keep pushing rows down forever.
+const MAX_ROW_PASSES := 16
+
+
+## Lays the whole family out by generation, as one chart.
+##
+## The old layout drew a tree per founding couple, and a person who married into
+## another house appeared twice — once beside their partner and once at the head
+## of their own line — so the marriage that joined the two families read as a
+## coincidence of names. Here each person belongs to exactly one household, each
+## household sits on the row of its latest-born member, and the marriage lines
+## are what hold the houses together.
+func _layout_generational() -> void:
+	var ids := _generational_ids()
+	if ids.is_empty():
+		return
+
+	var unit_of := {}          # person id -> index of the household they are in
+	var units: Array = []      # each entry is one or two person ids
+	for id in ids:
+		if unit_of.has(id):
+			continue
+		var members: Array[StringName] = [id]
+		unit_of[id] = units.size()
+		for spouse_id in source.spouses(id):
+			if unit_of.has(spouse_id) or not _in_scope(spouse_id):
+				continue
+			members.append(spouse_id)
+			unit_of[spouse_id] = units.size()
+			break              # one partner drawn per household keeps the row honest
+		units.append(members)
+
+	var rows := _unit_rows(units, unit_of)
+	var parents_of := {}
+	var children_of := {}
+	_unit_links(units, unit_of, parents_of, children_of)
+
+	var by_row := {}
+	for i in units.size():
+		var list: Array = by_row.get(rows[i], [])
+		list.append(i)
+		by_row[rows[i]] = list
+	var row_keys: Array = by_row.keys()
+	row_keys.sort()
+
+	var order := _order_rows(by_row, row_keys, parents_of, children_of)
+	var widths: Array[float] = []
+	for i in units.size():
+		widths.append(NODE_SIZE.x * units[i].size() + SPOUSE_GAP * (units[i].size() - 1))
+	var x := _place_rows(by_row, row_keys, parents_of, children_of, widths)
+
+	_commit_units(units, unit_of, rows, x, widths, ids)
+
+
+func _generational_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	if _focus_active:
+		for id in _visible_ids:
+			if source.exists(id):
+				out.append(id)
+		return out
+	for id in source.all_ids():
+		if source.exists(id):
+			out.append(id)
+	return out
+
+
+func _in_scope(id: StringName) -> bool:
+	if not source.exists(id):
+		return false
+	return not _focus_active or _visible_ids.has(id)
+
+
+## A household sits one row below the household of its parents. That is not the
+## same as the generation of the people in it: marrying someone a generation
+## older puts the pair on one row, and their children have to clear both.
+func _unit_rows(units: Array, unit_of: Dictionary) -> Array[int]:
+	var rows: Array[int] = []
+	for members in units:
+		var deepest := 0
+		for member in members:
+			deepest = maxi(deepest, source.generation(member))
+		rows.append(deepest)
+
+	for pass_index in MAX_ROW_PASSES:
+		var moved := false
+		for i in units.size():
+			for member in units[i]:
+				for child_id in source.children(member):
+					if not _in_scope(child_id) or not unit_of.has(child_id):
+						continue
+					var j: int = unit_of[child_id]
+					if j != i and rows[j] <= rows[i]:
+						rows[j] = rows[i] + 1
+						moved = true
+		if not moved:
+			break
+
+	var earliest := 0
+	for r in rows:
+		earliest = mini(earliest, r)
+	if earliest != 0:
+		for i in rows.size():
+			rows[i] -= earliest
+	return rows
+
+
+func _unit_links(units: Array, unit_of: Dictionary, parents_of: Dictionary,
+		children_of: Dictionary) -> void:
+	for i in units.size():
+		for member in units[i]:
+			for child_id in source.children(member):
+				if not _in_scope(child_id) or not unit_of.has(child_id):
+					continue
+				var j: int = unit_of[child_id]
+				if j == i:
+					continue
+				var kids: Array = children_of.get(i, [])
+				if not kids.has(j):
+					kids.append(j)
+					children_of[i] = kids
+				var folks: Array = parents_of.get(j, [])
+				if not folks.has(i):
+					folks.append(i)
+					parents_of[j] = folks
+
+
+## Orders each row so lines cross as little as they cheaply can: repeatedly sort
+## every row by the average position of what it connects to on the row above,
+## then on the row below.
+func _order_rows(by_row: Dictionary, row_keys: Array, parents_of: Dictionary,
+		children_of: Dictionary) -> Dictionary:
+	var order := {}
+	for key in row_keys:
+		var list: Array = by_row[key]
+		for k in list.size():
+			order[list[k]] = k
+
+	for sweep in ORDER_SWEEPS:
+		var downward := sweep % 2 == 0
+		var keys: Array = row_keys.duplicate()
+		if not downward:
+			keys.reverse()
+		var neighbours: Dictionary = parents_of if downward else children_of
+		for key in keys:
+			var list: Array = by_row[key]
+			list.sort_custom(func(a, b):
+				return _barycentre(a, neighbours, order) < _barycentre(b, neighbours, order))
+			for k in list.size():
+				order[list[k]] = k
+			by_row[key] = list
+	return order
+
+
+func _barycentre(unit: int, neighbours: Dictionary, order: Dictionary) -> float:
+	var linked: Array = neighbours.get(unit, [])
+	if linked.is_empty():
+		return float(order.get(unit, 0))
+	var total := 0.0
+	for other in linked:
+		total += float(order.get(other, 0))
+	return total / float(linked.size())
+
+
+## Places each row left to right, pulling every household toward the middle of
+## what it is joined to without ever letting it overtake its neighbour.
+func _place_rows(by_row: Dictionary, row_keys: Array, parents_of: Dictionary,
+		children_of: Dictionary, widths: Array[float]) -> Dictionary:
+	var x := {}
+	for key in row_keys:
+		var cursor := 0.0
+		for i in by_row[key]:
+			x[i] = cursor
+			cursor += widths[i] + GEN_H_GAP
+
+	for pass_index in PLACE_PASSES:
+		var downward := pass_index % 2 == 0
+		var keys: Array = row_keys.duplicate()
+		if not downward:
+			keys.reverse()
+		var neighbours: Dictionary = parents_of if downward else children_of
+		for key in keys:
+			var cursor := -INF
+			var wanted := 0.0
+			var placed := 0.0
+			var list: Array = by_row[key]
+			for i in list:
+				var desired: float = _desired_x(i, neighbours, x, widths)
+				var left: float = maxf(desired, cursor)
+				x[i] = left
+				cursor = left + widths[i] + GEN_H_GAP
+				wanted += desired
+				placed += left
+			# Overlaps are resolved by pushing right, which on its own walks the
+			# whole row further right every sweep and stretches the chart to
+			# nothing. Sliding the row back onto its own centre of gravity keeps
+			# the spacing that was just resolved and drops the drift.
+			if not list.is_empty():
+				var drift: float = (placed - wanted) / float(list.size())
+				if not is_zero_approx(drift):
+					for i in list:
+						x[i] -= drift
+	return x
+
+
+func _desired_x(unit: int, neighbours: Dictionary, x: Dictionary,
+		widths: Array[float]) -> float:
+	var linked: Array = neighbours.get(unit, [])
+	if linked.is_empty():
+		return float(x.get(unit, 0.0))
+	var total := 0.0
+	for other in linked:
+		total += float(x.get(other, 0.0)) + widths[other] * 0.5
+	return total / float(linked.size()) - widths[unit] * 0.5
+
+
+func _commit_units(units: Array, unit_of: Dictionary, rows: Array[int], x: Dictionary,
+		widths: Array[float], ids: Array[StringName]) -> void:
+	var leftmost := INF
+	for i in units.size():
+		leftmost = minf(leftmost, float(x.get(i, 0.0)))
+	if leftmost == INF:
+		leftmost = 0.0
+
+	for i in units.size():
+		var members: Array = units[i]
+		var left: float = float(x.get(i, 0.0)) - leftmost
+		var y: float = rows[i] * ROW_HEIGHT
+		for k in members.size():
+			_positions[members[k]] = Vector2(left + k * (NODE_SIZE.x + SPOUSE_GAP), y)
+		var centre: float = left + widths[i] * 0.5
+		for member in members:
+			_child_anchor[member] = centre
+		if members.size() == 2:
+			_spouse_edges.append([members[0], members[1]])
+			_partner_of[members[0]] = members[1]
+
+	# One descent line per person, hung from the middle of their parents' household.
+	for id in ids:
+		if not unit_of.has(id):
+			continue
+		for parent_id in source.parents(id):
+			if not _in_scope(parent_id) or not unit_of.has(parent_id):
+				continue
+			if unit_of[parent_id] == unit_of[id]:
+				continue
+			_edges.append([parent_id, id])
+			break
 
 
 ## In focus mode the tree is rooted at the highest visible ancestor rather than
@@ -232,11 +500,18 @@ func focus_on(id: StringName, ancestor_depth: int = 12, descendant_depth: int = 
 			if source.exists(sibling_id):
 				_visible_ids[sibling_id] = true
 
-	# Nobody visible should be shown without the person they married.
+	# Nobody visible should be shown without the person they married — and with
+	# their partner comes the partner's parents, because in a world where houses
+	# only meet by marriage that line is the join between two families and the
+	# reason the subject exists at all.
 	for visible_id in _visible_ids.keys():
 		for spouse_id in source.spouses(visible_id):
-			if source.exists(spouse_id):
-				_visible_ids[spouse_id] = true
+			if not source.exists(spouse_id):
+				continue
+			_visible_ids[spouse_id] = true
+			for in_law_id in source.parents(spouse_id):
+				if source.exists(in_law_id):
+					_visible_ids[in_law_id] = true
 
 	_focus_active = true
 	selected_id = id
@@ -290,7 +565,12 @@ func frame_all() -> void:
 	var scaled := _bounds.size * view_zoom
 	# Trees grow downward from their origin, so pin the top rather than centring
 	# vertically and leaving the roots floating in the middle of the screen.
-	var x: float = (size.x - scaled.x) * 0.5 if scaled.x < size.x else 24.0
+	# Horizontally the opposite: a family four centuries wide does not fit at any
+	# readable zoom, and its left edge is usually an empty corner, so open in the
+	# middle of it and let the player pan.
+	var x: float = (size.x - scaled.x) * 0.5
+	if scaled.x >= size.x:
+		x = size.x * 0.5 - _bounds.size.x * 0.5 * view_zoom
 	view_offset = Vector2(x, 28.0) - _bounds.position * view_zoom
 	_needs_framing = false
 	queue_redraw()
@@ -363,7 +643,10 @@ func _draw_node(id: StringName) -> void:
 	draw_string(font, rect.position + Vector2(pad, 46.0 * view_zoom), source.sublabel(id),
 		HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - pad * 2.0, sub_size, Palette.TEXT_MUTED)
 
-	var child_count := source.children(id).size()
+	# Folding a subtree only means something in a tree. In the family chart a
+	# person's descendants are also somebody else's, so there is nothing to fold
+	# them into; focus mode and search are what make that view readable.
+	var child_count := 0 if source.is_generational() else source.children(id).size()
 	if child_count > 0:
 		var chevron_centre := rect.position + Vector2(
 			rect.size.x - CHEVRON_WIDTH * view_zoom * 0.5, rect.size.y * 0.5)
@@ -382,7 +665,8 @@ func _on_tapped(world_position: Vector2) -> void:
 		var rect := Rect2(_positions[id], NODE_SIZE)
 		if not rect.has_point(world_position):
 			continue
-		var in_chevron: bool = world_position.x > rect.position.x + NODE_SIZE.x - CHEVRON_WIDTH
+		var in_chevron: bool = not source.is_generational() \
+			and world_position.x > rect.position.x + NODE_SIZE.x - CHEVRON_WIDTH
 		if in_chevron and not source.children(id).is_empty():
 			toggle_collapse(id)
 		else:

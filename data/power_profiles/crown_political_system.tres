@@ -28,5 +28,6 @@ max_score = 100.0
 base_score = 10.0
 membership_weight = 0.2
 monster_suppression_factor = 0.05
+rank_sensitivity = 1.00
 default_leadership_title = "君主"
 noun_bank = Array[String](["体制"])

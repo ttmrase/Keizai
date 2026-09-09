@@ -27,3 +27,5 @@ priority = 30
 ruler_title = "国王"
 local_ruler_title = "総督"
 council_label = "宮廷"
+rank_weight = 0.85
+chamber_seats = 7

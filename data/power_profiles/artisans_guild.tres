@@ -28,5 +28,6 @@ max_score = 100.0
 base_score = 5.0
 membership_weight = 0.25
 monster_suppression_factor = 0.0
+rank_sensitivity = 0.10
 default_leadership_title = "親方"
 noun_bank = Array[String](["職人ギルド", "鍛冶組合", "工匠会"])

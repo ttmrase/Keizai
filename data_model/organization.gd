@@ -69,6 +69,20 @@ const KIND_NAMES := {
 @export var house_relations: Dictionary[StringName, float] = {}
 ## HOUSE: settlements this house holds locally, independent of who reigns above.
 @export var held_settlement_ids: Array[StringName] = []
+## HOUSE: 家格 — the tier of the peerage this family stands at, 0 (男爵) to 4
+## (公爵). Derived from land, standing and the crown each epoch; how much it is
+## worth depends entirely on who is asking. See HouseRank.
+@export var rank_tier: int = 0
+## GUILD/FACTION: which houses and guilds actually stand behind this body, and
+## how firmly (org_id -> 0..1). This is what makes a faction more than a mood.
+@export var support_base: Dictionary[StringName, float] = {}
+## POLITICAL_SYSTEM: how the chamber divides between factions (org_id -> seats).
+@export var faction_seats: Dictionary[StringName, int] = {}
+@export var seat_total: int = 0
+## GUILD/FACTION: the house that has come to own this body's leadership, if one
+## has. A guild whose masters keep coming from the same family has been captured
+## by it, whatever its charter says.
+@export var patron_house_id: StringName = &""
 ## POLITICAL_SYSTEM: the form of government currently derived from the balance
 ## between houses, guilds and factions. Recomputed each power epoch.
 @export var polity_form_id: StringName = &""
@@ -128,6 +142,16 @@ func to_dict() -> Dictionary:
 		d["held_settlement_ids"] = _names_to_strings(held_settlement_ids)
 	if polity_form_id != &"":
 		d["polity_form_id"] = String(polity_form_id)
+	if rank_tier != 0:
+		d["rank_tier"] = rank_tier
+	if not support_base.is_empty():
+		d["support_base"] = _name_keyed_to_strings(support_base)
+	if not faction_seats.is_empty():
+		d["faction_seats"] = _name_keyed_to_strings(faction_seats)
+	if seat_total != 0:
+		d["seat_total"] = seat_total
+	if patron_house_id != &"":
+		d["patron_house_id"] = String(patron_house_id)
 	return d
 
 
@@ -176,6 +200,17 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.house_relations = relations
 	o.held_settlement_ids = _strings_to_names(d.get("held_settlement_ids", []))
 	o.polity_form_id = StringName(d.get("polity_form_id", ""))
+	o.rank_tier = int(d.get("rank_tier", 0))
+	var support: Dictionary[StringName, float] = {}
+	for k in d.get("support_base", {}):
+		support[StringName(k)] = float(d["support_base"][k])
+	o.support_base = support
+	var seats: Dictionary[StringName, int] = {}
+	for k in d.get("faction_seats", {}):
+		seats[StringName(k)] = int(d["faction_seats"][k])
+	o.faction_seats = seats
+	o.seat_total = int(d.get("seat_total", 0))
+	o.patron_house_id = StringName(d.get("patron_house_id", ""))
 	return o
 
 

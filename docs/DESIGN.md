@@ -529,3 +529,88 @@ anything to disagree about.
 from `GodPowerAPI` on purpose: naming a place changes no number and shifts no
 outcome, so it does not belong behind the boundary that keeps the player out of
 politics. That boundary is unchanged and still checked mechanically.
+
+---
+
+## Third iteration: the wiring between the elements
+
+The four kinds of institution each worked and none of them touched. A guild
+could double its influence without the crown noticing; a faction was an opinion
+with no constituency; a political system drifted through adjectives without ever
+becoming a different kind of thing. This round is almost entirely about the
+links, plus the two consequences that only became possible once the links
+existed.
+
+**Everything horizontal is derived, none of it is stored as sentiment.**
+`SocialTies.refresh_all()` runs once an epoch and reads four relations off
+things that are already true:
+
+- *A family owning an office.* One sweep over everyone who ever held a post
+  totals, per body, how long each house has held it. Past a share of its whole
+  recorded history the office is that house's — and then the office starts to
+  admit it, drifting toward hereditary legitimacy, which makes the next
+  succession draw from the same house again. When the family dies out the hold
+  releases and the seat goes back to being argued over. This loop is the answer
+  to 世襲制／実力制／協議制: they are not settings, they are what a body's history
+  has made of it.
+- *A support base.* Which houses and guilds stand behind a faction, from
+  ideological distance, offices held, a shared patron family, and whether the
+  land a house holds is ground the faction speaks for.
+- *A chamber.* Seats divided among the factions by influence and by how much of
+  the realm leans their way, allocated by largest remainder with ties broken on
+  org id so a replay divides the room the same way. The chamber's size comes
+  from the form of government, so a country that becomes a republic grows a room
+  to argue in.
+- *Leaning land.* Each region is with somebody, from its industry, its ruling
+  house's allegiances, and its dominant guild's.
+
+**家格.** `HouseRank` gives every house a tier from its land, standing, the crown
+and its age — capped by a quota, because a peerage is comparative and a country
+with eight dukes has none. What makes it worth having is that its *weight* is
+not constant: `PolityForm.rank_weight` says how much a form of government cares,
+`PowerProfile.rank_sensitivity` says how much a kind of body cares, and the two
+multiply. Under a feudal crown a name decides successions, wins vacant counties
+and is the title its holder is addressed by; under a popular assembly the same
+name is worth almost nothing, and a hunters' lodge never cared either way.
+
+**Regimes can now be taken.** Ideology drifted but institutions did not, so the
+crown survived everything. `RegimeShift` measures who is actually holding the
+country up — a bloc with two seats in five, an estate of guilds outweighing the
+throne, or a population angry enough that neither matters — and drains the
+regime's legitimacy while that lasts. When a challenger's hold exceeds what is
+left of the regime's standing, the discrete facts change hands: legitimacy basis
+and decision structure are rewritten in the winner's image, the country's ideals
+are dragged most of the way to theirs, and unless the new order still runs on
+blood the sitting ruler is deposed and the seat refilled next tick under the new
+rules. Those two fields are institutional facts rather than continuous values,
+so unlike the drifting axes they change through `HistoryLog.record()` and
+nowhere else.
+
+**Crises produce politics nobody had tried.** Schism rules gained a `radicalism`
+scale and the ability to set the branch's own legitimacy basis and decision
+structure. An ordinary split is a disagreement about degree and inherits nearly
+everything; a radical one keeps the lineage and little else. Five archetypes are
+authored against extreme conditions — levellers out of famine and anger,
+millenarians out of unending calamity, a junta out of an existential threat,
+free cities out of wealth the crown cannot tax, technocrats where craft and
+magic outrun tradition. Two ceilings keep this legible rather than noisy: a
+society carries at most three bodies of any one archetype, so whichever
+archetype the world currently rewards cannot split into seven variations of
+itself, and a branch introducing a kind of institution the world does not yet
+have may exceed the per-kind ceiling, because a society always has room for
+something it has never had before.
+
+**One family tree instead of eight.** The old view drew a tree per founding
+couple. Since houses only meet by marriage, everyone who married out appeared
+twice — once beside their partner and once at the head of their own line — and
+the marriage joining the two families read as a coincidence of surnames. The
+family view is now laid out by generation: households (a person, or a married
+pair) are placed on a row, each person appears exactly once, and the marriage
+lines are what hold the houses together. Rows come from birth date rather than
+depth of descent, because people marry across generations and counting descent
+inflates to fifty-odd rows over four centuries; a relaxation pass then pushes
+any household below its parents, so the ordering stays true. Ordering within a
+row is a few barycentre sweeps, and placement recentres each row on its own
+centre of gravity after resolving overlaps — without that, resolving overlaps
+rightward walks the chart wider on every sweep. Organization lineages are
+genuinely forests and keep the old layout.

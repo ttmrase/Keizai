@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"global_ore"
+op = 0
+threshold = 1500.0
+describe_as = "溢れる資材と新しい技"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"count.archetype.mage_guild"
+op = 0
+threshold = 0.5
+describe_as = "魔術師たちの台頭"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"radical_technocrats"
+rule_type = 0
+applies_to_kind = 2
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 900
+priority = 86
+chance_per_tick = 0.09
+schism_kind = &"radical_break"
+branch_archetype_id = &"technocrat_faction"
+inherited_member_fraction = Vector2(0.25, 0.5)
+ideology_drift_bias = {
+"tradition_reform": 0.9,
+"secular_theocratic": -0.7,
+"centralization": 0.4
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "主任"
+radicalism = 0.70
+branch_legitimacy_basis = 2
+branch_decision_structure = 1
+chronicle_template = "{reason}のなか、{leader}は血筋より腕を説き、{parent}から{branch}を組織した。"

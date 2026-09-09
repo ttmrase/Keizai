@@ -28,5 +28,6 @@ max_score = 100.0
 base_score = 6.0
 membership_weight = 0.3
 monster_suppression_factor = 0.0
+rank_sensitivity = 0.10
 default_leadership_title = "代表"
 noun_bank = Array[String](["民衆派", "市民派"])

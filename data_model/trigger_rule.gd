@@ -50,6 +50,17 @@ enum SuccessionMethod {
 ## Cap on how many organizations of the branch archetype may exist at once.
 @export var max_instances_of_archetype: int = 0   # 0 = unlimited
 @export var branch_leadership_title: String = ""
+## How far the branch is thrown from the parent, 0..1. An ordinary split is a
+## disagreement about degree and inherits nearly everything; a radical one is a
+## different answer to the question, and 1.0 means it keeps almost nothing but
+## the lineage. This is what stops a century of schisms producing a shelf of
+## near-identical factions.
+@export var radicalism: float = 0.0
+## The branch's own institutional facts, -1 to inherit the parent's. A movement
+## born of famine does not merely disagree with the old order about taxes — it
+## rejects that a seat should be inherited at all.
+@export var branch_legitimacy_basis: int = -1
+@export var branch_decision_structure: int = -1
 
 # --- SUCCESSION ---
 @export var method: SuccessionMethod = SuccessionMethod.PRIMOGENITURE

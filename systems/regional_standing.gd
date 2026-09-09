@@ -46,9 +46,15 @@ static func _verify_ruling_house(settlement: SettlementState) -> void:
 			holder.held_settlement_ids.append(settlement.id)
 		return
 
+	# Where the realm cares about pedigree, a grand old family takes the vacant
+	# county over a stronger upstart; where it does not, strength simply wins.
+	var regard := HouseRank.regard_in_realm(HouseRank.dominant_realm())
 	var best: Organization = null
+	var best_claim := -INF
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
-		if best == null or house.power_score > best.power_score:
+		var claim: float = house.power_score + regard * float(house.rank_tier) * 18.0
+		if claim > best_claim:
+			best_claim = claim
 			best = house
 	if best == null:
 		settlement.ruling_house_id = &""

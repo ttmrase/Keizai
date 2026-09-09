@@ -20,3 +20,5 @@ priority = 80
 ruler_title = "頭領"
 local_ruler_title = "代官"
 council_label = "財務評定"
+rank_weight = 0.45
+chamber_seats = 11

@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"recent_disaster_pressure"
+op = 0
+threshold = 2.4
+describe_as = "終わらぬ災厄"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.avg_unrest"
+op = 0
+threshold = 0.4
+describe_as = "世の乱れ"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"radical_millenarians"
+rule_type = 0
+applies_to_kind = 2
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 900
+priority = 94
+chance_per_tick = 0.09
+schism_kind = &"radical_break"
+branch_archetype_id = &"millenarian_faction"
+inherited_member_fraction = Vector2(0.25, 0.5)
+ideology_drift_bias = {
+"secular_theocratic": 0.95,
+"tradition_reform": 0.55,
+"isolationism_commerce": -0.6
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "預言者"
+radicalism = 0.90
+branch_legitimacy_basis = 3
+branch_decision_structure = 0
+chronicle_template = "{reason}を世の終わりの兆しと見た{leader}は、{parent}を離れて{branch}を興した。"

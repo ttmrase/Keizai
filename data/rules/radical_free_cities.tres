@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"global_wealth"
+op = 0
+threshold = 2200.0
+describe_as = "膨れ上がる都市の富"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.avg_unrest"
+op = 1
+threshold = 0.3
+describe_as = "落ち着いた市中"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"radical_free_cities"
+rule_type = 0
+applies_to_kind = 2
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 900
+priority = 88
+chance_per_tick = 0.09
+schism_kind = &"radical_break"
+branch_archetype_id = &"free_city_faction"
+inherited_member_fraction = Vector2(0.25, 0.5)
+ideology_drift_bias = {
+"isolationism_commerce": 0.9,
+"centralization": -0.9,
+"tradition_reform": 0.5
+}
+min_parent_members = 45
+max_instances_of_archetype = 1
+branch_leadership_title = "市参事"
+radicalism = 0.75
+branch_legitimacy_basis = 5
+branch_decision_structure = 2
+chronicle_template = "{reason}を背に、{leader}は王の徴税を拒み、{parent}から{branch}を分かった。"

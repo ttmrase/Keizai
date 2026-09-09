@@ -27,3 +27,5 @@ priority = 85
 ruler_title = "総裁"
 local_ruler_title = "市長"
 council_label = "商人評議会"
+rank_weight = 0.25
+chamber_seats = 21

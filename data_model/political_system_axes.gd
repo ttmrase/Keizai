@@ -126,6 +126,14 @@ static func from_dict(d: Dictionary) -> PoliticalSystemAxes:
 	return a
 
 
+static func legitimacy_from_name(name: String, fallback: int) -> int:
+	return _enum_from_name(LEGITIMACY_NAMES, name, fallback)
+
+
+static func structure_from_name(name: String, fallback: int) -> int:
+	return _enum_from_name(STRUCTURE_NAMES, name, fallback)
+
+
 static func _enum_from_name(table: Dictionary, name: String, fallback: int) -> int:
 	for k in table:
 		if table[k] == name:

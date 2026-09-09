@@ -16,6 +16,10 @@ extends Resource
 ## Fraction of monster population this archetype culls per point of power.
 ## Only the archetypes that actually fight monsters set this above zero.
 @export var monster_suppression_factor: float = 0.0
+## How much this kind of body cares who your family is, 0..1. A temple or a
+## trading house wants well-born officers and gains standing from them; a
+## hunters' lodge wants someone who can fight and gains nothing from a title.
+@export var rank_sensitivity: float = 0.0
 ## Naming/flavour hints used by the generator when this archetype is founded.
 @export var default_leadership_title: String = "Head"
 @export var noun_bank: Array[String] = []

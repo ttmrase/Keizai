@@ -27,3 +27,5 @@ priority = 60
 ruler_title = "国王"
 local_ruler_title = "州知事"
 council_label = "議会"
+rank_weight = 0.70
+chamber_seats = 19

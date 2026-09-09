@@ -27,3 +27,5 @@ priority = 90
 ruler_title = "総団長"
 local_ruler_title = "辺境伯"
 council_label = "討伐評定"
+rank_weight = 0.30
+chamber_seats = 9

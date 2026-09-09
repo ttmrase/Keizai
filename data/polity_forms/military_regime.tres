@@ -20,3 +20,5 @@ priority = 95
 ruler_title = "総統"
 local_ruler_title = "守将"
 council_label = "軍務評定"
+rank_weight = 0.20
+chamber_seats = 7

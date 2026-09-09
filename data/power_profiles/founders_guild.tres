@@ -28,5 +28,6 @@ max_score = 100.0
 base_score = 8.0
 membership_weight = 0.35
 monster_suppression_factor = 0.0
+rank_sensitivity = 0.40
 default_leadership_title = "組合長"
 noun_bank = Array[String](["職能組合", "手仕事の組合", "労働組合"])

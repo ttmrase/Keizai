@@ -49,6 +49,19 @@ const AFFINITY := {
 }
 
 
+## Which faction archetype has a natural constituency in a region of this kind.
+## A faction speaks for somewhere in particular — the levellers are loud in the
+## mining valleys, the junta on the frontier — which is how land ends up inside
+## the political network rather than beside it.
+const SYMPATHY := {
+	MINING: [&"commons_faction", &"levellers_faction"],
+	FORESTRY: [&"farmers_faction", &"commons_faction"],
+	FARMING: [&"farmers_faction", &"levellers_faction"],
+	TRADE: [&"free_city_faction", &"commons_faction"],
+	FRONTIER: [&"war_junta_faction", &"temple_faction"],
+}
+
+
 static func label(industry: StringName) -> String:
 	return LABELS.get(industry, String(industry))
 
@@ -64,6 +77,10 @@ static func yield_modifier(industry: StringName, key: String) -> float:
 
 static func favours(industry: StringName, archetype_id: StringName) -> bool:
 	return AFFINITY.get(industry, []).has(archetype_id)
+
+
+static func sympathetic_to(industry: StringName, archetype_id: StringName) -> bool:
+	return SYMPATHY.get(industry, []).has(archetype_id)
 
 
 ## Assigns industries across the map so a world always has some of each rather

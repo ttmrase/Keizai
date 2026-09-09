@@ -28,5 +28,6 @@ max_score = 100.0
 base_score = 5.0
 membership_weight = 0.3
 monster_suppression_factor = 0.0
+rank_sensitivity = 0.15
 default_leadership_title = "肝煎"
 noun_bank = Array[String](["農民派", "農村同盟", "耕す者の集い"])

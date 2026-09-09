@@ -86,6 +86,18 @@ const ORG_DISSOLVE_MEMBERS := 3
 ## a ceiling, drift-driven schisms compound into a crowd of indistinguishable
 ## splinters and the lineage tree stops being readable.
 const MAX_ACTIVE_ORGS_PER_KIND := 7
+## ...except that a society always has room for something it has never had
+## before. A branch that invents a kind of institution the world does not yet
+## contain may exceed the ceiling by this much; a plain splinter may not. Without
+## the exception a world that has already filled its quota with lookalike
+## factions can never produce a new politics, however badly it needs one.
+const NEW_ARCHETYPE_HEADROOM := 2
+## And no more than this many bodies of any one archetype. A society sustains a
+## few rival lodges of the same trade, not seven — without the cap, whichever
+## archetype the world currently rewards splits over and over until every faction
+## in the country is a variation on the same one, which is exactly the sameness
+## the archetypes exist to avoid.
+const MAX_ACTIVE_PER_ARCHETYPE := 3
 
 ## Longest name the player may give a place or an institution.
 const MAX_NAME_LENGTH := 24

@@ -172,6 +172,11 @@ func _show_detail(id: StringName) -> void:
 				lord["house"].display_name])
 	lines.append("[color=#9a9080]属する国[/color]  %s"
 		% (holder.display_name if holder != null else "なし"))
+	# A region is not only governed, it leans. Its trade and the family holding it
+	# put it behind some faction in the capital, which is how land counts there.
+	var lean := GameState.get_organization(s.faction_lean_id)
+	lines.append("[color=#9a9080]この地の声[/color]  %s"
+		% (lean.display_name if lean != null else "定まらず"))
 	lines.append("[color=#9a9080]人口[/color]  %d　[color=#9a9080]富[/color]  %d"
 		% [int(s.population), int(s.wealth)])
 	lines.append("[color=#9a9080]食料[/color]  %d%s" % [int(s.food_stock),

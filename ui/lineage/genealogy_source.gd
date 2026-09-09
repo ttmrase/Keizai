@@ -1,9 +1,45 @@
 class_name GenealogySource
 extends LineageSource
 
-## The family tree. A child has two parents but is drawn once, under whichever
-## parent the traversal reaches first — otherwise the same person would appear in
-## two places and the tree would stop reading as a tree.
+## The family tree — all of it, as one chart.
+##
+## Every house descends from the same founding cohort and the houses marry into
+## each other, so this is a single graph, not one tree per family. Drawn as
+## separate trees, a married couple appears twice (once in each of their birth
+## families) and the marriage that joins the two houses is invisible. So the view
+## lays people out by generation instead: everyone appears exactly once, spouses
+## sit side by side, and the line between them is the join.
+
+func is_generational() -> bool:
+	return true
+
+
+func all_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in GameState.people:
+		out.append(id)
+	return out
+
+
+## Roughly the span between one generation and the next.
+const TICKS_PER_GENERATION := SimConfig.TICKS_PER_YEAR * 24
+
+
+## Which band of time a person belongs to.
+##
+## Counting descent instead — one below the deepest parent — sounds more correct
+## and reads far worse: people marry across generations, so the count inflates
+## every time they do, and four centuries produce fifty-odd rows of which most
+## hold a handful of people. Birth date gives a chart whose rows are generations
+## as anyone would mean the word. It can put a parent and a late-born child in
+## the same band, which the view then pushes apart — so the ordering stays true
+## and the chart stays the shape of the history.
+func generation(id: StringName) -> int:
+	var p := GameState.get_person(id)
+	if p == null:
+		return 0
+	return int(floorf(float(p.birth_tick) / float(TICKS_PER_GENERATION)))
+
 
 func roots() -> Array[StringName]:
 	var out: Array[StringName] = []
@@ -26,15 +62,8 @@ func children(id: StringName) -> Array[StringName]:
 		return []
 	var out: Array[StringName] = []
 	for child_id in p.children_ids:
-		var child := GameState.get_person(child_id)
-		if child == null:
-			continue
-		# Claim each child under one parent only — the father where he is known —
-		# so a couple's children are drawn once, beneath the pair.
-		if child.father_id != &"" and child.father_id != id \
-				and GameState.get_person(child.father_id) != null:
-			continue
-		out.append(child_id)
+		if GameState.get_person(child_id) != null:
+			out.append(child_id)
 	return out
 
 

@@ -56,6 +56,12 @@ func _ready() -> void:
 	await _settle()
 	await _capture("%s/lineage_people.png" % _out_dir)
 
+	# The whole family at once: every house on one chart, joined by marriage.
+	lineage._graph.clear_focus()
+	lineage._update_focus_note()
+	await _settle()
+	await _capture("%s/lineage_all_people.png" % _out_dir)
+
 	# And one focused on a single figure, which is how it is normally read.
 	var subject := &""
 	for id in GameState.people:

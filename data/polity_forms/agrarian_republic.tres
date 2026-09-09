@@ -27,3 +27,5 @@ priority = 70
 ruler_title = "議長"
 local_ruler_title = "肝煎"
 council_label = "村々の合議"
+rank_weight = 0.15
+chamber_seats = 19

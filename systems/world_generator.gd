@@ -44,7 +44,9 @@ static func generate(world_seed: int) -> void:
 	# One resource step so the world has believable numbers before the first tick.
 	GameState.step_resources(0)
 	PowerCalculator.recalculate_all(0)
+	HouseRank.refresh_all(0)
 	RegionalStanding.refresh_all(0)
+	SocialTies.refresh_all(0)
 	PolityFormEvaluator.refresh_all(0)
 	HouseRelations.refresh_all(0)
 	EventBus.world_reset.emit()

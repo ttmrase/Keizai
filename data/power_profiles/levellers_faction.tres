@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv0"]
+script = ExtResource("2_driver")
+world_var_path = &"world.settlements.avg_unrest"
+weight = 54.0
+expected_max = 0.7
+invert = false
+label = "民の怒り"
+
+[sub_resource type="Resource" id="drv1"]
+script = ExtResource("2_driver")
+world_var_path = &"world.settlements.starving_fraction"
+weight = 30.0
+expected_max = 0.8
+invert = false
+label = "飢えた村"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"levellers_faction"
+display_label = "平等派"
+drivers = Array[Resource]([SubResource("drv0"), SubResource("drv1")])
+max_score = 100.0
+base_score = 4.0
+membership_weight = 0.34
+monster_suppression_factor = 0.0
+rank_sensitivity = 0.00
+default_leadership_title = "総代"
+noun_bank = Array[String](["平等派", "水平派", "鋤の同盟"])

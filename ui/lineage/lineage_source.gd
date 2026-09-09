@@ -50,3 +50,23 @@ func search(_query: String) -> Array[StringName]:
 
 func exists(_id: StringName) -> bool:
 	return false
+
+
+## Every node, for a source whose shape is a graph rather than a forest of trees.
+func all_ids() -> Array[StringName]:
+	return []
+
+
+## True when this source should be laid out by generation rather than as trees
+## hanging from roots. A family tree has to be: the marriages between houses are
+## edges of the same graph, so drawing each house as its own tree means drawing
+## every married couple twice, once in each family. Organizations really are a
+## forest — a guild has one parent guild — and stay that way.
+func is_generational() -> bool:
+	return false
+
+
+## The generation a node sits in: 0 for the founding cohort, otherwise one below
+## the deepest parent. Only meaningful for a generational source.
+func generation(_id: StringName) -> int:
+	return 0

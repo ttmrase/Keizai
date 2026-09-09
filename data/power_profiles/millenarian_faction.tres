@@ -3,31 +3,31 @@
 [ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
 [ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
 
-[sub_resource type="Resource" id="drv_calamity"]
+[sub_resource type="Resource" id="drv0"]
 script = ExtResource("2_driver")
 world_var_path = &"recent_disaster_pressure"
-weight = 46.0
+weight = 56.0
 expected_max = 4.0
 invert = false
-label = "打ち続く災厄"
+label = "絶えぬ災厄"
 
-[sub_resource type="Resource" id="drv_unrest"]
+[sub_resource type="Resource" id="drv1"]
 script = ExtResource("2_driver")
 world_var_path = &"world.settlements.avg_unrest"
-weight = 20.0
+weight = 22.0
 expected_max = 0.7
 invert = false
-label = "民の不安"
+label = "世の乱れ"
 
 [resource]
 script = ExtResource("1_profile")
-archetype_id = &"temple_faction"
-display_label = "神殿派閥"
-drivers = Array[Resource]([SubResource("drv_calamity"), SubResource("drv_unrest")])
+archetype_id = &"millenarian_faction"
+display_label = "終末教団"
+drivers = Array[Resource]([SubResource("drv0"), SubResource("drv1")])
 max_score = 100.0
-base_score = 6.0
-membership_weight = 0.25
+base_score = 4.0
+membership_weight = 0.26
 monster_suppression_factor = 0.0
-rank_sensitivity = 0.70
-default_leadership_title = "祭司長"
-noun_bank = Array[String](["神殿派", "聖堂教団", "祈りの会"])
+rank_sensitivity = 0.10
+default_leadership_title = "預言者"
+noun_bank = Array[String](["終末教団", "灰の同胞団", "審判を待つ者"])

@@ -101,6 +101,15 @@ static func _candidates(org: Organization, tick: int, rule: TriggerRule) -> Arra
 	if org.kind == Organization.OrgKind.HOUSE:
 		return _house_candidates(org, tick)
 
+	# A guild or faction whose leadership one family has held for generations
+	# fills the seat from that family — the office has become theirs in practice
+	# long before anybody writes it down.
+	if org.kind != Organization.OrgKind.POLITICAL_SYSTEM and org.patron_house_id != &"" \
+			and SocialTies.office_basis(org) == SocialTies.OfficeBasis.HEREDITARY:
+		var from_patron := _patron_house_candidates(org, tick)
+		if not from_patron.is_empty():
+			return from_patron
+
 	if org.kind == Organization.OrgKind.POLITICAL_SYSTEM \
 			and method == TriggerRule.SuccessionMethod.PRIMOGENITURE:
 		var from_house := _ruling_house_candidates(org, tick)
@@ -113,6 +122,18 @@ static func _candidates(org: Organization, tick: int, rule: TriggerRule) -> Arra
 			return heirs
 
 	return _open_candidates(org, tick)
+
+
+## The adults of the family that has come to own this office.
+static func _patron_house_candidates(org: Organization, tick: int) -> Array[NotableIndividual]:
+	var house := GameState.get_organization(org.patron_house_id)
+	if house == null or not house.is_active():
+		return []
+	var out: Array[NotableIndividual] = []
+	for member in GameState.house_members(house.org_id):
+		if member.is_adult(tick) and member.current_tenure() == null:
+			out.append(member)
+	return out
 
 
 ## The house's own adults, children of the late head first.
@@ -206,6 +227,9 @@ static func _claim_weight(p: NotableIndividual, org: Organization, tick: int,
 			and org.ideology.legitimacy_basis == PoliticalSystemAxes.LegitimacyBasis.THEOCRATIC \
 			and p.has_tag(&"pious"):
 		w += 1.5
+	# Where birth counts, it counts here. A duke's son walks into a temple or a
+	# counting house; under a popular assembly the same name buys him nothing.
+	w += HouseRank.weight_for(org) * float(HouseRank.tier_of_person(p)) * 0.7
 	return maxf(0.1, w)
 
 

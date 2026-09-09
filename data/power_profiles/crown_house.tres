@@ -20,5 +20,6 @@ max_score = 100.0
 base_score = 12.0
 membership_weight = 0.12
 monster_suppression_factor = 0.0
+rank_sensitivity = 1.00
 default_leadership_title = "当主"
 noun_bank = Array[String](["家"])

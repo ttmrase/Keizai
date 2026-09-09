@@ -20,5 +20,6 @@ max_score = 100.0
 base_score = 5.0
 membership_weight = 0.2
 monster_suppression_factor = 0.35
+rank_sensitivity = 0.05
 default_leadership_title = "団長"
 noun_bank = Array[String](["討伐者ギルド", "魔物狩り組合", "討伐団"])
