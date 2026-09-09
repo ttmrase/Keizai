@@ -21,6 +21,19 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 
+	# Running one spec at a time matters once the suite takes twenty minutes:
+	#   godot --headless --path . res://tests/TestRunner.tscn -- --spec=houses
+	var only := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--spec="):
+			only = arg.split("=")[1]
+	if not only.is_empty():
+		var filtered: Array[String] = []
+		for path in paths:
+			if path.contains(only):
+				filtered.append(path)
+		paths = filtered
+
 	print("running %d specs" % paths.size())
 	for path in paths:
 		var script: GDScript = load(path)

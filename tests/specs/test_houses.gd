@@ -11,18 +11,33 @@ func run() -> void:
 	finish()
 
 
+## One noble family per region — and the families that serve them seated in the
+## same place, which is what makes them retainers rather than neighbours.
 func _check_one_house_per_region() -> void:
 	SimTestHarness.fresh_world(4001)
-	var houses := GameState.organizations_of_kind(Organization.OrgKind.HOUSE)
-	check_eq(houses.size(), WorldGenerator.SETTLEMENT_COUNT,
-		"the world should begin with one house per region")
+	var nobles: Array[Organization] = []
+	var retainers: Array[Organization] = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			nobles.append(house)
+		else:
+			retainers.append(house)
+	check_eq(nobles.size(), WorldGenerator.SETTLEMENT_COUNT,
+		"the world should begin with one noble house per region")
 
 	var seats := {}
-	for house in houses:
+	for house in nobles:
 		check(house.dynasty_seat_settlement_id != &"", "%s should hold a seat" % house.display_name)
 		check(not seats.has(house.dynasty_seat_settlement_id),
-			"two houses were seated in the same region")
+			"two noble houses were seated in the same region")
 		seats[house.dynasty_seat_settlement_id] = true
+
+	for house in retainers:
+		var liege := GameState.get_organization(house.liege_house_id)
+		check(liege != null, "%s should serve a house" % house.display_name)
+		if liege != null:
+			check_eq(house.dynasty_seat_settlement_id, liege.dynasty_seat_settlement_id,
+				"a retainer family sits where the family it serves sits")
 
 	for id in GameState.world.settlements:
 		check(GameState.world.settlements[id].ruling_house_id != &"",
@@ -92,7 +107,20 @@ func _check_marriage_joins_houses() -> void:
 		if spouse == null or not p.is_alive():
 			continue
 		couples += 1
-		check_eq(p.house_org_id, spouse.house_org_id,
-			"%s and %s are married but belong to different houses"
+		if p.house_org_id == spouse.house_org_id:
+			continue
+		# The exception, and the reason houses with no sons survive: somebody who
+		# already heads a house does not leave it to marry. When both of them do,
+		# neither gives theirs up and the two families are joined without either
+		# being absorbed.
+		var p_head := _heads_own_house(p)
+		var spouse_head := _heads_own_house(spouse)
+		check(p_head and spouse_head,
+			"%s and %s are married into different houses without either heading one"
 				% [p.full_name, spouse.full_name])
 	check_gt(float(couples), 0.0, "some marriages should have happened by now")
+
+
+func _heads_own_house(person: NotableIndividual) -> bool:
+	var house := GameState.get_organization(person.house_org_id)
+	return house != null and house.is_active() and house.leader_person_id == person.person_id

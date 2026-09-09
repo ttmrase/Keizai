@@ -184,15 +184,25 @@ static func _find_leader(parent: Organization, tick: int,
 	return RngService.pick_weighted(&"rules", candidates, weights)
 
 
-## The leader, their spouse, and everyone descended from them — the people who
-## leave with a cadet branch.
+## The leader, everyone descended from them, and the people those descendants
+## married — the household that leaves with a cadet branch.
+##
+## Taking the descendants without their spouses splits married couples between
+## two houses, which is visible in the family tree as a pair with two different
+## surnames and no reason for it. Whoever married into this line goes where the
+## line goes.
 static func _line_of(leader: NotableIndividual) -> Array[StringName]:
 	var out: Array[StringName] = [leader.person_id]
-	for spouse_id in leader.spouse_ids:
-		var spouse := GameState.get_person(spouse_id)
-		if spouse != null and spouse.is_alive():
-			out.append(spouse_id)
+	_take_spouses(leader, out)
 	for descendant in GenealogyValidator.descendants(leader.person_id, 6):
 		if not out.has(descendant.person_id):
 			out.append(descendant.person_id)
+		_take_spouses(descendant, out)
 	return out
+
+
+static func _take_spouses(person: NotableIndividual, out: Array[StringName]) -> void:
+	for spouse_id in person.spouse_ids:
+		var spouse := GameState.get_person(spouse_id)
+		if spouse != null and spouse.is_alive() and not out.has(spouse_id):
+			out.append(spouse_id)
