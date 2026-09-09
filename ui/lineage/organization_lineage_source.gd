@@ -1,13 +1,26 @@
 class_name OrganizationLineageSource
 extends LineageSource
 
-## The institution tree: how every guild, house, faction and regime descends from
-## the four the world began with.
+## How every institution descends from the one its kind began with.
+##
+## Which kinds are drawn is set by whoever is using it, because the families and
+## everything else do not belong on the same screen. Eight houses with three
+## retainer families each, branching for four centuries, is most of the tree and
+## crowds the guilds, factions and faiths down to a corner of it — so the view
+## keeps two of these: one rooted at the institutions, one rooted at the houses.
+
+## The kinds this instance draws, rooted at the first of each.
+var root_kinds: Array[int] = [
+	Organization.OrgKind.POLITICAL_SYSTEM,
+	Organization.OrgKind.GUILD,
+	Organization.OrgKind.FACTION,
+	Organization.OrgKind.RELIGION,
+]
+
 
 func roots() -> Array[StringName]:
 	var out: Array[StringName] = []
-	for kind in [Organization.OrgKind.POLITICAL_SYSTEM, Organization.OrgKind.HOUSE,
-			Organization.OrgKind.GUILD, Organization.OrgKind.FACTION]:
+	for kind in root_kinds:
 		var root := GameState.root_of_kind(kind)
 		if root != null:
 			out.append(root.org_id)
@@ -193,6 +206,10 @@ func search(query: String) -> Array[StringName]:
 	if needle.is_empty():
 		return out
 	for org in GameState.organizations.values():
+		# Only what this view is drawing: finding a house from the institution
+		# screen would jump to a node that is not on it.
+		if not root_kinds.has(org.kind):
+			continue
 		if org.display_name.contains(needle):
 			out.append(org.org_id)
 	return out

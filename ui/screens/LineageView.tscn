@@ -62,14 +62,24 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 size_flags_horizontal = 3
 toggle_mode = true
-text = "組織の系譜"
+theme_override_font_sizes/font_size = 16
+text = "組織"
+
+[node name="Houses" type="Button" parent="Top/Modes"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+theme_override_font_sizes/font_size = 16
+text = "家"
 
 [node name="People" type="Button" parent="Top/Modes"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 size_flags_horizontal = 3
 toggle_mode = true
-text = "人物の家系"
+theme_override_font_sizes/font_size = 16
+text = "人物"
 
 [node name="SearchRow" type="HBoxContainer" parent="Top"]
 layout_mode = 2

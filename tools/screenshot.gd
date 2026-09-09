@@ -56,6 +56,14 @@ func _ready() -> void:
 	await _settle()
 	await _capture("%s/lineage_people.png" % _out_dir)
 
+	# Families are their own screen now, so it gets its own shot.
+	lineage._show_houses()
+	await _settle()
+	await _capture("%s/lineage_houses.png" % _out_dir)
+
+	lineage._show_people()
+	await _settle()
+
 	# The whole family at once: every house on one chart, joined by marriage.
 	lineage._graph.clear_focus()
 	lineage._update_focus_note()

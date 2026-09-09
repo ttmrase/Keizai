@@ -1,16 +1,26 @@
 extends Control
 
-## Hosts both lineage trees. They share one graph widget and differ only in the
-## data source, so focus, collapse and search behave identically in both.
+## Hosts the three lineage views. They share one graph widget and differ only in
+## the data source, so focus, search and the jump to the root behave identically
+## in all of them.
+##
+## Families are on their own screen rather than beside the institutions: eight
+## houses with three retainer families each, branching for four centuries, is
+## most of the tree, and putting it next to the guilds and faiths leaves those
+## squeezed into a corner of a chart that is mostly surnames.
 
-var _org_source := OrganizationLineageSource.new()
+enum Mode { INSTITUTIONS, HOUSES, PEOPLE }
+
+var _institution_source := OrganizationLineageSource.new()
+var _house_source := OrganizationLineageSource.new()
 var _people_source := GenealogySource.new()
-var _showing_orgs := true
+var _mode := Mode.INSTITUTIONS
 ## People view only: draw the heads of houses, without everyone who married in.
 var _spine_only := true
 
 @onready var _graph: LineageGraphView = $Graph
 @onready var _org_button: Button = $Top/Modes/Orgs
+@onready var _house_button: Button = $Top/Modes/Houses
 @onready var _people_button: Button = $Top/Modes/People
 @onready var _scope_button: Button = $Top/SearchRow/Scope
 @onready var _search: LineEdit = $Top/SearchRow/Search
@@ -27,7 +37,9 @@ var _rename_dialog: RenameDialog
 
 
 func _ready() -> void:
-	_org_button.pressed.connect(_show_orgs)
+	_house_source.root_kinds = [Organization.OrgKind.HOUSE]
+	_org_button.pressed.connect(_show_institutions)
+	_house_button.pressed.connect(_show_houses)
 	_people_button.pressed.connect(_show_people)
 	_scope_button.pressed.connect(_toggle_scope)
 	_root_button.pressed.connect(_jump_to_root)
@@ -44,13 +56,13 @@ func _ready() -> void:
 
 	_detail.visible = false
 	_results.visible = false
-	_show_orgs()
+	_show_institutions()
 
 
 ## Only organizations carry a name of their own — a person's surname belongs to
 ## their house, so renaming the house is what renames them.
 func _on_rename_pressed() -> void:
-	if not _showing_orgs:
+	if _mode == Mode.PEOPLE:
 		return
 	var org := GameState.get_organization(_graph.selected_id)
 	if org != null:
@@ -67,17 +79,26 @@ func on_shown() -> void:
 	_rebuild()
 
 
-func _show_orgs() -> void:
-	_showing_orgs = true
-	_graph.set_source(_org_source)
+func _show_institutions() -> void:
+	_mode = Mode.INSTITUTIONS
+	_graph.set_source(_institution_source)
 	_graph.spine_mode = false
 	_search.placeholder_text = "組織を探す"
 	_sync_modes()
 	_rebuild()
 
 
+func _show_houses() -> void:
+	_mode = Mode.HOUSES
+	_graph.set_source(_house_source)
+	_graph.spine_mode = false
+	_search.placeholder_text = "家を探す"
+	_sync_modes()
+	_rebuild()
+
+
 func _show_people() -> void:
-	_showing_orgs = false
+	_mode = Mode.PEOPLE
 	_graph.set_source(_people_source)
 	_graph.spine_mode = _spine_only
 	_search.placeholder_text = "人物を探す"
@@ -87,13 +108,17 @@ func _show_people() -> void:
 
 ## The whole record at once is a wall of boxes; the line of house heads is a
 ## chart. Both are one tap apart, and tapping anybody opens their own lineage in
-## full either way.
+## full either way. On the family screen the same button hides the households in
+## service, which are three quarters of the families in the world.
 func _toggle_scope() -> void:
-	if _showing_orgs:
-		_org_source.include_retainers = not _org_source.include_retainers
-	else:
-		_spine_only = not _spine_only
-		_graph.spine_mode = _spine_only
+	match _mode:
+		Mode.HOUSES:
+			_house_source.include_retainers = not _house_source.include_retainers
+		Mode.PEOPLE:
+			_spine_only = not _spine_only
+			_graph.spine_mode = _spine_only
+		_:
+			return
 	_graph.clear_focus()
 	_sync_modes()
 	_rebuild()
@@ -114,17 +139,20 @@ func _most_notable_living() -> StringName:
 
 
 func _sync_modes() -> void:
-	_org_button.button_pressed = _showing_orgs
-	_people_button.button_pressed = not _showing_orgs
-	_org_button.add_theme_color_override("font_color",
-		Palette.ACCENT if _showing_orgs else Palette.TEXT_MUTED)
-	_people_button.add_theme_color_override("font_color",
-		Palette.TEXT_MUTED if _showing_orgs else Palette.ACCENT)
-	_scope_button.visible = true
-	if _showing_orgs:
-		_scope_button.text = "側近家も" if not _org_source.include_retainers else "主家のみ"
-	else:
-		_scope_button.text = "全員" if _spine_only else "当主のみ"
+	for entry in [[_org_button, Mode.INSTITUTIONS], [_house_button, Mode.HOUSES],
+			[_people_button, Mode.PEOPLE]]:
+		var button: Button = entry[0]
+		var active: bool = _mode == entry[1]
+		button.button_pressed = active
+		button.add_theme_color_override("font_color",
+			Palette.ACCENT if active else Palette.TEXT_MUTED)
+
+	_scope_button.visible = _mode != Mode.INSTITUTIONS
+	match _mode:
+		Mode.HOUSES:
+			_scope_button.text = "側近家も" if not _house_source.include_retainers else "主家のみ"
+		Mode.PEOPLE:
+			_scope_button.text = "全員" if _spine_only else "当主のみ"
 
 
 func _rebuild() -> void:
@@ -142,16 +170,21 @@ func _update_focus_note() -> void:
 	_focus_note.visible = focused
 	if focused:
 		_focus_note.text = "焦点表示中：選んだ相手とその前後の代だけを表示しています"
-	elif not _showing_orgs and _spine_only:
+	elif _mode == Mode.PEOPLE and _spine_only:
 		_focus_note.visible = true
 		_focus_note.text = "当主のみ表示中：誰かを選ぶとその人の系譜が開きます"
-	elif _showing_orgs and not _org_source.include_retainers:
+	elif _mode == Mode.HOUSES and not _house_source.include_retainers:
 		_focus_note.visible = true
 		_focus_note.text = "主家のみ表示中：側近家は「側近家も」で開きます"
 
 
 func _current_source() -> LineageSource:
-	return _org_source if _showing_orgs else _people_source
+	match _mode:
+		Mode.HOUSES:
+			return _house_source
+		Mode.PEOPLE:
+			return _people_source
+	return _institution_source
 
 
 func _on_search_changed(text: String) -> void:
@@ -200,7 +233,7 @@ func _jump_to_root() -> void:
 		_graph.frame_all()
 		return
 	var root_id := &""
-	if _showing_orgs:
+	if _mode != Mode.PEOPLE:
 		var root := GenealogyValidator.root_ancestor(id)
 		if root != null:
 			root_id = root.org_id
@@ -229,5 +262,5 @@ func _show_detail(id: StringName) -> void:
 		return
 	_detail_title.text = source.label(id)
 	_detail_body.text = source.detail(id)
-	_rename_button.visible = _showing_orgs
+	_rename_button.visible = _mode != Mode.PEOPLE
 	_detail.visible = true
