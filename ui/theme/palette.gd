@@ -23,6 +23,7 @@ const GUILD := Color("6fa8c8")
 const HOUSE := Color("c8926f")
 const FACTION := Color("8fbf7a")
 const POLITY := Color("b48fd0")
+const RELIGION := Color("d0b48f")
 
 
 static func for_kind(kind: int) -> Color:
@@ -35,6 +36,8 @@ static func for_kind(kind: int) -> Color:
 			return FACTION
 		Organization.OrgKind.POLITICAL_SYSTEM:
 			return POLITY
+		Organization.OrgKind.RELIGION:
+			return RELIGION
 	return TEXT_MUTED
 
 
@@ -48,6 +51,8 @@ static func kind_label(kind: int) -> String:
 			return "派閥"
 		Organization.OrgKind.POLITICAL_SYSTEM:
 			return "政体"
+		Organization.OrgKind.RELIGION:
+			return "信仰"
 	return "組織"
 
 

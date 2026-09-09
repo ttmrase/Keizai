@@ -6,10 +6,13 @@ extends Control
 var _org_source := OrganizationLineageSource.new()
 var _people_source := GenealogySource.new()
 var _showing_orgs := true
+## People view only: draw the heads of houses, without everyone who married in.
+var _spine_only := true
 
 @onready var _graph: LineageGraphView = $Graph
 @onready var _org_button: Button = $Top/Modes/Orgs
 @onready var _people_button: Button = $Top/Modes/People
+@onready var _scope_button: Button = $Top/SearchRow/Scope
 @onready var _search: LineEdit = $Top/SearchRow/Search
 @onready var _root_button: Button = $Top/SearchRow/ToRoot
 @onready var _results: PanelContainer = $Results
@@ -26,6 +29,7 @@ var _rename_dialog: RenameDialog
 func _ready() -> void:
 	_org_button.pressed.connect(_show_orgs)
 	_people_button.pressed.connect(_show_people)
+	_scope_button.pressed.connect(_toggle_scope)
 	_root_button.pressed.connect(_jump_to_root)
 	_search.text_submitted.connect(_run_search)
 	_search.text_changed.connect(_on_search_changed)
@@ -66,6 +70,7 @@ func on_shown() -> void:
 func _show_orgs() -> void:
 	_showing_orgs = true
 	_graph.set_source(_org_source)
+	_graph.spine_mode = false
 	_search.placeholder_text = "組織を探す"
 	_sync_modes()
 	_rebuild()
@@ -74,16 +79,24 @@ func _show_orgs() -> void:
 func _show_people() -> void:
 	_showing_orgs = false
 	_graph.set_source(_people_source)
+	_graph.spine_mode = _spine_only
 	_search.placeholder_text = "人物を探す"
 	_sync_modes()
 	_rebuild()
-	# Hundreds of people at once is a wall of boxes. Open on someone who matters
-	# and let the player walk outward from there.
-	var subject := _most_notable_living()
-	if subject != &"":
-		_graph.focus_on(subject)
-		_update_focus_note()
-		_show_detail(subject)
+
+
+## The whole record at once is a wall of boxes; the line of house heads is a
+## chart. Both are one tap apart, and tapping anybody opens their own lineage in
+## full either way.
+func _toggle_scope() -> void:
+	if _showing_orgs:
+		_org_source.include_retainers = not _org_source.include_retainers
+	else:
+		_spine_only = not _spine_only
+		_graph.spine_mode = _spine_only
+	_graph.clear_focus()
+	_sync_modes()
+	_rebuild()
 
 
 ## Whoever currently holds the most influential seat — the natural way in.
@@ -107,6 +120,11 @@ func _sync_modes() -> void:
 		Palette.ACCENT if _showing_orgs else Palette.TEXT_MUTED)
 	_people_button.add_theme_color_override("font_color",
 		Palette.TEXT_MUTED if _showing_orgs else Palette.ACCENT)
+	_scope_button.visible = true
+	if _showing_orgs:
+		_scope_button.text = "側近家も" if not _org_source.include_retainers else "主家のみ"
+	else:
+		_scope_button.text = "全員" if _spine_only else "当主のみ"
 
 
 func _rebuild() -> void:
@@ -124,6 +142,12 @@ func _update_focus_note() -> void:
 	_focus_note.visible = focused
 	if focused:
 		_focus_note.text = "焦点表示中：選んだ相手とその前後の代だけを表示しています"
+	elif not _showing_orgs and _spine_only:
+		_focus_note.visible = true
+		_focus_note.text = "当主のみ表示中：誰かを選ぶとその人の系譜が開きます"
+	elif _showing_orgs and not _org_source.include_retainers:
+		_focus_note.visible = true
+		_focus_note.text = "主家のみ表示中：側近家は「側近家も」で開きます"
 
 
 func _current_source() -> LineageSource:

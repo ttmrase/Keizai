@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"global_harvest_modifier"
+op = 1
+threshold = 0.72
+describe_as = "続く不作"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.starving_fraction"
+op = 0
+threshold = 0.2
+describe_as = "飢えた村々"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"faith_harvest"
+rule_type = 0
+applies_to_kind = 4
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 700
+priority = 70
+chance_per_tick = 0.08
+schism_kind = &"revelation"
+branch_archetype_id = &"harvest_cult"
+inherited_member_fraction = Vector2(0.2, 0.4)
+ideology_drift_bias = {
+"secular_theocratic": 0.6,
+"tradition_reform": -0.3,
+"centralization": -0.3
+}
+min_parent_members = 1
+max_instances_of_archetype = 1
+branch_leadership_title = "祭主"
+radicalism = 0.50
+branch_legitimacy_basis = 3
+branch_decision_structure = 1
+chronicle_template = "{reason}のなか、人々は土に祈る作法を定めた。{parent}から{branch}が形を取った。"

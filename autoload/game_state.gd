@@ -65,6 +65,23 @@ func get_current_leader(org_id: StringName) -> NotableIndividual:
 	return people.get(org.leader_person_id)
 
 
+## Everyone who has ever held this body's seat, earliest first, with the years
+## they held it. Nothing is stored for this — the tenures are already on the
+## people, and a roll of past leaders is just a different way of reading them.
+func leader_roll(org_id: StringName) -> Array:
+	var out: Array = []
+	for id in people:
+		var p: NotableIndividual = people[id]
+		for t in p.role_history:
+			if t.org_id == org_id:
+				out.append({"person": p, "tenure": t})
+	out.sort_custom(func(a, b):
+		var sa: int = a["tenure"].start_tick
+		var sb: int = b["tenure"].start_tick
+		return sa < sb if sa != sb else String(a["person"].person_id) < String(b["person"].person_id))
+	return out
+
+
 func organizations_of_kind(kind: Organization.OrgKind, only_active := true) -> Array[Organization]:
 	var out: Array[Organization] = []
 	for id in organizations:
@@ -246,8 +263,11 @@ func _apply_death(e: HistoryEvent) -> void:
 		return
 	p.death_tick = e.tick
 	p.death_event_id = e.event_id
-	var tenure := p.current_tenure()
-	if tenure != null:
+	# Every seat, not the first one found: a monarch usually also heads their own
+	# house, and closing only one leaves the other open forever — which reads, in
+	# the roll of that body's leaders, as somebody still in office two centuries
+	# after they died.
+	for tenure in p.open_tenures():
 		tenure.end_tick = e.tick
 		tenure.end_event_id = e.event_id
 	# The seat is left empty; a SUCCESSION event fills it.
@@ -265,7 +285,7 @@ func _apply_succession(e: HistoryEvent) -> void:
 		return
 	var previous: NotableIndividual = people.get(StringName(e.payload.get("previous_leader_id", "")))
 	if previous != null:
-		var old_tenure := previous.current_tenure()
+		var old_tenure := previous.tenure_in(org.org_id)
 		if old_tenure != null:
 			old_tenure.end_tick = e.tick
 			old_tenure.end_event_id = e.event_id
@@ -282,6 +302,9 @@ func _apply_power_transfer(e: HistoryEvent) -> void:
 	if bool(e.payload.get("regime_change", false)):
 		_apply_regime_change(to_org, e)
 		return
+	if bool(e.payload.get("house_rising", false)):
+		_apply_house_rising(to_org, e)
+		return
 	if settlement_id != &"":
 		var s: SettlementState = world.settlements.get(settlement_id)
 		if s != null:
@@ -293,6 +316,50 @@ func _apply_power_transfer(e: HistoryEvent) -> void:
 			to_org.governs_settlement_ids.append(settlement_id)
 	if from_org != null:
 		from_org.legitimacy = clampf(from_org.legitimacy - float(e.payload.get("legitimacy_cost", 0.1)), 0.0, 1.0)
+
+
+## A retainer family becomes a noble one — by force, by blood, or by favour. The
+## rank of a house is a discrete fact like a leadership, so it changes here and
+## nowhere else; whatever it cost the family it displaced is settled here too.
+func _apply_house_rising(risen: Organization, e: HistoryEvent) -> void:
+	var source: Organization = organizations.get(StringName(e.payload.get("from_house_id", "")))
+	risen.standing = Organization.Standing.NOBLE
+	risen.liege_house_id = &""
+	risen.loyalty = 1.0
+
+	var seized := StringName(e.payload.get("seized_settlement", ""))
+	if seized != &"":
+		var s: SettlementState = world.settlements.get(seized)
+		if s != null:
+			s.ruling_house_id = risen.org_id
+		if not risen.held_settlement_ids.has(seized):
+			risen.held_settlement_ids.append(seized)
+		if source != null:
+			source.held_settlement_ids.erase(seized)
+		if risen.dynasty_seat_settlement_id == &"":
+			risen.dynasty_seat_settlement_id = seized
+
+	if source != null and bool(e.payload.get("demote_source", false)):
+		# The family that lost is not destroyed, only lowered — and lowered into
+		# the service of the family that beat it, which is where the next
+		# generation of grievance comes from.
+		source.standing = Organization.Standing.RETAINER
+		source.liege_house_id = risen.org_id
+		source.loyalty = 0.2
+		source.rank_tier = 0
+		for settlement_id in source.held_settlement_ids.duplicate():
+			var lost: SettlementState = world.settlements.get(settlement_id)
+			if lost != null and lost.ruling_house_id == source.org_id:
+				lost.ruling_house_id = risen.org_id
+			if not risen.held_settlement_ids.has(settlement_id):
+				risen.held_settlement_ids.append(settlement_id)
+		source.held_settlement_ids.clear()
+
+	# Everyone who served the risen house now serves it as a noble house.
+	for id in organizations:
+		var other: Organization = organizations[id]
+		if other.liege_house_id == risen.org_id and other.org_id != risen.org_id:
+			other.loyalty = maxf(other.loyalty, 0.5)
 
 
 ## A regime is overturned. What a country rests on and who decides in it are
@@ -322,7 +389,7 @@ func _apply_regime_change(polity: Organization, e: HistoryEvent) -> void:
 	if bool(e.payload.get("depose_ruler", false)):
 		var ruler: NotableIndividual = people.get(polity.leader_person_id)
 		if ruler != null:
-			var tenure := ruler.current_tenure()
+			var tenure := ruler.tenure_in(polity.org_id)
 			if tenure != null:
 				tenure.end_tick = e.tick
 				tenure.end_event_id = e.event_id

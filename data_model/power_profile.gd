@@ -16,6 +16,10 @@ extends Resource
 ## Fraction of monster population this archetype culls per point of power.
 ## Only the archetypes that actually fight monsters set this above zero.
 @export var monster_suppression_factor: float = 0.0
+## Some bodies have no seat to fill. The oldest faith in the world has no
+## priesthood — it is what people believe before anybody organizes it — and
+## trying to elect it a leader every tick would be the wrong shape entirely.
+@export var leaderless: bool = false
 ## How much this kind of body cares who your family is, 0..1. A temple or a
 ## trading house wants well-born officers and gains standing from them; a
 ## hunters' lodge wants someone who can fight and gains nothing from a title.

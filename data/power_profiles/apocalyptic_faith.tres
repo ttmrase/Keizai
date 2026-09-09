@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="PowerProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/power_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://data_model/power_driver.gd" id="2_driver"]
+
+[sub_resource type="Resource" id="drv0"]
+script = ExtResource("2_driver")
+world_var_path = &"org.self.member_count"
+weight = 46.0
+expected_max = 16000.0
+invert = false
+label = "信徒の数"
+
+[sub_resource type="Resource" id="drv1"]
+script = ExtResource("2_driver")
+world_var_path = &"recent_disaster_pressure"
+weight = 42.0
+expected_max = 4.0
+invert = false
+label = "止まぬ災厄"
+
+[resource]
+script = ExtResource("1_profile")
+archetype_id = &"apocalyptic_faith"
+display_label = "終末信仰"
+drivers = Array[Resource]([SubResource("drv0"), SubResource("drv1")])
+max_score = 100.0
+base_score = 6.0
+membership_weight = 0.0
+monster_suppression_factor = 0.0
+leaderless = false
+rank_sensitivity = 0.05
+default_leadership_title = "預言者"
+noun_bank = Array[String](["終末の教え", "灰の福音", "審判の日の会"])

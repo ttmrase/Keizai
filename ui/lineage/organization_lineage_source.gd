@@ -14,14 +14,26 @@ func roots() -> Array[StringName]:
 	return out
 
 
+## Three retainer families under each of eight houses is most of the tree and
+## almost none of the interest: they hold nothing, and the tree they crowd out is
+## the one showing where the guilds, factions and faiths came from. Off by
+## default, one tap away, and a retainer house that rises to the nobility appears
+## in the ordinary view the moment it does.
+var include_retainers := false
+
+
 func children(id: StringName) -> Array[StringName]:
 	var org := GameState.get_organization(id)
 	if org == null:
 		return []
 	var out: Array[StringName] = []
 	for child_id in org.child_org_ids:
-		if GameState.get_organization(child_id) != null:
-			out.append(child_id)
+		var child := GameState.get_organization(child_id)
+		if child == null:
+			continue
+		if not include_retainers and child.standing == Organization.Standing.RETAINER:
+			continue
+		out.append(child_id)
 	return out
 
 
@@ -91,6 +103,25 @@ func detail(id: StringName) -> String:
 				% [form.display_name, form.description])
 
 	if org.kind == Organization.OrgKind.HOUSE:
+		lines.append("[color=#9a9080]家格[/color]  %s・%s%s" % [
+			org.standing_label(),
+			HouseRank.tier_name(org.rank_tier) if org.is_noble() else "位なし",
+			"　%s" % HouseCharacter.label(org.character_id) if org.character_id != &"" else ""])
+		if org.standing == Organization.Standing.RETAINER:
+			var liege := GameState.get_organization(org.liege_house_id)
+			lines.append("[color=#9a9080]仕える先[/color]  %s（%s）" % [
+				liege.display_name if liege != null else "なし",
+				Retainers.describe_loyalty(org.loyalty)])
+		else:
+			var served := Retainers.retainers_of(org.org_id)
+			if not served.is_empty():
+				var names: Array[String] = []
+				for r in served:
+					names.append("%s（%s）" % [r.display_name, Retainers.describe_loyalty(r.loyalty)])
+				lines.append("[color=#9a9080]側近家[/color]  %s" % "、".join(names))
+		var faith := GameState.get_organization(org.faith_id)
+		if faith != null:
+			lines.append("[color=#9a9080]信仰[/color]  %s" % faith.display_name)
 		if not org.held_settlement_ids.is_empty():
 			var places: Array[String] = []
 			for settlement_id in org.held_settlement_ids:
@@ -103,6 +134,34 @@ func detail(id: StringName) -> String:
 		if not standing.is_empty():
 			lines.append("[color=#9a9080]他家との関係[/color]  %s" % standing)
 
+	var roll := _leader_roll_text(org)
+	if not roll.is_empty():
+		lines.append("[color=#9a9080]歴代の%s[/color]\n%s" % [org.leadership_title, roll])
+
+	return "\n".join(lines)
+
+
+## Everyone who has held this seat, most recent first. Nothing is stored for
+## this — the tenures already sit on the people, and reading them back is how a
+## body gets a memory of who has run it.
+const ROLL_LIMIT := 12
+
+
+func _leader_roll_text(org: Organization) -> String:
+	var roll := GameState.leader_roll(org.org_id)
+	if roll.size() < 2:
+		return ""
+	var lines: Array[String] = []
+	for i in range(roll.size() - 1, maxi(-1, roll.size() - 1 - ROLL_LIMIT), -1):
+		var entry: Dictionary = roll[i]
+		var t: RoleTenure = entry["tenure"]
+		var person: NotableIndividual = entry["person"]
+		lines.append("　%d年〜%s　%s" % [
+			int(t.start_tick / SimConfig.TICKS_PER_YEAR),
+			"現在" if t.is_current() else "%d年" % int(t.end_tick / SimConfig.TICKS_PER_YEAR),
+			person.full_name])
+	if roll.size() > ROLL_LIMIT:
+		lines.append("　…ほか%d名" % (roll.size() - ROLL_LIMIT))
 	return "\n".join(lines)
 
 

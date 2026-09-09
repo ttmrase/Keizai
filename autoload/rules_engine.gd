@@ -20,8 +20,11 @@ func evaluate_tick(tick: int) -> void:
 func _fill_empty_seats(tick: int) -> void:
 	# Houses first: a crown follows whoever now heads the house that held it.
 	for kind in [Organization.OrgKind.HOUSE, Organization.OrgKind.POLITICAL_SYSTEM,
-			Organization.OrgKind.GUILD, Organization.OrgKind.FACTION]:
+			Organization.OrgKind.GUILD, Organization.OrgKind.FACTION,
+			Organization.OrgKind.RELIGION]:
 		for org in GameState.organizations_of_kind(kind):
+			if _is_leaderless_by_nature(org):
+				continue
 			if org.leader_person_id == &"":
 				SuccessionResolver.resolve(org, tick)
 			else:
@@ -29,6 +32,14 @@ func _fill_empty_seats(tick: int) -> void:
 				if leader == null or not leader.is_alive():
 					org.leader_person_id = &""
 					SuccessionResolver.resolve(org, tick)
+
+
+## Some bodies have no seat. The oldest faith in the world has no priesthood —
+## it is what people believe before anyone organizes it — and electing it a head
+## every tick would make it the wrong thing entirely.
+func _is_leaderless_by_nature(org: Organization) -> bool:
+	var profile := ContentRegistry.get_power_profile(org.archetype_id)
+	return profile != null and profile.leaderless
 
 
 func _evaluate_pressures(tick: int) -> void:
@@ -44,7 +55,9 @@ func _evaluate_pressures(tick: int) -> void:
 				continue
 			if not RuleConditionEvaluator.all_hold(rule, org):
 				continue
-			if rng.randf() > rule.chance_per_tick:
+			# A body led by somebody out of a house of scholars argues its way
+			# apart far more readily than one led out of a house of courtiers.
+			if rng.randf() > rule.chance_per_tick * HouseCharacter.schism_affinity(org):
 				continue
 			if _fire(rule, org, tick):
 				org.last_fired_tick[rule.rule_id] = tick

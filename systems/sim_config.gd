@@ -78,6 +78,7 @@ const MEMBERSHIP_SHARE := {
 	1: 0.012,  # HOUSE
 	2: 0.22,   # FACTION
 	3: 0.06,   # POLITICAL_SYSTEM
+	4: 0.30,   # RELIGION — a faith counts everyone who holds it, not a membership roll
 }
 const MEMBERSHIP_ADJUST_FRACTION := 0.06
 ## Below this a non-root organization is considered to have died out.
@@ -86,6 +87,11 @@ const ORG_DISSOLVE_MEMBERS := 3
 ## a ceiling, drift-driven schisms compound into a crowd of indistinguishable
 ## splinters and the lineage tree stops being readable.
 const MAX_ACTIVE_ORGS_PER_KIND := 7
+## Families are the exception, and by a long way. A country has a handful of
+## guilds and dozens of households; capping houses at the same number as guilds
+## makes extinction a one-way ratchet, because no cadet branch can ever form to
+## replace a line that has died out, and the world grinds down to exactly the cap.
+const MAX_ACTIVE_HOUSES := 40
 ## ...except that a society always has room for something it has never had
 ## before. A branch that invents a kind of institution the world does not yet
 ## contain may exceed the ceiling by this much; a plain splinter may not. Without
@@ -98,6 +104,11 @@ const NEW_ARCHETYPE_HEADROOM := 2
 ## in the country is a variation on the same one, which is exactly the sameness
 ## the archetypes exist to avoid.
 const MAX_ACTIVE_PER_ARCHETYPE := 3
+
+## Retainer houses attached to each founding noble house. They are the rank
+## between the people and the nobility: near enough to the great families to
+## matter, far enough to resent it.
+const RETAINERS_PER_HOUSE := 3
 
 ## Longest name the player may give a place or an institution.
 const MAX_NAME_LENGTH := 24

@@ -10,6 +10,7 @@ const KIND_FILTERS := [
 	{"label": "ギルド", "kind": Organization.OrgKind.GUILD},
 	{"label": "派閥", "kind": Organization.OrgKind.FACTION},
 	{"label": "家", "kind": Organization.OrgKind.HOUSE},
+	{"label": "信仰", "kind": Organization.OrgKind.RELIGION},
 ]
 
 var _filter := -1
@@ -203,8 +204,7 @@ func _row(org: Organization, strongest: float) -> Control:
 	var leader := GameState.get_current_leader(org.org_id)
 	var sub := Label.new()
 	sub.text = "%s・%d名　%s%s" % [_kind_note(org), org.member_count,
-		leader.full_name if leader != null else "指導者不在",
-		"（%s）" % HouseRank.tier_name(org.rank_tier) if org.kind == Organization.OrgKind.HOUSE else ""]
+		leader.full_name if leader != null else "指導者不在", _house_note(org)]
 	sub.position = Vector2(14, 34)
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.add_theme_color_override("font_color", Palette.TEXT_MUTED)
@@ -222,6 +222,20 @@ func _row(org: Organization, strongest: float) -> Control:
 	score.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(score)
 	return button
+
+
+## What a family is: where it stands, what rank it holds if it holds one, and
+## what kind of household it keeps.
+func _house_note(org: Organization) -> String:
+	if org.kind != Organization.OrgKind.HOUSE:
+		return ""
+	if org.standing != Organization.Standing.NOBLE:
+		var liege := GameState.get_organization(org.liege_house_id)
+		return "（%s・%s%s）" % [org.standing_label(),
+			HouseCharacter.label(org.character_id),
+			"／%s" % liege.display_name if liege != null else ""]
+	return "（%s・%s）" % [HouseRank.tier_name(org.rank_tier),
+		HouseCharacter.label(org.character_id)]
 
 
 ## What kind of body this is, and — for the ones that have offices to fill — how
@@ -263,6 +277,8 @@ func _breakdown(org: Organization) -> Control:
 	labels[PowerCalculator.MEMBERSHIP_KEY] = "規模"
 	labels[PowerCalculator.LEADERSHIP_KEY] = "指導者の力量"
 	labels[PowerCalculator.PEDIGREE_KEY] = "家格の重み"
+	labels[PowerCalculator.CHARACTER_KEY] = "家風"
+	labels[PowerCalculator.REALM_SUPPORT_KEY] = "諸家の支え"
 
 	var entries: Array = []
 	for key in org.power_drivers:
@@ -309,6 +325,21 @@ func _breakdown(org: Organization) -> Control:
 		support.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		rows.add_child(support)
 
+	var roll := GameState.leader_roll(org.org_id)
+	if roll.size() >= 2:
+		var names: Array[String] = []
+		for i in range(roll.size() - 1, maxi(-1, roll.size() - 6), -1):
+			var t: RoleTenure = roll[i]["tenure"]
+			names.append("%s(%d年〜)" % [roll[i]["person"].full_name,
+				int(t.start_tick / SimConfig.TICKS_PER_YEAR)])
+		var history := Label.new()
+		history.text = "歴代の%s：%s%s" % [org.leadership_title, "　".join(names),
+			"　…全%d代" % roll.size() if roll.size() > 5 else ""]
+		history.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		history.add_theme_font_size_override("font_size", 16)
+		history.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		rows.add_child(history)
+
 	if org.kind == Organization.OrgKind.HOUSE:
 		var land: Array[String] = []
 		for settlement_id in org.held_settlement_ids:
@@ -322,6 +353,31 @@ func _breakdown(org: Organization) -> Control:
 		standing.add_theme_font_size_override("font_size", 16)
 		standing.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		rows.add_child(standing)
+
+		var served := Retainers.retainers_of(org.org_id)
+		if not served.is_empty():
+			var parts: Array[String] = []
+			for r in served:
+				parts.append("%s %s" % [r.display_name, Retainers.describe_loyalty(r.loyalty)])
+			var vassals := Label.new()
+			vassals.text = "側近家：%s" % "　".join(parts)
+			vassals.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			vassals.add_theme_font_size_override("font_size", 16)
+			vassals.add_theme_color_override("font_color", Palette.TEXT_DIM)
+			rows.add_child(vassals)
+
+	if org.kind == Organization.OrgKind.RELIGION:
+		var regions: Array[String] = []
+		for id in GameState.world.settlements:
+			var s: SettlementState = GameState.world.settlements[id]
+			if s.religion_id == org.org_id:
+				regions.append(s.display_name)
+		var spread := Label.new()
+		spread.text = "信じる地：%s" % ("、".join(regions) if not regions.is_empty() else "なし")
+		spread.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		spread.add_theme_font_size_override("font_size", 16)
+		spread.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		rows.add_child(spread)
 
 	return panel
 

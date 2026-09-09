@@ -13,6 +13,8 @@ extends RefCounted
 const AFFINITY_BONUS := 45.0
 ## How much being seated in the region itself counts for.
 const SEAT_BONUS := 25.0
+## How much less a family wants another county for each one it already holds.
+const LAND_SATIETY := 26.0
 
 
 static func refresh_all(tick: int) -> void:
@@ -52,7 +54,16 @@ static func _verify_ruling_house(settlement: SettlementState) -> void:
 	var best: Organization = null
 	var best_claim := -INF
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		# A county is held by a noble family. A retainer takes one only by rising
+		# out of that rank first, which is a different thing entirely.
+		if house.standing != Organization.Standing.NOBLE:
+			continue
 		var claim: float = house.power_score + regard * float(house.rank_tier) * 18.0
+		# A family already holding several counties is a less obvious candidate
+		# for another one. Without this the strongest house takes every vacancy
+		# in the same epoch and ends up holding the entire country, which is not
+		# a feudal kingdom, it is one man with eight houses.
+		claim -= float(house.held_settlement_ids.size()) * LAND_SATIETY
 		if claim > best_claim:
 			best_claim = claim
 			best = house

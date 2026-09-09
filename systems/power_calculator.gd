@@ -16,6 +16,8 @@ const BASE_KEY := &"base"
 const MEMBERSHIP_KEY := &"membership"
 const LEADERSHIP_KEY := &"leadership"
 const PEDIGREE_KEY := &"pedigree"
+const CHARACTER_KEY := &"character"
+const REALM_SUPPORT_KEY := &"realm_support"
 
 ## What each trait is worth to the organization a person leads. Two guilds with
 ## identical world conditions would otherwise always score identically; who is
@@ -63,7 +65,12 @@ static func _settle_membership(active: Array[Organization], tick: int) -> void:
 			living_by_house[p.house_org_id] = int(living_by_house.get(p.house_org_id, 0)) + 1
 
 	for org in active:
-		if org.kind == Organization.OrgKind.HOUSE:
+		if org.kind == Organization.OrgKind.RELIGION:
+			# A faith's following is how much of the world holds it, which
+			# Religion has already counted. Nothing here should overwrite that
+			# with a share of a membership roll it does not have.
+			pass
+		elif org.kind == Organization.OrgKind.HOUSE:
 			# A house is not a share of the population — it is a family, and its
 			# size is however many of it are currently alive. That is also what
 			# makes a house able to die out, which a share-based figure never could.
@@ -117,6 +124,19 @@ static func calculate(org: Organization, profile: PowerProfile) -> float:
 	if pedigree_term != 0.0:
 		drivers[PEDIGREE_KEY] = pedigree_term
 		score += pedigree_term
+
+	if org.kind == Organization.OrgKind.HOUSE:
+		var character_term := HouseCharacter.power_bonus(org)
+		if character_term != 0.0:
+			drivers[CHARACTER_KEY] = character_term
+			score += character_term
+	elif org.kind == Organization.OrgKind.POLITICAL_SYSTEM:
+		# A crown standing on houses of courtiers is a different proposition from
+		# the same crown standing on houses that would rather it left.
+		var support_term := HouseCharacter.realm_support(org) * 22.0
+		if support_term != 0.0:
+			drivers[REALM_SUPPORT_KEY] = support_term
+			score += support_term
 
 	org.power_drivers = drivers
 	org.power_score = clampf(score, 0.0, profile.max_score)

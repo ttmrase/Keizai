@@ -196,6 +196,13 @@ static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> 
 		polity.leader_person_id,
 		polity.origin_event_id)
 
+	# A body owned by a family means a family has taken the state, and a family
+	# that has taken the state settles its accounts: a rival stripped of its land
+	# and lowered, its own most loyal servants raised in that rival's place.
+	var patron := GameState.get_organization(winner.patron_house_id)
+	if patron != null and patron.is_active():
+		Retainers.reward_and_punish(patron, tick)
+
 
 ## How the winner will decide things. A guild that buys a country runs it the way
 ## it runs a guild hall; a faction brings its own habits.

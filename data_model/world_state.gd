@@ -41,6 +41,9 @@ extends Resource
 ## Aggregate suppression applied to monster growth by whoever is hunting them.
 ## Written by PowerCalculator's epoch pass, read by the resource step.
 @export var monster_suppression: float = 0.0
+## Share of the world held by its single largest faith, 0..1. A country that all
+## prays the same way is a different country from one that does not.
+@export var faith_concentration: float = 0.0
 
 
 func get_settlement(id: StringName) -> SettlementState:
@@ -75,6 +78,7 @@ func to_dict() -> Dictionary:
 		"recent_disaster_pressure": recent_disaster_pressure,
 		"peak_disaster_magnitude": peak_disaster_magnitude,
 		"monster_suppression": monster_suppression,
+		"faith_concentration": faith_concentration,
 	}
 
 
@@ -106,4 +110,5 @@ static func from_dict(d: Dictionary) -> WorldState:
 	w.recent_disaster_pressure = float(d.get("recent_disaster_pressure", 0.0))
 	w.peak_disaster_magnitude = float(d.get("peak_disaster_magnitude", 0.0))
 	w.monster_suppression = float(d.get("monster_suppression", 0.0))
+	w.faith_concentration = float(d.get("faith_concentration", 0.0))
 	return w

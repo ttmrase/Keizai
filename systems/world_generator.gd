@@ -21,6 +21,7 @@ const ROOT_GUILD := &"founders_guild"
 const ROOT_HOUSE := &"crown_house"
 const ROOT_FACTION := &"commons_faction"
 const ROOT_POLITY := &"crown_political_system"
+const ROOT_RELIGION := &"animism"
 
 
 static func generate(world_seed: int) -> void:
@@ -36,7 +37,9 @@ static func generate(world_seed: int) -> void:
 
 	GameState.world.seed = world_seed
 	_create_settlements()
+	_create_religion()
 	var houses := _create_houses()
+	_create_retainers(houses)
 	_create_polity(houses)
 	_create_guild(houses)
 	_create_faction(houses)
@@ -44,6 +47,7 @@ static func generate(world_seed: int) -> void:
 	# One resource step so the world has believable numbers before the first tick.
 	GameState.step_resources(0)
 	PowerCalculator.recalculate_all(0)
+	Religion.refresh_all(0)
 	HouseRank.refresh_all(0)
 	RegionalStanding.refresh_all(0)
 	SocialTies.refresh_all(0)
@@ -89,6 +93,34 @@ static func _spread_position(rng: RandomNumberGenerator) -> Vector2:
 	return best
 
 
+## The world opens believing in the ground it stands on. Animism has no priests,
+## no doctrine and no seat to fill; it is what is there before anyone organizes
+## anything, and it is the root every later faith traces back to.
+static func _create_religion() -> StringName:
+	var faith := Organization.new()
+	faith.org_id = GameState.mint_org_id()
+	faith.kind = Organization.OrgKind.RELIGION
+	faith.archetype_id = ROOT_RELIGION
+	faith.leadership_title = "なし"
+	faith.ideology = PoliticalSystemGenerator.generate_root_axes()
+	faith.ideology.secular_theocratic = 0.15
+	faith.ideology_baseline = faith.ideology.clone()
+	var named := PoliticalSystemGenerator.name_and_describe(faith)
+	faith.display_name = named["display_name"]
+	faith.description = named["description"]
+
+	HistoryLog.emit_event(
+		HistoryEvent.EventType.FOUNDING,
+		0,
+		"人々は山と川と死者に祈っていた。%sには名も司祭もなかった。" % faith.display_name,
+		{"organization": faith.to_dict()},
+		faith.org_id, &"")
+
+	for id in GameState.world.settlements:
+		GameState.world.settlements[id].religion_id = faith.org_id
+	return faith.org_id
+
+
 ## One house per region, each holding its own seat. The first is the reigning
 ## house only because somebody has to be; the rest are its equals to begin with.
 static func _create_houses() -> Array[Organization]:
@@ -110,6 +142,7 @@ static func _create_houses() -> Array[Organization]:
 		house.resources = {&"gold": rng.randf_range(180.0, 460.0)}
 		house.ideology = PoliticalSystemGenerator.generate_root_axes()
 		house.ideology_baseline = house.ideology.clone()
+		house.standing = Organization.Standing.NOBLE
 		# Only the first house is a root; the others descend from it in the
 		# lineage tree, because the invariant is one root per kind. They are
 		# founded at the same moment, as branches of the same original line.
@@ -143,6 +176,8 @@ static func _create_houses() -> Array[Organization]:
 
 		house.leader_person_id = patriarch.person_id
 		settlement.ruling_house_id = house_id
+		HouseCharacter.assign_at_founding(house, rng)
+		Religion.settle_house_faith(house)
 		HistoryLog.emit_event(
 			HistoryEvent.EventType.FOUNDING,
 			0,
@@ -152,6 +187,65 @@ static func _create_houses() -> Array[Organization]:
 		houses.append(GameState.get_organization(house_id))
 		index += 1
 	return houses
+
+
+## Three families under each of the great ones: stewards, captains and keepers of
+## accounts who are no longer of the people and not yet of the nobility. They own
+## nothing in their own name and have everything to gain, which is the entire
+## reason they are here.
+static func _create_retainers(nobles: Array[Organization]) -> void:
+	var rng := RngService.stream(&"worldgen")
+	for liege in nobles:
+		for i in SimConfig.RETAINERS_PER_HOUSE:
+			var house := Organization.new()
+			house.org_id = GameState.mint_org_id()
+			house.kind = Organization.OrgKind.HOUSE
+			house.archetype_id = ROOT_HOUSE
+			house.parent_org_id = liege.org_id
+			house.standing = Organization.Standing.RETAINER
+			house.liege_house_id = liege.org_id
+			house.loyalty = rng.randf_range(0.55, 0.9)
+			house.dynasty_seat_settlement_id = liege.dynasty_seat_settlement_id
+			house.leadership_title = "家長"
+			house.member_count = 4
+			house.resources = {&"gold": rng.randf_range(20.0, 70.0)}
+			house.ideology = PoliticalSystemGenerator.generate_branch_axes(liege, {}, 0.25)
+			house.ideology_baseline = house.ideology.clone()
+			var named := PoliticalSystemGenerator.name_and_describe(house)
+			house.display_name = named["display_name"]
+			house.description = named["description"]
+
+			var surname := HouseNaming.surname_of_name(house.display_name)
+			var head := _make_founder(surname, "m", rng.randi_range(30, 42), house.org_id, rng)
+			var consort := _make_founder(surname, "f", rng.randi_range(28, 39), house.org_id, rng)
+			_record_founder_birth(head)
+			_record_founder_birth(consort)
+			HistoryLog.emit_event(
+				HistoryEvent.EventType.MARRIAGE,
+				-4,
+				"%sと%sが婚姻を結んだ。" % [head.full_name, consort.full_name],
+				{}, &"", &"", &"",
+				[head.person_id, consort.person_id] as Array[StringName])
+			# Two children rather than one: a three-person household whose only
+			# child marries out is finished in a generation, and the whole rank
+			# would be gone before it had a chance at anything.
+			for c in 2:
+				var child := _make_founder(surname, "f" if (i + c) % 2 == 0 else "m",
+					rng.randi_range(8, 19), house.org_id, rng)
+				child.is_founder_generation = false
+				child.father_id = head.person_id
+				child.mother_id = consort.person_id
+				_record_founder_birth(child)
+
+			house.leader_person_id = head.person_id
+			HouseCharacter.assign_at_founding(house, rng)
+			Religion.settle_house_faith(house)
+			HistoryLog.emit_event(
+				HistoryEvent.EventType.FOUNDING,
+				0,
+				"%sは%sに仕える家として立った。" % [house.display_name, liege.display_name],
+				{"organization": house.to_dict()},
+				house.org_id, head.person_id)
 
 
 static func _create_polity(houses: Array[Organization]) -> StringName:

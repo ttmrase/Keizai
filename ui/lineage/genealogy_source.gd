@@ -41,6 +41,24 @@ func generation(id: StringName) -> int:
 	return int(floorf(float(p.birth_tick) / float(TICKS_PER_GENERATION)))
 
 
+## The line of house heads: everyone who has ever held a family, and nobody else.
+##
+## The whole record drawn at once is a thousand boxes wide and unreadable, and
+## most of those boxes are people who married in and are already represented by
+## the household they joined. The heads are the spine of the thing — a chain per
+## family, generation by generation — and anyone else is one tap away.
+func spine_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		for t in p.role_history:
+			var org := GameState.get_organization(t.org_id)
+			if org != null and org.kind == Organization.OrgKind.HOUSE:
+				out.append(id)
+				break
+	return out
+
+
 func roots() -> Array[StringName]:
 	var out: Array[StringName] = []
 	for id in GameState.people:

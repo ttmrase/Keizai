@@ -38,7 +38,13 @@ const MAX_TIER_STEP := 1
 
 
 static func refresh_all(tick: int) -> void:
-	var houses := GameState.organizations_of_kind(Organization.OrgKind.HOUSE)
+	# The peerage is the nobility's own order of precedence. A retainer family
+	# stands outside it entirely — that is what being a retainer means — and
+	# ranking them alongside would give the world thirty-two dukes.
+	var houses: Array[Organization] = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			houses.append(house)
 	if houses.is_empty():
 		return
 

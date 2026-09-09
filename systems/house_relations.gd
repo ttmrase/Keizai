@@ -22,7 +22,13 @@ const ADJUST_RATE := 0.12
 
 
 static func refresh_all(tick: int) -> void:
-	var houses := GameState.organizations_of_kind(Organization.OrgKind.HOUSE)
+	# Only the great families keep this kind of web with each other. A retainer
+	# house has one relationship that matters and it is with its liege, which is
+	# loyalty rather than standing — see Retainers.
+	var houses: Array[Organization] = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			houses.append(house)
 	if houses.size() < 2:
 		return
 

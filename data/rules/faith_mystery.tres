@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"global_ore"
+op = 0
+threshold = 1300.0
+describe_as = "地より出づる富"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"count.archetype.mage_guild"
+op = 0
+threshold = 0.5
+describe_as = "魔術師たちの台頭"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"faith_mystery"
+rule_type = 0
+applies_to_kind = 4
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 700
+priority = 68
+chance_per_tick = 0.08
+schism_kind = &"revelation"
+branch_archetype_id = &"mystery_cult"
+inherited_member_fraction = Vector2(0.2, 0.4)
+ideology_drift_bias = {
+"secular_theocratic": 0.5,
+"tradition_reform": 0.6,
+"isolationism_commerce": 0.3
+}
+min_parent_members = 1
+max_instances_of_archetype = 1
+branch_leadership_title = "秘儀長"
+radicalism = 0.60
+branch_legitimacy_basis = 2
+branch_decision_structure = 1
+chronicle_template = "{reason}のなか、選ばれた者だけが知る作法が生まれ、{parent}から{branch}が分かれ出た。"

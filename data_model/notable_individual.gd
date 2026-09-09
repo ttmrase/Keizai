@@ -67,6 +67,26 @@ func current_tenure() -> RoleTenure:
 	return null
 
 
+## The open tenure for one particular body. A person can hold two seats at once —
+## a monarch usually also heads their own house — so "the tenure they are
+## currently serving" is ambiguous whenever it matters most.
+func tenure_in(org_id: StringName) -> RoleTenure:
+	for t in role_history:
+		if t.org_id == org_id and t.is_current():
+			return t
+	return null
+
+
+## Every seat this person still holds. Death ends all of them, not the first one
+## the list happens to reach.
+func open_tenures() -> Array[RoleTenure]:
+	var out: Array[RoleTenure] = []
+	for t in role_history:
+		if t.is_current():
+			out.append(t)
+	return out
+
+
 func ever_held_office() -> bool:
 	return not role_history.is_empty()
 

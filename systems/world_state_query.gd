@@ -91,6 +91,7 @@ const _KIND_BY_NAME := {
 	"house": Organization.OrgKind.HOUSE,
 	"faction": Organization.OrgKind.FACTION,
 	"polity": Organization.OrgKind.POLITICAL_SYSTEM,
+	"religion": Organization.OrgKind.RELIGION,
 }
 
 

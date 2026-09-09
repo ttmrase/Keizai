@@ -614,3 +614,88 @@ row is a few barycentre sweeps, and placement recentres each row on its own
 centre of gravity after resolving overlaps — without that, resolving overlaps
 rightward walks the chart wider on every sweep. Organization lineages are
 genuinely forests and keep the old layout.
+
+---
+
+## Fourth iteration: rank, faith, and reasons
+
+Five additions and one correction, all of them about the same thing: the world
+had institutions and people but very little society between them.
+
+**A rank between the people and the nobility.** Each founding house is attached
+three retainer families — not commoners, not nobles, holding no county in their
+own name and unable to marry into the families they serve except with
+difficulty. The gap is the whole design: a retainer house has somewhere to go,
+and `Retainers` gives it three roads. It can revolt, when loyalty is gone and
+its standing has caught up with its liege's. It can inherit, when so much of the
+liege's living blood is its own that nobody left is loyal enough to mind. Or it
+can be raised, when a noble house that has just taken the state strips a rival
+and rewards its own. All three run through `HistoryLog.record()`, because the
+rank of a house is a discrete fact like a leadership rather than a value that
+drifts, and the fall is recorded with the rise: a stripped house is lowered into
+the service of the family that beat it rather than destroyed.
+
+Loyalty is read, not accumulated: marriage ties to the liege, land granted, how
+far apart their ideals have drifted, and whether the liege has climbed while its
+retainers stayed where they were.
+
+Crossing the rank line had to be a refusal rather than a preference. Weighting
+it down was not enough — when every partner available to a noble is a retainer,
+a weighted draw still picks one with certainty, and the line got crossed in a
+fifth of all marriages. `Retainers.rank_allows()` refuses the match outright most
+of the time, and opens up precisely when a house has fallen out with every equal
+it has. A match made anyway is usually a scandal rather than a policy, and
+`HousePartition.try_elopement()` casts the couple out as a new house one rank
+below — unless the family had nowhere else to look, in which case they made the
+match on purpose and keep it.
+
+**Faith, starting from nothing organized.** The world opens on an animism with
+no priests and no seat to fill, which is the root of its own lineage and never
+entirely goes away. Organized faiths derive from it through the same schism
+machinery as guilds and factions; what makes them faiths is what happens next.
+Every region holds one, regions drift toward whichever faith answers the life
+being lived there, a house keeps the faith of its own seat, and a house carries
+that faith to every other region it holds. That loop is what lets a revelation
+get out of the valley it was born in. Two details were load-bearing: a newborn
+faith is given the ground it arose in, because a body with no members dissolves
+the same epoch it is founded; and a faith is not driven out of the last place
+that holds it for anything less than a rout.
+
+**A character per house.** Priests, soldiers, courtiers, scholars, merchants,
+farmers. Settled at founding from the trade of the ground the family sits on,
+then re-read from what its members actually do — put your sons in temples for a
+century and you are a clerical house whatever you started as. It pays two ways:
+a body led by somebody out of a house of scholars argues itself apart far more
+readily, and a form of government standing on the houses that suit it is better
+held up than the same form standing on houses that would rather it left.
+
+**Reasons families split.** Cadet branches used to appear because conditions
+held and a die came up short, which produced branches and no stories.
+`HousePartition` adds three quarrels a reader would recognise: an heir not up to
+it whose abler sibling will not serve them, a head dying with only children to
+follow him, and a marriage the family will not have. Each writes its own
+sentence and its own kind of branch.
+
+**The roll of leaders.** Nothing is stored for it. The tenures already sit on
+the people; `GameState.leader_roll()` reads them back, and a body gets a memory
+of everyone who has run it.
+
+**The correction: the family chart was unreadable.** One chart holding every
+person who ever lived is a thousand boxes wide, and most of those boxes are
+people who married in and are already represented by the household they joined.
+The default view is now the spine — the line of house heads, generation by
+generation, with nobody who married in — and tapping any of them opens their
+full lineage. A toggle restores the complete chart, which is still one seamless
+graph with everyone drawn exactly once. Because the spine skips the generations
+in between, descent lines run to the nearest ancestor who is actually drawn
+rather than to a parent who is not, so the chain stays connected instead of
+falling into fragments; the same rule improves focus mode, where a parent
+outside the focus used to mean no line at all.
+
+Two ceilings had to be corrected for a world of thirty-two families. Houses
+needed their own, far higher than the ceiling for guilds: capping them at seven
+made extinction a one-way ratchet, since no cadet branch could form to replace a
+line that had died out, and the world ground down to exactly the cap. And the
+per-archetype cap, which exists so a world does not fill with seven lookalike
+guilds, must not apply to houses at all — every family in the world shares one
+archetype, so it would have forbidden the second family outright.

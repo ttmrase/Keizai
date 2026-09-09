@@ -20,7 +20,11 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 		return null
 	var archetype: StringName = rule.branch_archetype_id if rule.branch_archetype_id != &"" \
 		else parent.archetype_id
-	if _count_of(archetype) >= SimConfig.MAX_ACTIVE_PER_ARCHETYPE:
+	# The per-archetype cap exists so the world does not fill with seven
+	# lookalike guilds. Every family in the world shares one archetype, so
+	# applying it to houses would forbid the second family outright.
+	if parent.kind != Organization.OrgKind.HOUSE \
+			and _count_of(archetype) >= SimConfig.MAX_ACTIVE_PER_ARCHETYPE:
 		return null
 
 	var rng := RngService.stream(&"rules")
@@ -33,6 +37,15 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 	branch.founding_tick = tick
 	branch.dynasty_seat_settlement_id = parent.dynasty_seat_settlement_id
 	branch.cause_tags = parent.cause_tags.duplicate()
+	# A cadet branch is still the same kind of family and still keeps the same
+	# faith. Both can change later; neither is forgotten at the moment of the
+	# split, which is what leaving them blank amounted to.
+	branch.character_id = parent.character_id
+	branch.faith_id = parent.faith_id
+	if parent.kind == Organization.OrgKind.HOUSE:
+		branch.standing = parent.standing
+		branch.liege_house_id = parent.liege_house_id
+		branch.loyalty = parent.loyalty
 
 	var profile := ContentRegistry.get_power_profile(branch.archetype_id)
 	branch.leadership_title = rule.branch_leadership_title
@@ -131,6 +144,8 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 ## world that has already filled its quota with lookalike splinters could never
 ## produce a new politics, however badly it needed one.
 static func _ceiling_for(rule: TriggerRule) -> int:
+	if rule.applies_to_kind == Organization.OrgKind.HOUSE:
+		return SimConfig.MAX_ACTIVE_HOUSES
 	if rule.branch_archetype_id == &"":
 		return SimConfig.MAX_ACTIVE_ORGS_PER_KIND
 	if _count_of(rule.branch_archetype_id) > 0:

@@ -27,7 +27,8 @@ func run() -> void:
 
 func _check_single_root_per_kind() -> void:
 	for kind in [Organization.OrgKind.GUILD, Organization.OrgKind.HOUSE,
-			Organization.OrgKind.FACTION, Organization.OrgKind.POLITICAL_SYSTEM]:
+			Organization.OrgKind.FACTION, Organization.OrgKind.POLITICAL_SYSTEM,
+			Organization.OrgKind.RELIGION]:
 		var roots: Array[StringName] = []
 		for org in GameState.organizations.values():
 			if org.kind == kind and org.is_root():

@@ -42,15 +42,19 @@ func _advance_one_tick() -> void:
 		# who stands behind whom and how that divides the chamber, whether the
 		# chamber is now strong enough to overturn the regime, and what form of
 		# government the whole arrangement adds up to afterwards.
+		Religion.refresh_all(current_tick)
 		HouseRank.refresh_all(current_tick)
 		RegionalStanding.refresh_all(current_tick)
 		SocialTies.refresh_all(current_tick)
 		RegimeShift.consider_all(current_tick)
 		PolityFormEvaluator.refresh_all(current_tick)
 		HouseRelations.refresh_all(current_tick)
+		Retainers.refresh_all(current_tick)
+		HouseCharacter.refresh_all(current_tick)
 		EventBus.power_recalculated.emit(current_tick)
 	if current_tick % SimConfig.IDEOLOGY_DRIFT_EPOCH_TICKS == 0:
 		PoliticalSystemGenerator.drift_all(current_tick)
+	HousePartition.step(current_tick)
 	RulesEngine.evaluate_tick(current_tick)
 	EventBus.tick_advanced.emit(current_tick)
 

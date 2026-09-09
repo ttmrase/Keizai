@@ -70,3 +70,9 @@ func is_generational() -> bool:
 ## the deepest parent. Only meaningful for a generational source.
 func generation(_id: StringName) -> int:
 	return 0
+
+
+## The nodes worth drawing when the whole record is too much to read at once.
+## An empty array means there is no such reduction and everything is drawn.
+func spine_ids() -> Array[StringName]:
+	return []

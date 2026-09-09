@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"recent_disaster_pressure"
+op = 0
+threshold = 2.0
+describe_as = "重なる災厄"
+
+[sub_resource type="Resource" id="c1"]
+script = ExtResource("2_cond")
+world_var_path = &"world.settlements.avg_unrest"
+op = 0
+threshold = 0.35
+describe_as = "怯える民"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"faith_apocalypse"
+rule_type = 0
+applies_to_kind = 4
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0"), SubResource("c1")])
+cooldown_ticks = 700
+priority = 78
+chance_per_tick = 0.08
+schism_kind = &"revelation"
+branch_archetype_id = &"apocalyptic_faith"
+inherited_member_fraction = Vector2(0.2, 0.4)
+ideology_drift_bias = {
+"secular_theocratic": 0.95,
+"tradition_reform": 0.5,
+"isolationism_commerce": -0.5
+}
+min_parent_members = 1
+max_instances_of_archetype = 1
+branch_leadership_title = "預言者"
+radicalism = 0.85
+branch_legitimacy_basis = 3
+branch_decision_structure = 0
+chronicle_template = "{reason}を終わりの徴と読んだ者たちがあり、{parent}から{branch}が興った。"

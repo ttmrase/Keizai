@@ -177,6 +177,9 @@ func _show_detail(id: StringName) -> void:
 	var lean := GameState.get_organization(s.faction_lean_id)
 	lines.append("[color=#9a9080]この地の声[/color]  %s"
 		% (lean.display_name if lean != null else "定まらず"))
+	var faith := GameState.get_organization(s.religion_id)
+	lines.append("[color=#9a9080]信仰[/color]  %s"
+		% (faith.display_name if faith != null else "なし"))
 	lines.append("[color=#9a9080]人口[/color]  %d　[color=#9a9080]富[/color]  %d"
 		% [int(s.population), int(s.wealth)])
 	lines.append("[color=#9a9080]食料[/color]  %d%s" % [int(s.food_stock),

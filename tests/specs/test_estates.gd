@@ -1,0 +1,299 @@
+extends Spec
+
+## The rank below the nobility, the faith above everyone, what kind of family a
+## house is, why families split, and the two ways of reading a family tree.
+
+func run() -> void:
+	_check_the_world_starts_with_retainers()
+	_check_crossing_the_rank_is_hard()
+	_check_a_retainer_house_can_rise()
+	_check_a_noble_house_can_fall()
+	_check_faith_starts_leaderless_and_derives()
+	_check_faith_spreads_and_traces_to_animism()
+	_check_houses_have_a_character_that_counts()
+	_check_households_split_for_reasons()
+	_check_the_roll_of_leaders()
+	_check_the_spine_is_house_heads()
+	finish()
+
+
+func _check_the_world_starts_with_retainers() -> void:
+	SimTestHarness.fresh_world(8101)
+	var nobles := 0
+	var retainers := 0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			nobles += 1
+		elif house.standing == Organization.Standing.RETAINER:
+			retainers += 1
+			check(house.liege_house_id != &"", "%s should serve somebody" % house.display_name)
+			var liege := GameState.get_organization(house.liege_house_id)
+			check(liege != null and liege.standing == Organization.Standing.NOBLE,
+				"%s should serve a noble house" % house.display_name)
+			check(house.held_settlement_ids.is_empty(),
+				"a retainer house holds no county of its own")
+	check_eq(retainers, nobles * SimConfig.RETAINERS_PER_HOUSE,
+		"every founding house should have its three retainer families")
+	check_gt(float(nobles), 4.0, "and there should be a nobility for them to serve")
+
+	# The peerage is the nobility's own order and nobody else's.
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing != Organization.Standing.NOBLE:
+			check_eq(house.rank_tier, 0, "%s stands outside the peerage" % house.display_name)
+
+
+## Marrying across the line is possible and should stay rare — and it opens up
+## exactly when a great house has fallen out with everyone at its own level.
+func _check_crossing_the_rank_is_hard() -> void:
+	SimTestHarness.fresh_world(8102)
+	var noble: Organization = null
+	var retainer: Organization = null
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if noble == null and house.standing == Organization.Standing.NOBLE:
+			noble = house
+		elif retainer == null and house.standing == Organization.Standing.RETAINER:
+			retainer = house
+	check(noble != null and retainer != null, "the world should have both ranks")
+	if noble == null or retainer == null:
+		return
+
+	var a := GameState.house_members(noble.org_id)[0]
+	var b := GameState.house_members(retainer.org_id)[0]
+	check(Retainers.is_match_beneath_rank(a, b), "this is a match across the rank line")
+
+	# On good terms with its equals, a house has no reason to look below itself.
+	for other in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if other.standing == Organization.Standing.NOBLE:
+			noble.house_relations[other.org_id] = 0.5
+	var when_content := Retainers.match_weight(a, b)
+
+	# With nobody left to marry, it very much does.
+	for other in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if other.standing == Organization.Standing.NOBLE:
+			noble.house_relations[other.org_id] = -0.8
+	var when_isolated := Retainers.match_weight(a, b)
+
+	check(when_content < 0.15, "a well-connected house rarely marries below its rank")
+	check_gt(when_isolated - when_content, 0.15,
+		"a house with no equals left to marry should look downward")
+	check_gt(1.0, when_isolated, "and still not treat it as an ordinary match")
+
+
+func _check_a_retainer_house_can_rise() -> void:
+	SimTestHarness.fresh_world(8103)
+	var retainer: Organization = null
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.RETAINER:
+			retainer = house
+			break
+	check(retainer != null, "the world should have retainer families")
+	if retainer == null:
+		return
+	var liege := GameState.get_organization(retainer.liege_house_id)
+	check(liege != null and not liege.held_settlement_ids.is_empty(),
+		"the liege should hold land to lose")
+	if liege == null:
+		return
+
+	var seat: StringName = liege.held_settlement_ids[0]
+	retainer.loyalty = 0.0
+	retainer.power_score = 90.0
+	liege.power_score = 10.0
+	Retainers.refresh_all(SimClock.current_tick)
+
+	check_eq(retainer.standing, Organization.Standing.NOBLE,
+		"a retainer house with the strength and the grievance should take the rank")
+	check(retainer.held_settlement_ids.has(seat), "and the county it rose over")
+	check_eq(retainer.liege_house_id, &"", "a risen house serves nobody")
+	check(GameState.world.settlements[seat].ruling_house_id == retainer.org_id,
+		"and the region should know it")
+	check(GenealogyValidator.traces_to_root(retainer.org_id),
+		"however it rose, it still traces to the first house in the world")
+
+
+## The other half of the same coin: a house that seizes the state strips a rival
+## and raises its own, and the rival goes into that house's service.
+func _check_a_noble_house_can_fall() -> void:
+	SimTestHarness.fresh_world(8104)
+	var winner: Organization = null
+	var rival: Organization = null
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing != Organization.Standing.NOBLE:
+			continue
+		if winner == null:
+			winner = house
+		elif rival == null and not house.held_settlement_ids.is_empty():
+			rival = house
+	if winner == null or rival == null:
+		check(false, "the world should have rival noble houses")
+		return
+	winner.house_relations[rival.org_id] = -0.6
+	Retainers.reward_and_punish(winner, SimClock.current_tick)
+
+	check_eq(rival.standing, Organization.Standing.RETAINER,
+		"a stripped rival is lowered rather than destroyed")
+	check_eq(rival.liege_house_id, winner.org_id,
+		"and lowered into the service of the house that beat it")
+	check(rival.held_settlement_ids.is_empty(), "with nothing left in its own name")
+
+
+func _check_faith_starts_leaderless_and_derives() -> void:
+	SimTestHarness.fresh_world(8105)
+	var animism := GameState.root_of_kind(Organization.OrgKind.RELIGION)
+	check(animism != null, "the world should open with a faith")
+	if animism == null:
+		return
+	check_eq(animism.archetype_id, &"animism", "and it should be the nameless one")
+	check_eq(animism.leader_person_id, &"", "which has no priesthood")
+
+	var profile := ContentRegistry.get_power_profile(&"animism")
+	check(profile != null and profile.leaderless,
+		"and is marked as a body with no seat to fill")
+
+	for id in GameState.world.settlements:
+		check_eq(GameState.world.settlements[id].religion_id, animism.org_id,
+			"everywhere starts believing the same thing")
+
+	# Nothing fills its empty seat, however long the world runs.
+	SimTestHarness.advance(400)
+	check_eq(animism.leader_person_id, &"",
+		"a faith with no priesthood should never acquire one by accident")
+
+
+func _check_faith_spreads_and_traces_to_animism() -> void:
+	SimTestHarness.eventful_world(8106, 2600)
+	var faiths := GameState.organizations_of_kind(Organization.OrgKind.RELIGION)
+	check_gt(float(faiths.size()), 1.0,
+		"a world through famine, plague and monsters should have organized its faith")
+
+	var held := {}
+	for id in GameState.world.settlements:
+		var s: SettlementState = GameState.world.settlements[id]
+		check(GameState.get_organization(s.religion_id) != null,
+			"%s believes in something that exists" % s.display_name)
+		held[s.religion_id] = true
+	check_gt(float(held.size()), 1.0, "and should not all believe the same thing")
+
+	for faith in faiths:
+		check(GenealogyValidator.traces_to_root(faith.org_id),
+			"%s must trace back to the first faith in the world" % faith.display_name)
+		var chain := GenealogyValidator.org_lineage(faith.org_id)
+		check(chain.is_empty() or chain[chain.size() - 1].archetype_id == &"animism",
+			"%s should trace to the animism, not to something else" % faith.display_name)
+
+
+func _check_houses_have_a_character_that_counts() -> void:
+	SimTestHarness.fresh_world(8107)
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		check(HouseCharacter.ALL.has(house.character_id),
+			"%s should be some recognisable kind of family" % house.display_name)
+		check(not HouseCharacter.label(house.character_id).is_empty(),
+			"and that kind should have a name")
+
+	# A family of scholars throws off breakaways; a family of courtiers does not.
+	var faction := GameState.root_of_kind(Organization.OrgKind.FACTION)
+	var leader := GameState.get_person(faction.leader_person_id)
+	check(leader != null, "the faction should have a speaker")
+	if leader == null:
+		return
+	var house := GameState.get_organization(leader.house_org_id)
+	if house == null:
+		return
+	house.character_id = HouseCharacter.SCHOLARLY
+	var restless := HouseCharacter.schism_affinity(faction)
+	house.character_id = HouseCharacter.NOBLE
+	var settled := HouseCharacter.schism_affinity(faction)
+	check_gt(restless - settled, 0.5,
+		"a body led out of a house of scholars should argue itself apart more readily")
+
+	# And a crown standing on courtiers is better propped up than one that is not.
+	var polity := GameState.root_of_kind(Organization.OrgKind.POLITICAL_SYSTEM)
+	polity.polity_form_id = &"feudal_kingdom"
+	for h in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		h.character_id = HouseCharacter.NOBLE
+	var propped := HouseCharacter.realm_support(polity)
+	for h in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		h.character_id = HouseCharacter.AGRARIAN
+	var unpropped := HouseCharacter.realm_support(polity)
+	check_gt(propped - unpropped, 0.5,
+		"a feudal crown standing on courtiers should be better held up than one standing on farmers")
+
+
+## Branches should have causes anyone would recognise, not merely conditions.
+func _check_households_split_for_reasons() -> void:
+	SimTestHarness.eventful_world(8108, 2400)
+	var reasons := {}
+	for e in HistoryLog.backbone:
+		if e.event_type != HistoryEvent.EventType.SCHISM:
+			continue
+		var kind := StringName(e.payload.get("schism_kind", ""))
+		reasons[kind] = int(reasons.get(kind, 0)) + 1
+		check(not HousePartition.reason_label(kind).is_empty(),
+			"every split should have a name for why it happened")
+		check(not e.description.is_empty(), "and a sentence saying so")
+
+	var household_causes := int(reasons.get(&"unfit_heir", 0)) \
+		+ int(reasons.get(&"minority", 0)) + int(reasons.get(&"elopement", 0))
+	check_gt(float(household_causes), 0.0,
+		"four centuries of families should produce at least one quarrel of their own")
+
+
+func _check_the_roll_of_leaders() -> void:
+	SimTestHarness.eventful_world(8109, 1200)
+	var checked := 0
+	for org in GameState.active_organizations():
+		var roll := GameState.leader_roll(org.org_id)
+		if roll.size() < 2:
+			continue
+		checked += 1
+		var previous := -999999
+		for entry in roll:
+			var t: RoleTenure = entry["tenure"]
+			check(t.start_tick >= previous, "the roll should read earliest first")
+			previous = t.start_tick
+			check_eq(t.org_id, org.org_id, "every tenure on the roll belongs to this body")
+			check(entry["person"] != null, "and to somebody who existed")
+		var last: Dictionary = roll[roll.size() - 1]
+		if org.leader_person_id != &"":
+			check_eq(last["person"].person_id, org.leader_person_id,
+				"the last entry should be whoever holds the seat now")
+	check_gt(float(checked), 0.0, "some body should have had more than one leader by now")
+
+
+## The default family view is the line of house heads. Everyone who married in is
+## left out — which is exactly what made the full chart unreadable.
+func _check_the_spine_is_house_heads() -> void:
+	SimTestHarness.eventful_world(8110, 1200)
+	var source := GenealogySource.new()
+	var spine := source.spine_ids()
+	check_gt(float(spine.size()), 4.0, "there should be a line of heads to draw")
+	check(spine.size() < GameState.people.size(),
+		"and it should be a reduction, not the whole record")
+
+	for id in spine:
+		var p := GameState.get_person(id)
+		var held_a_house := false
+		for t in p.role_history:
+			var org := GameState.get_organization(t.org_id)
+			if org != null and org.kind == Organization.OrgKind.HOUSE:
+				held_a_house = true
+		check(held_a_house, "%s is on the spine, so should have held a house" % p.full_name)
+
+	var view := LineageGraphView.new()
+	view.source = source
+	view.spine_mode = true
+	view.rebuild()
+	var placed: Dictionary = view._positions
+	check_eq(placed.size(), spine.size(), "the spine view draws the heads and nobody else")
+	check(view._spouse_edges.is_empty(),
+		"and draws no marriages, because the people who married in are not on it")
+	for edge in view._edges:
+		check(placed[edge[1]].y > placed[edge[0]].y,
+			"a head should still be drawn below the head they descend from")
+
+	# Switching the scope off draws everyone again.
+	view.spine_mode = false
+	view.rebuild()
+	check_eq(view._positions.size(), GameState.people.size(),
+		"the full chart still holds everyone, exactly once")
+	view.free()

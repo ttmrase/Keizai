@@ -26,6 +26,10 @@ func _ready() -> void:
 	_print_chamber()
 	_print_regions()
 	_print_social_ties()
+	_print_faiths()
+	_print_houses()
+	_print_leader_rolls()
+	_print_event_tally()
 	_print_org_tree()
 	_print_house_relations()
 	_print_power_table()
@@ -304,6 +308,92 @@ func _print_social_ties() -> void:
 					"・%s" % patron.display_name if patron != null else ""])
 			if not backers.is_empty():
 				print("      支持: %s" % "  ".join(backers.slice(0, 4)))
+
+
+## What actually happened, counted by cause rather than sampled. The excerpt
+## above shows thirty entries out of thousands; this says whether the machinery
+## that is supposed to produce them ever ran at all.
+func _print_event_tally() -> void:
+	print("\n--- 出来事の内訳 ---")
+	var tally := {}
+	for e in HistoryLog.backbone + HistoryLog.buffer:
+		var key := ""
+		match e.event_type:
+			HistoryEvent.EventType.SCHISM:
+				key = "分派・%s" % HousePartition.reason_label(
+					StringName(e.payload.get("schism_kind", "")))
+			HistoryEvent.EventType.POWER_TRANSFER:
+				if bool(e.payload.get("regime_change", false)):
+					key = "政変"
+				elif bool(e.payload.get("house_rising", false)):
+					key = "家の興り・%s" % e.payload.get("reason", "")
+				else:
+					key = "領地の移動"
+			HistoryEvent.EventType.MARRIAGE:
+				key = "婚姻(家格越え)" if bool(e.payload.get("across_rank", false)) else "婚姻"
+			HistoryEvent.EventType.IDEOLOGY_SHIFT:
+				if e.payload.has("to_form"):
+					key = "統治形態の変化"
+				elif e.payload.has("to_tier"):
+					key = "家格の上下"
+				elif e.payload.has("to_character"):
+					key = "家風の変化"
+				elif e.payload.has("from_faith") or e.payload.has("settlement"):
+					key = "改宗"
+				else:
+					key = "思想の変化"
+			_:
+				continue
+		tally[key] = int(tally.get(key, 0)) + 1
+	var keys: Array = tally.keys()
+	keys.sort()
+	for key in keys:
+		print("  %-24s %d件" % [key, tally[key]])
+
+
+func _print_faiths() -> void:
+	print("\n--- 信仰 ---")
+	for entry in Religion.congregations():
+		var faith: Organization = entry[0]
+		var leader := GameState.get_current_leader(faith.org_id)
+		print("  %-16s %d地域 / 信徒%d名 / %s"
+			% [faith.display_name, int(entry[1]), faith.member_count,
+				leader.full_name if leader != null else "司祭なし"])
+
+
+func _print_houses() -> void:
+	print("\n--- 家 ---")
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		var liege := GameState.get_organization(house.liege_house_id)
+		var faith := GameState.get_organization(house.faith_id)
+		var extra := ""
+		if house.standing == Organization.Standing.RETAINER:
+			extra = "　仕える先: %s（%s %.2f）" % [
+				liege.display_name if liege != null else "なし",
+				Retainers.describe_loyalty(house.loyalty), house.loyalty]
+		print("  %-12s %-4s %-6s %-6s %-8s 領%d名%d%s"
+			% [house.display_name, house.standing_label(),
+				HouseRank.tier_name(house.rank_tier) if house.is_noble() else "—",
+				HouseCharacter.label(house.character_id),
+				faith.display_name if faith != null else "無信",
+				house.held_settlement_ids.size(), house.member_count, extra])
+
+
+func _print_leader_rolls() -> void:
+	print("\n--- 歴代の長 ---")
+	for kind in [Organization.OrgKind.POLITICAL_SYSTEM, Organization.OrgKind.GUILD]:
+		for org in GameState.organizations_of_kind(kind):
+			var roll := GameState.leader_roll(org.org_id)
+			if roll.size() < 2:
+				continue
+			print("  %s（%s）" % [org.display_name, org.leadership_title])
+			for entry in roll:
+				var t: RoleTenure = entry["tenure"]
+				print("      %4d年〜%-6s %s" % [
+					int(t.start_tick / SimConfig.TICKS_PER_YEAR),
+					"現在" if t.is_current() else "%d年" % int(t.end_tick / SimConfig.TICKS_PER_YEAR),
+					entry["person"].full_name])
+			break
 
 
 func _print_regions() -> void:

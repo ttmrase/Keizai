@@ -25,6 +25,12 @@ var selected_id: StringName = &""
 ## When set, only these ids are laid out — focus mode.
 var _visible_ids: Dictionary = {}
 var _focus_active := false
+## Draw only the line of house heads, without the people who married in. The
+## whole record at once is a thousand boxes wide; this is the readable form of
+## it, and any of those boxes opens the rest.
+var spine_mode := false
+## Whatever is being laid out this pass, for quick membership tests.
+var _scope: Dictionary = {}
 var _collapsed: Dictionary = {}
 
 var _positions: Dictionary = {}      # id -> Vector2 (top-left, world space)
@@ -143,18 +149,32 @@ func _layout_generational() -> void:
 			continue
 		var members: Array[StringName] = [id]
 		unit_of[id] = units.size()
-		for spouse_id in source.spouses(id):
-			if unit_of.has(spouse_id) or not _in_scope(spouse_id):
-				continue
-			members.append(spouse_id)
-			unit_of[spouse_id] = units.size()
-			break              # one partner drawn per household keeps the row honest
+		# The spine is the line of heads. The people who married into it are
+		# exactly the ones it leaves out, so there is no partner to draw beside
+		# anybody — which is most of what makes it readable.
+		if not _spine_only():
+			for spouse_id in source.spouses(id):
+				if unit_of.has(spouse_id) or not _in_scope(spouse_id):
+					continue
+				members.append(spouse_id)
+				unit_of[spouse_id] = units.size()
+				break          # one partner per household keeps the row honest
 		units.append(members)
 
-	var rows := _unit_rows(units, unit_of)
+	# Who each person hangs from. Usually a parent, but when the parent is not
+	# being drawn — the spine skips everyone who never held a house, and focus
+	# mode skips everyone outside it — the line runs to the nearest ancestor who
+	# is, so the chain stays connected instead of falling apart into fragments.
+	var link_parent := {}
+	for id in ids:
+		var anchor := _nearest_drawn_ancestor(id)
+		if anchor != &"":
+			link_parent[id] = anchor
+
+	var rows := _unit_rows(units, unit_of, link_parent)
 	var parents_of := {}
 	var children_of := {}
-	_unit_links(units, unit_of, parents_of, children_of)
+	_unit_links(unit_of, link_parent, parents_of, children_of)
 
 	var by_row := {}
 	for i in units.size():
@@ -170,32 +190,71 @@ func _layout_generational() -> void:
 		widths.append(NODE_SIZE.x * units[i].size() + SPOUSE_GAP * (units[i].size() - 1))
 	var x := _place_rows(by_row, row_keys, parents_of, children_of, widths)
 
-	_commit_units(units, unit_of, rows, x, widths, ids)
+	_commit_units(units, unit_of, rows, x, widths, ids, link_parent)
+
+
+## True while the reduced view is the one being drawn. Settled once per layout in
+## _generational_ids(), because it is asked once per person after that.
+var _spine_active := false
+
+
+func _spine_only() -> bool:
+	return _spine_active
 
 
 func _generational_ids() -> Array[StringName]:
+	_scope.clear()
+	_spine_active = false
 	var out: Array[StringName] = []
 	if _focus_active:
 		for id in _visible_ids:
 			if source.exists(id):
 				out.append(id)
-		return out
-	for id in source.all_ids():
-		if source.exists(id):
-			out.append(id)
+	elif spine_mode:
+		for id in source.spine_ids():
+			if source.exists(id):
+				out.append(id)
+		_spine_active = not out.is_empty()
+	if out.is_empty():
+		for id in source.all_ids():
+			if source.exists(id):
+				out.append(id)
+	for id in out:
+		_scope[id] = true
 	return out
 
 
 func _in_scope(id: StringName) -> bool:
-	if not source.exists(id):
-		return false
-	return not _focus_active or _visible_ids.has(id)
+	return _scope.has(id)
+
+
+## The closest person above this one who is actually being drawn. In the full
+## chart that is simply a parent; in the spine it may be a great-grandparent,
+## because the generations in between never held anything.
+const ANCESTOR_SEARCH_DEPTH := 10
+
+
+func _nearest_drawn_ancestor(id: StringName) -> StringName:
+	var frontier: Array = [[id, 0]]
+	var seen := {}
+	while not frontier.is_empty():
+		var entry: Array = frontier.pop_front()
+		var current: StringName = entry[0]
+		var depth: int = entry[1]
+		if depth > ANCESTOR_SEARCH_DEPTH or seen.has(current):
+			continue
+		seen[current] = true
+		if depth > 0 and _in_scope(current):
+			return current
+		for parent_id in source.parents(current):
+			frontier.append([parent_id, depth + 1])
+	return &""
 
 
 ## A household sits one row below the household of its parents. That is not the
 ## same as the generation of the people in it: marrying someone a generation
 ## older puts the pair on one row, and their children have to clear both.
-func _unit_rows(units: Array, unit_of: Dictionary) -> Array[int]:
+func _unit_rows(units: Array, unit_of: Dictionary, link_parent: Dictionary) -> Array[int]:
 	var rows: Array[int] = []
 	for members in units:
 		var deepest := 0
@@ -205,15 +264,14 @@ func _unit_rows(units: Array, unit_of: Dictionary) -> Array[int]:
 
 	for pass_index in MAX_ROW_PASSES:
 		var moved := false
-		for i in units.size():
-			for member in units[i]:
-				for child_id in source.children(member):
-					if not _in_scope(child_id) or not unit_of.has(child_id):
-						continue
-					var j: int = unit_of[child_id]
-					if j != i and rows[j] <= rows[i]:
-						rows[j] = rows[i] + 1
-						moved = true
+		for child_id in link_parent:
+			var j: int = unit_of.get(child_id, -1)
+			var i: int = unit_of.get(link_parent[child_id], -1)
+			if i < 0 or j < 0 or i == j:
+				continue
+			if rows[j] <= rows[i]:
+				rows[j] = rows[i] + 1
+				moved = true
 		if not moved:
 			break
 
@@ -226,24 +284,21 @@ func _unit_rows(units: Array, unit_of: Dictionary) -> Array[int]:
 	return rows
 
 
-func _unit_links(units: Array, unit_of: Dictionary, parents_of: Dictionary,
+func _unit_links(unit_of: Dictionary, link_parent: Dictionary, parents_of: Dictionary,
 		children_of: Dictionary) -> void:
-	for i in units.size():
-		for member in units[i]:
-			for child_id in source.children(member):
-				if not _in_scope(child_id) or not unit_of.has(child_id):
-					continue
-				var j: int = unit_of[child_id]
-				if j == i:
-					continue
-				var kids: Array = children_of.get(i, [])
-				if not kids.has(j):
-					kids.append(j)
-					children_of[i] = kids
-				var folks: Array = parents_of.get(j, [])
-				if not folks.has(i):
-					folks.append(i)
-					parents_of[j] = folks
+	for child_id in link_parent:
+		var j: int = unit_of.get(child_id, -1)
+		var i: int = unit_of.get(link_parent[child_id], -1)
+		if i < 0 or j < 0 or i == j:
+			continue
+		var kids: Array = children_of.get(i, [])
+		if not kids.has(j):
+			kids.append(j)
+			children_of[i] = kids
+		var folks: Array = parents_of.get(j, [])
+		if not folks.has(i):
+			folks.append(i)
+			parents_of[j] = folks
 
 
 ## Orders each row so lines cross as little as they cheaply can: repeatedly sort
@@ -336,7 +391,7 @@ func _desired_x(unit: int, neighbours: Dictionary, x: Dictionary,
 
 
 func _commit_units(units: Array, unit_of: Dictionary, rows: Array[int], x: Dictionary,
-		widths: Array[float], ids: Array[StringName]) -> void:
+		widths: Array[float], ids: Array[StringName], link_parent: Dictionary) -> void:
 	var leftmost := INF
 	for i in units.size():
 		leftmost = minf(leftmost, float(x.get(i, 0.0)))
@@ -356,17 +411,14 @@ func _commit_units(units: Array, unit_of: Dictionary, rows: Array[int], x: Dicti
 			_spouse_edges.append([members[0], members[1]])
 			_partner_of[members[0]] = members[1]
 
-	# One descent line per person, hung from the middle of their parents' household.
+	# One descent line per person, hung from the middle of the household above.
 	for id in ids:
-		if not unit_of.has(id):
+		if not unit_of.has(id) or not link_parent.has(id):
 			continue
-		for parent_id in source.parents(id):
-			if not _in_scope(parent_id) or not unit_of.has(parent_id):
-				continue
-			if unit_of[parent_id] == unit_of[id]:
-				continue
-			_edges.append([parent_id, id])
-			break
+		var anchor: StringName = link_parent[id]
+		if unit_of.get(anchor, -1) == unit_of[id]:
+			continue
+		_edges.append([anchor, id])
 
 
 ## In focus mode the tree is rooted at the highest visible ancestor rather than

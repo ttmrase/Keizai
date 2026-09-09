@@ -9,14 +9,14 @@ extends RefCounted
 ## Above this many living notables, fertility falls off sharply. Without a cap
 ## the cast grows without bound; set too low, and the houses cannot replace their
 ## own dead — nobody is ever created from nothing to make up the shortfall.
-const CROWDING_SOFT_CAP := 90
+const CROWDING_SOFT_CAP := 165
 const MAX_CHILDREN := 6
 
 ## The number of named figures the houses tend toward. Below it, families push
 ## urgently for heirs; above it, they stop. Without the lower half of this the
 ## population is only ever pushed downward, and one bad century ends the world —
 ## there is nobody to invent a replacement.
-const NOTABLE_TARGET := 55
+const NOTABLE_TARGET := 105
 const SCARCITY_FERTILITY_BOOST := 2.4
 
 ## Famine and plague reach the great houses, but they eat before their tenants
@@ -102,11 +102,17 @@ static func _step_marriages(tick: int) -> void:
 		var partner := _find_partner(a, singles, tick)
 		if partner == null:
 			continue
+		# A match across the line between the nobility and its servants is not
+		# forbidden, only disowned. The couple are cast out first, so the marriage
+		# that follows is recorded between the people they have become.
+		var beneath := Retainers.is_match_beneath_rank(a, partner)
+		var cast_out := beneath and HousePartition.try_elopement(a, partner, tick)
 		HistoryLog.emit_event(
 			HistoryEvent.EventType.MARRIAGE,
 			tick,
-			"%sと%sが婚姻を結んだ。" % [a.full_name, partner.full_name],
-			{},
+			"%sと%sが婚姻を結んだ。%s" % [a.full_name, partner.full_name,
+				"家格を越えた縁組であった。" if beneath and not cast_out else ""],
+			{"across_rank": beneath, "cast_out": cast_out},
 			&"",
 			&"",
 			&"",
@@ -142,15 +148,25 @@ static func _find_partner(a: NotableIndividual, pool: Array[NotableIndividual],
 			continue
 		if _too_closely_related(a, b):
 			continue
+		# The line between the nobility and its servants is a real refusal, not a
+		# preference. A family with no equals left to marry may cross it; one
+		# with options will not hear of it.
+		if not Retainers.rank_allows(a, b):
+			continue
 		eligible.append(b)
 	if eligible.is_empty():
 		return null
 	# Pick at random rather than taking the first match: always pairing the
 	# earliest-listed person funnels every marriage into one family line, and
 	# within a few generations the whole world shares a surname.
+	#
+	# Rank is the other half of it. A noble family marries its equals, and looks
+	# below itself only when it has fallen out with everyone at its own level —
+	# which is precisely when the line between the ranks gets crossed.
 	var weights: Array = []
 	for b in eligible:
-		weights.append(2.0 if b.family_name != a.family_name else 0.4)
+		var weight: float = 2.0 if b.family_name != a.family_name else 0.4
+		weights.append(weight * Retainers.match_weight(a, b))
 	return RngService.pick_weighted(&"demography", eligible, weights)
 
 

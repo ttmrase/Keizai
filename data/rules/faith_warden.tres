@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="TriggerRule" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://data_model/trigger_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://data_model/rule_condition.gd" id="2_cond"]
+
+[sub_resource type="Resource" id="c0"]
+script = ExtResource("2_cond")
+world_var_path = &"global_monster_threat_level"
+op = 0
+threshold = 0.55
+describe_as = "夜ごとの魔物"
+
+[resource]
+script = ExtResource("1_rule")
+rule_id = &"faith_warden"
+rule_type = 0
+applies_to_kind = 4
+applies_to_archetypes = Array[StringName]([])
+conditions = Array[Resource]([SubResource("c0")])
+cooldown_ticks = 700
+priority = 74
+chance_per_tick = 0.08
+schism_kind = &"revelation"
+branch_archetype_id = &"warden_cult"
+inherited_member_fraction = Vector2(0.2, 0.4)
+ideology_drift_bias = {
+"secular_theocratic": 0.7,
+"militarism_pacifism": 0.6,
+"centralization": 0.4
+}
+min_parent_members = 1
+max_instances_of_archetype = 1
+branch_leadership_title = "守護司祭"
+radicalism = 0.55
+branch_legitimacy_basis = 3
+branch_decision_structure = 0
+chronicle_template = "{reason}に、人々は守ってくれる神を求めた。{parent}から{branch}が立ち上がった。"

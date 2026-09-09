@@ -13,13 +13,32 @@ extends Resource
 ## `parent_org_id` is the traceability chain: exactly one organization per kind
 ## has an empty parent, and every other organization reaches it by walking up.
 
-enum OrgKind { GUILD, HOUSE, FACTION, POLITICAL_SYSTEM }
+enum OrgKind { GUILD, HOUSE, FACTION, POLITICAL_SYSTEM, RELIGION }
 
 const KIND_NAMES := {
 	OrgKind.GUILD: "GUILD",
 	OrgKind.HOUSE: "HOUSE",
 	OrgKind.FACTION: "FACTION",
 	OrgKind.POLITICAL_SYSTEM: "POLITICAL_SYSTEM",
+	OrgKind.RELIGION: "RELIGION",
+}
+
+## Where a family stands in the order of society. The gap between the two upper
+## ranks is the interesting one: a retainer family is not of the people any more
+## and not of the nobility yet, which is the whole reason it has something to
+## want.
+enum Standing { COMMONER, RETAINER, NOBLE }
+
+const STANDING_NAMES := {
+	Standing.COMMONER: "COMMONER",
+	Standing.RETAINER: "RETAINER",
+	Standing.NOBLE: "NOBLE",
+}
+
+const STANDING_LABELS := {
+	Standing.COMMONER: "平民",
+	Standing.RETAINER: "側近家",
+	Standing.NOBLE: "貴族",
 }
 
 @export var org_id: StringName = &""
@@ -83,6 +102,19 @@ const KIND_NAMES := {
 ## has. A guild whose masters keep coming from the same family has been captured
 ## by it, whatever its charter says.
 @export var patron_house_id: StringName = &""
+## HOUSE: where this family stands, and whom it serves if it stands below the
+## nobility. A retainer house is bound to one noble house and can rise by
+## outliving it, out-marrying it, or turning on it.
+@export var standing: Standing = Standing.NOBLE
+@export var liege_house_id: StringName = &""
+## HOUSE: how a retainer family currently feels about the house it serves, 0..1.
+## Read off marriages, land and how the liege has treated it, not accumulated.
+@export var loyalty: float = 0.75
+## HOUSE: what kind of family this is — priests, soldiers, courtiers, scholars.
+## Shapes what it is good at and what it tends to produce.
+@export var character_id: StringName = &""
+## HOUSE/SETTLEMENT-facing: the faith this family keeps.
+@export var faith_id: StringName = &""
 ## POLITICAL_SYSTEM: the form of government currently derived from the balance
 ## between houses, guilds and factions. Recomputed each power epoch.
 @export var polity_form_id: StringName = &""
@@ -90,6 +122,14 @@ const KIND_NAMES := {
 
 func kind_name() -> String:
 	return KIND_NAMES.get(kind, "UNKNOWN")
+
+
+func standing_label() -> String:
+	return STANDING_LABELS.get(standing, "")
+
+
+func is_noble() -> bool:
+	return kind == OrgKind.HOUSE and standing == Standing.NOBLE
 
 
 func is_root() -> bool:
@@ -152,6 +192,15 @@ func to_dict() -> Dictionary:
 		d["seat_total"] = seat_total
 	if patron_house_id != &"":
 		d["patron_house_id"] = String(patron_house_id)
+	if standing != Standing.NOBLE:
+		d["standing"] = STANDING_NAMES[standing]
+	if liege_house_id != &"":
+		d["liege_house_id"] = String(liege_house_id)
+	if character_id != &"":
+		d["character_id"] = String(character_id)
+	if faith_id != &"":
+		d["faith_id"] = String(faith_id)
+	d["loyalty"] = loyalty
 	return d
 
 
@@ -211,7 +260,19 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.faction_seats = seats
 	o.seat_total = int(d.get("seat_total", 0))
 	o.patron_house_id = StringName(d.get("patron_house_id", ""))
+	o.standing = _standing_from_name(d.get("standing", "NOBLE"))
+	o.liege_house_id = StringName(d.get("liege_house_id", ""))
+	o.character_id = StringName(d.get("character_id", ""))
+	o.faith_id = StringName(d.get("faith_id", ""))
+	o.loyalty = float(d.get("loyalty", 0.75))
 	return o
+
+
+static func _standing_from_name(n: String) -> Standing:
+	for k in STANDING_NAMES:
+		if STANDING_NAMES[k] == n:
+			return k
+	return Standing.NOBLE
 
 
 static func _kind_from_name(n: String) -> OrgKind:
