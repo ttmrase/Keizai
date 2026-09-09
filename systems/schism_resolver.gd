@@ -214,5 +214,6 @@ static func _line_of(leader: NotableIndividual) -> Array[StringName]:
 static func _take_spouses(person: NotableIndividual, out: Array[StringName]) -> void:
 	for spouse_id in person.spouse_ids:
 		var spouse := GameState.get_person(spouse_id)
-		if spouse != null and spouse.is_alive() and not out.has(spouse_id):
-			out.append(spouse_id)
+		if spouse == null or not spouse.is_alive() or out.has(spouse_id):
+			continue
+		out.append(spouse_id)

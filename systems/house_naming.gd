@@ -25,6 +25,15 @@ static func surname_of(house_org_id: StringName) -> String:
 
 ## Moves a person into a house and restyles their name accordingly.
 static func adopt_into_house(person: NotableIndividual, house_org_id: StringName) -> void:
+	# Somebody who heads a family and then leaves it — married out, or gone with
+	# a cadet branch — leaves the seat empty behind them. Without this the house
+	# they left is still led by a person who is no longer of it, which is not a
+	# thing a family tolerates and not a thing the record should show.
+	var previous := GameState.get_organization(person.house_org_id)
+	if previous != null and previous.org_id != house_org_id \
+			and previous.leader_person_id == person.person_id:
+		previous.leader_person_id = &""
+
 	person.house_org_id = house_org_id
 	person.family_name = surname_of(house_org_id)
 
