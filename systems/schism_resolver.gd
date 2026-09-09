@@ -46,6 +46,16 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 		branch.standing = parent.standing
 		branch.liege_house_id = parent.liege_house_id
 		branch.loyalty = parent.loyalty
+		# A cadet line leaves with a name and no land, which makes it a client of
+		# the house it left rather than its equal. This is also what keeps the
+		# rank below the nobility populated: every branch of a great house swells
+		# it, and only holding ground gets a family back out of it. Treating a
+		# branch as another noble house instead inverts the world within a few
+		# centuries — thirty noble families and nobody in service to any of them.
+		if parent.standing == Organization.Standing.NOBLE:
+			branch.standing = Organization.Standing.RETAINER
+			branch.liege_house_id = parent.org_id
+			branch.loyalty = 0.6
 
 	var profile := ContentRegistry.get_power_profile(branch.archetype_id)
 	branch.leadership_title = rule.branch_leadership_title

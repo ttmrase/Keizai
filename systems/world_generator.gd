@@ -49,6 +49,7 @@ static func generate(world_seed: int) -> void:
 	PowerCalculator.recalculate_all(0)
 	Religion.refresh_all(0)
 	HouseRank.refresh_all(0)
+	Retainers.refresh_all(0)
 	RegionalStanding.refresh_all(0)
 	SocialTies.refresh_all(0)
 	PolityFormEvaluator.refresh_all(0)

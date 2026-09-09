@@ -55,6 +55,8 @@ static func refresh_all(tick: int) -> void:
 	var retainers := _retainer_houses()
 	if retainers.is_empty():
 		return
+	_raise_holders_for_unheld_land(retainers, tick)
+	_keep_a_nobility(tick)
 	for house in retainers:
 		_settle_loyalty(house)
 
@@ -64,6 +66,108 @@ static func refresh_all(tick: int) -> void:
 			continue
 		if not descent.is_empty():
 			_try_inheritance(house, descent, tick)
+
+
+## Land that no noble family holds gets one, raised out of the households that
+## were already serving there.
+##
+## This is what keeps a nobility in the world at all. Every road upward converts
+## one noble house into a retainer as it promotes another, and elopement pushes
+## families downward with nothing coming back, so the rank drains: eight
+## centuries in, a world could have thirty households and not one noble among
+## them, no rank, no feuds between great families, and no candidate for a vacant
+## county — since a retainer cannot take one until it has stopped being a
+## retainer. Somebody has to hold the ground, and whoever does is thereafter
+## noble, which is how the rank worked before anyone wrote it down.
+static func _raise_holders_for_unheld_land(retainers: Array[Organization], tick: int) -> void:
+	var risings: Array = []
+	var promised := {}
+	for id in GameState.world.settlements:
+		var s: SettlementState = GameState.world.settlements[id]
+		var holder := GameState.get_organization(s.ruling_house_id)
+		# Only a county whose family is actually gone. A living holder keeps it,
+		# whatever rank they have fallen to.
+		if holder != null and holder.is_active():
+			continue
+		var claimant := _best_claimant_for(s, retainers, promised)
+		if claimant == null:
+			continue
+		promised[claimant.org_id] = true
+		risings.append([claimant, s])
+
+	for entry in risings:
+		var claimant: Organization = entry[0]
+		var settlement: SettlementState = entry[1]
+		HistoryLog.emit_event(
+			HistoryEvent.EventType.POWER_TRANSFER,
+			tick,
+			"%sを頂く家は絶えた。仕えていた%sが跡を継ぎ、貴族の列に加わった。"
+				% [settlement.display_name, claimant.display_name],
+			{
+				"house_rising": true,
+				"seized_settlement": String(settlement.id),
+				"reason": "succession_of_service",
+				"legitimacy_cost": 0.0,
+			},
+			claimant.org_id,
+			claimant.leader_person_id,
+			claimant.origin_event_id)
+
+
+## A crown cannot govern eight counties through one family. When the great houses
+## have thinned past the point of holding the country between them, the greatest
+## of the households still standing are raised until there are enough again —
+## which is how a nobility has always replaced itself.
+static func nobility_floor() -> int:
+	return maxi(2, int(GameState.world.settlements.size() / 2))
+
+
+static func _keep_a_nobility(tick: int) -> void:
+	var nobles := 0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			nobles += 1
+	var short := nobility_floor() - nobles
+	if short <= 0:
+		return
+
+	var candidates := _retainer_houses()
+	candidates.sort_custom(func(a, b):
+		return a.power_score > b.power_score if not is_equal_approx(a.power_score, b.power_score) \
+			else String(a.org_id) < String(b.org_id))
+	for i in mini(short, candidates.size()):
+		var risen: Organization = candidates[i]
+		HistoryLog.emit_event(
+			HistoryEvent.EventType.POWER_TRANSFER,
+			tick,
+			"諸家は数を減らしすぎた。%sが引き上げられ、貴族の列に加えられた。" % risen.display_name,
+			{"house_rising": true, "reason": "thin_nobility", "legitimacy_cost": 0.0},
+			risen.org_id,
+			risen.leader_person_id,
+			risen.origin_event_id)
+
+
+## Whoever has a claim on a county whose family has died out — and only somebody
+## who actually served there. There is no general claim: a household with no
+## connection to the place has no more right to it than any other, and letting
+## the greatest household left take every vacancy promotes the whole rank out of
+## existence within a few centuries.
+static func _best_claimant_for(settlement: SettlementState, retainers: Array[Organization],
+		promised: Dictionary) -> Organization:
+	var best: Organization = null
+	var best_claim := -INF
+	for house in retainers:
+		if promised.has(house.org_id) or house.member_count <= 0:
+			continue
+		var served_here := house.liege_house_id == settlement.ruling_house_id
+		var seated_here := house.dynasty_seat_settlement_id == settlement.id
+		if not served_here and not seated_here:
+			continue
+		var claim: float = house.power_score + (60.0 if served_here else 0.0)
+		if claim > best_claim:
+			best_claim = claim
+			best = house
+	return best
 
 
 static func _retainer_houses() -> Array[Organization]:

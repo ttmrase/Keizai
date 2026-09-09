@@ -44,12 +44,17 @@ func _advance_one_tick() -> void:
 		# government the whole arrangement adds up to afterwards.
 		Religion.refresh_all(current_tick)
 		HouseRank.refresh_all(current_tick)
+		# Before the land is reassigned, not after: a county whose family has died
+		# out is first claim of the households that were serving there, and only
+		# what nobody claims falls to whichever great house is nearest. The other
+		# order funnels every vacancy to the strongest survivor until one family
+		# holds the entire country and the nobility is a single name.
+		Retainers.refresh_all(current_tick)
 		RegionalStanding.refresh_all(current_tick)
 		SocialTies.refresh_all(current_tick)
 		RegimeShift.consider_all(current_tick)
 		PolityFormEvaluator.refresh_all(current_tick)
 		HouseRelations.refresh_all(current_tick)
-		Retainers.refresh_all(current_tick)
 		HouseCharacter.refresh_all(current_tick)
 		EventBus.power_recalculated.emit(current_tick)
 	if current_tick % SimConfig.IDEOLOGY_DRIFT_EPOCH_TICKS == 0:

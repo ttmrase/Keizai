@@ -12,6 +12,7 @@ func run() -> void:
 	_check_faith_spreads_and_traces_to_animism()
 	_check_houses_have_a_character_that_counts()
 	_check_households_split_for_reasons()
+	_check_both_ranks_survive_the_centuries()
 	_check_the_roll_of_leaders()
 	_check_the_spine_is_house_heads()
 	finish()
@@ -276,6 +277,46 @@ func _check_households_split_for_reasons() -> void:
 		+ int(reasons.get(&"minority", 0)) + int(reasons.get(&"elopement", 0))
 	check_gt(float(household_causes), 0.0,
 		"four centuries of families should produce at least one quarrel of their own")
+
+
+## The rank has to still be there in the fourth century, and so does the
+## nobility above it. Both directions failed at different points: every road
+## upward turns a noble house into a retainer while promoting one, so the
+## nobility drained to a single family holding the whole country; and treating a
+## cadet branch as another noble house inverted it the other way, thirty noble
+## families with nobody in service to any of them.
+func _check_both_ranks_survive_the_centuries() -> void:
+	SimTestHarness.eventful_world(8111, 2600)
+	var nobles := 0
+	var retainers := 0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			nobles += 1
+		elif house.standing == Organization.Standing.RETAINER:
+			retainers += 1
+	check_gt(float(nobles), float(Retainers.nobility_floor()) - 0.5,
+		"the country should still have enough great families to govern itself")
+	check_gt(float(retainers), 2.0,
+		"and should still have a rank below them, or the ladder has no rungs")
+
+	# No single family should end up holding the entire country.
+	var by_holder := {}
+	for id in GameState.world.settlements:
+		var s: SettlementState = GameState.world.settlements[id]
+		var holder := GameState.get_organization(s.ruling_house_id)
+		check(holder != null and holder.is_active(), "%s should be held" % s.display_name)
+		if holder != null:
+			by_holder[holder.org_id] = int(by_holder.get(holder.org_id, 0)) + 1
+	check_gt(float(by_holder.size()), 2.0,
+		"the counties should be spread across several families, not gathered into one")
+
+	# And families should still be moving between the ranks.
+	var risings := 0
+	for e in HistoryLog.backbone:
+		if e.event_type == HistoryEvent.EventType.POWER_TRANSFER \
+				and bool(e.payload.get("house_rising", false)):
+			risings += 1
+	check_gt(float(risings), 0.0, "somebody should have risen in four centuries")
 
 
 func _check_the_roll_of_leaders() -> void:

@@ -72,9 +72,15 @@ func _check_form_follows_the_balance_of_power() -> void:
 
 func _check_house_relations_are_mutual_and_varied() -> void:
 	SimTestHarness.eventful_world(5004, 3000)
-	var houses := GameState.organizations_of_kind(Organization.OrgKind.HOUSE)
+	# The web of feuds and alliances is the nobility's own. A retainer family has
+	# one relationship that matters and it is loyalty to its liege, which is a
+	# different thing measured elsewhere.
+	var houses: Array[Organization] = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			houses.append(house)
 	if houses.size() < 2:
-		check(false, "the run should still have several houses standing")
+		check(false, "the run should still have several noble houses standing")
 		return
 
 	var lowest := INF
