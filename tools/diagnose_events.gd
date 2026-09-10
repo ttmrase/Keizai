@@ -4,8 +4,7 @@ extends Node
 
 func _ready() -> void:
 	ContentRegistry.ensure_loaded()
-	var seeds := [4101, 4102, 4103]
-	for world_seed in seeds:
+	for world_seed in [4101, 4102]:
 		WorldGenerator.generate(world_seed)
 		SimClock.start(0)
 		SimClock.set_time_scale(0.0)
@@ -17,6 +16,22 @@ func _ready() -> void:
 			GodPowerAPI.trigger_disaster(&"plague", &"", 1.4)
 			GodPowerAPI.trigger_disaster(&"drought", &"", 1.5)
 			SimClock.advance_n_ticks_instant(700)
+		print("== 荒れた世界 ==")
+		_report(world_seed)
+
+	# And one left more or less alone, which is what most play looks like.
+	for world_seed in [4201, 4202]:
+		WorldGenerator.generate(world_seed)
+		SimClock.start(0)
+		SimClock.set_time_scale(0.0)
+		GodPowerAPI.set_monster_spawn_rate(1.2)
+		SimClock.advance_n_ticks_instant(3000)
+		GodPowerAPI.set_harvest_modifier(0.7)
+		GodPowerAPI.trigger_disaster(&"drought", &"", 1.2)
+		SimClock.advance_n_ticks_instant(2400)
+		GodPowerAPI.set_harvest_modifier(1.1)
+		SimClock.advance_n_ticks_instant(3000)
+		print("== 穏やかな世界 ==")
 		_report(world_seed)
 	get_tree().quit(0)
 
