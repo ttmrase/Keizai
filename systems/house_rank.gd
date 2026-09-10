@@ -61,7 +61,14 @@ static func refresh_all(tick: int) -> void:
 	var royal := royal_house_id()
 	var houses: Array[Organization] = []
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
-		if house.standing == Organization.Standing.NOBLE and house.org_id != royal:
+		if house.org_id == royal:
+			# Held no title means holds no title. Leaving the old tier standing in
+			# the field while the name reads 王家 puts a third marquess in a
+			# country with room for two, and takes his place out of the quota
+			# without taking him out of the count.
+			house.rank_tier = 0
+			continue
+		if house.standing == Organization.Standing.NOBLE:
 			houses.append(house)
 	if houses.is_empty():
 		return
@@ -90,8 +97,15 @@ static func refresh_all(tick: int) -> void:
 		# Earned by standing, but capped by precedence: there is room for one
 		# duke in a country, not eight. Without the quota every family that owns
 		# three counties is a duke and the peerage stops meaning anything.
-		var target: int = mini(_tier_for(standing, previous), _quota_tier(position))
-		house.rank_tier = clampi(target, previous - MAX_TIER_STEP, previous + MAX_TIER_STEP)
+		var quota := _quota_tier(position)
+		var target: int = mini(_tier_for(standing, previous), quota)
+		# Damping slows how fast standing moves a house up or down the order. It
+		# does not protect a house from the quota: precedence is comparative, and
+		# a family that has been displaced to seventh cannot be a marquess while
+		# it climbs down. Applied after the damping rather than before it, or the
+		# country carries four marquesses for as long as the descent takes.
+		house.rank_tier = mini(
+			clampi(target, previous - MAX_TIER_STEP, previous + MAX_TIER_STEP), quota)
 		if house.rank_tier != previous and house.founding_tick < tick:
 			_chronicle(house, previous, tick)
 

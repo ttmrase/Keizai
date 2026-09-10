@@ -114,15 +114,56 @@ func _check_a_family_can_own_an_office() -> void:
 
 func _check_rank_is_a_pyramid() -> void:
 	SimTestHarness.eventful_world(7104, 1400)
-	var tiers := {}
+	# The two ladders are counted apart, because they are two ladders. A baronet
+	# at the top of the service rungs carries tier 3 in the same field a marquess
+	# does, and counting them together says a country has four marquesses when it
+	# has two and a pair of well-regarded knights.
+	var peerage := {}
+	var service := {}
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
-		check(house.rank_tier >= 0 and house.rank_tier < HouseRank.TIER_NAMES.size(),
-			"%s stands at tier %d, outside the peerage" % [house.display_name, house.rank_tier])
-		tiers[house.rank_tier] = int(tiers.get(house.rank_tier, 0)) + 1
-		check(not HouseRank.tier_name(house.rank_tier).is_empty(),
-			"every tier should have a name")
-	check(int(tiers.get(4, 0)) <= 1, "a country has room for one duke, not several")
-	check(int(tiers.get(3, 0)) <= 2, "and for two marquesses at the outside")
+		if house.standing == Organization.Standing.NOBLE:
+			check(house.rank_tier >= 0 and house.rank_tier < HouseRank.TIER_NAMES.size(),
+				"%s stands at tier %d, outside the peerage"
+					% [house.display_name, house.rank_tier])
+			peerage[house.rank_tier] = int(peerage.get(house.rank_tier, 0)) + 1
+			check(not HouseRank.tier_name(house.rank_tier).is_empty(),
+				"every tier should have a name")
+		elif house.standing == Organization.Standing.RETAINER:
+			check(house.rank_tier >= 0 and house.rank_tier < HouseRank.SERVICE_TITLES.size(),
+				"%s stands at service rung %d, off the ladder"
+					% [house.display_name, house.rank_tier])
+			service[house.rank_tier] = int(service.get(house.rank_tier, 0)) + 1
+
+	# Asserted against the quota table rather than against a remembered summary of
+	# it. The rule is that the n-th house in order of precedence may stand no
+	# higher than the n-th entry allows, so for every rank, the number of houses
+	# at it or above cannot exceed the number of places with room for it. Stating
+	# it as "one duke and two marquesses" was a guess that happened to hold: with
+	# nobody standing high enough to be a duke, the top three places are all open
+	# to a marquess, and a century without a duke has three of them.
+	for tier in range(1, HouseRank.TIER_NAMES.size()):
+		var at_or_above := 0
+		for held in peerage:
+			if int(held) >= tier:
+				at_or_above += int(peerage[held])
+		var room := 0
+		for cap in HouseRank.TIER_QUOTA:
+			if int(cap) >= tier:
+				room += 1
+		check(at_or_above <= room,
+			"%d families stand at %s or above, in a country with room for %d"
+				% [at_or_above, HouseRank.TIER_NAMES[tier], room])
+	check(int(peerage.get(4, 0)) <= 1, "a country has room for one duke, not several")
+
+	# The lower ladder has no quota — a liege knights whoever it likes — but the
+	# value of a rung is settled by the whole world, so the crowd stays at the
+	# bottom of it however generous everybody is.
+	var served := 0
+	for rung in service:
+		served += int(service[rung])
+	if served > 0:
+		check_gt(float(int(service.get(0, 0))) / float(served), 0.3,
+			"most households in service are in service and nothing more")
 
 
 ## The same family name is worth a great deal under a crown and almost nothing
@@ -195,17 +236,28 @@ func _check_a_regime_can_actually_fall() -> void:
 	var before_ruler := polity.leader_person_id
 	RegimeShift.consider_all(SimClock.current_tick)
 
-	check_eq(polity.ideology.legitimacy_basis,
+	# What the country rests on has changed, so this is a different country: the
+	# kingdom ended and a successor was founded out of it. Follow the country
+	# rather than the organization — the organization is the thing that fell.
+	check(not polity.is_active(), "a kingdom that stops resting on blood has ended")
+	var heir := HouseRank.dominant_realm()
+	check(heir != null and heir.org_id != polity.org_id,
+		"and something stands in its place")
+	if heir == null:
+		return
+	check_eq(heir.parent_org_id, polity.org_id,
+		"the successor records the state it was founded out of")
+	check_eq(heir.ideology.legitimacy_basis,
 		PoliticalSystemAxes.LegitimacyBasis.WEALTH_BASED,
 		"a country held up by its merchants should end up resting on wealth")
-	check(polity.leader_person_id != before_ruler,
+	check(heir.leader_person_id != before_ruler,
 		"a monarch deposed by a change of constitution should not still be on the throne")
-	check_near(polity.legitimacy, RegimeShift.FRESH_LEGITIMACY, 0.001,
+	check_near(heir.legitimacy, RegimeShift.FRESH_LEGITIMACY, 0.001,
 		"a new order starts with its own standing, not the old one's")
 
 	# And the form of government follows the constitution, not the other way round.
 	PolityFormEvaluator.refresh_all(SimClock.current_tick)
-	var form := PolityFormEvaluator.form_of(polity)
+	var form := PolityFormEvaluator.form_of(heir)
 	check(form != null and form.form_id != &"feudal_kingdom",
 		"the country should no longer be describable as a feudal kingdom")
 
