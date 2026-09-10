@@ -363,9 +363,23 @@ static func _claim_weight(p: NotableIndividual, org: Organization, tick: int,
 	# barred — a country that has just pulled down its king and cannot govern
 	# without him has happened, and is worth being able to happen here — but the
 	# name that was deposed is the one everybody has just finished blaming.
-	if p.was_deposed_from(org.org_id):
+	if _carries_a_fallen_order(p, org):
 		w *= ANCIEN_REGIME_PENALTY
 	return maxf(0.1, w)
+
+
+## Whether this seat, or any state this one was founded out of, is one they were
+## turned out of. A republic founded on the ruins of a kingdom is a different
+## organization and the same country, and it remembers who the king was.
+static func _carries_a_fallen_order(p: NotableIndividual, org: Organization) -> bool:
+	var walk := org
+	var guard := 0
+	while walk != null and guard < 16:
+		if p.was_deposed_from(walk.org_id):
+			return true
+		walk = GameState.get_organization(walk.parent_org_id)
+		guard += 1
+	return false
 
 
 ## What being the last regime's head is worth to the one that replaced it.

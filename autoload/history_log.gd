@@ -24,6 +24,8 @@ const _LINEAGE_CRITICAL_TYPES := [
 	HistoryEvent.EventType.POWER_TRANSFER,
 	HistoryEvent.EventType.MARRIAGE,
 	HistoryEvent.EventType.DISSOLVED,
+	# A rupture is the hinge a later century is explained by. Never compacted.
+	HistoryEvent.EventType.INCIDENT,
 ]
 
 

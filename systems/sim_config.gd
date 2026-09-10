@@ -50,6 +50,10 @@ const MAX_POPULATION := 20000
 # soon as they improve.
 const UNREST_FROM_STARVATION := 0.85
 const UNREST_FROM_MONSTERS := 0.55
+## And what a country believes, where it does not all believe the same thing. A
+## valley that has taken up a new faith while the family set over it keeps the
+## old one does what it is told slowly.
+const UNREST_FROM_FAITH := 0.34
 const UNREST_ADJUST_RATE := 0.012
 
 # --- Monsters ---

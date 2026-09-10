@@ -12,7 +12,8 @@ const FILTERS := [
 		HistoryEvent.EventType.POWER_TRANSFER, HistoryEvent.EventType.CONFLICT_RESOLVED]},
 	{"label": "人物", "types": [HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.DEATH,
 		HistoryEvent.EventType.MARRIAGE]},
-	{"label": "災厄", "types": [HistoryEvent.EventType.DISASTER_OCCURRED]},
+	{"label": "災厄", "types": [HistoryEvent.EventType.DISASTER_OCCURRED,
+		HistoryEvent.EventType.INCIDENT]},
 	# The households in service generate most of the births, marriages and deaths
 	# in the world. Left in the main feed they bury everything else, so they get
 	# a page of their own rather than being thrown away.
@@ -259,6 +260,8 @@ func _colour_for(e: HistoryEvent) -> Color:
 			return Palette.DANGER
 		HistoryEvent.EventType.SUCCESSION, HistoryEvent.EventType.POWER_TRANSFER:
 			return Palette.POLITY
+		HistoryEvent.EventType.INCIDENT:
+			return Palette.DANGER
 		HistoryEvent.EventType.DISASTER_OCCURRED:
 			return Palette.HOUSE
 		HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.MARRIAGE:

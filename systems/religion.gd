@@ -194,6 +194,93 @@ static func _largest(held: Dictionary) -> float:
 	return best
 
 
+# ----------------------------------------------------------------- the world
+
+## The faith most of the world holds, or null where belief is evenly split.
+static func dominant_faith() -> Organization:
+	var best: Organization = null
+	var best_held := 0
+	for entry in congregations():
+		var faith: Organization = entry[0]
+		var held: int = entry[1]
+		if held > best_held:
+			best_held = held
+			best = faith
+	return best if best_held > 0 else null
+
+
+## How much this world's beliefs matter to anybody outside a temple, 0..1.
+##
+## A world that all prays the same way has no religious politics: everyone agrees,
+## so agreeing is worth nothing. A world split down the middle has nothing else.
+## Every reader of faith below scales by this, which is why a faith rising from
+## nothing changes the character of a century rather than only its liturgy.
+static func division() -> float:
+	var concentration := GameState.world.faith_concentration
+	if concentration <= 0.0:
+		return 0.0
+	# 1 at an even split, 0 when one faith holds everything.
+	return clampf((1.0 - concentration) * 2.0, 0.0, 1.0)
+
+
+## Whether two bodies hold the same faith: +1 for the same, -1 for different,
+## 0 where one of them has none. Already scaled by how much the world cares.
+static func alignment(a: Organization, b: Organization) -> float:
+	if a == null or b == null:
+		return 0.0
+	var fa := faith_of_house(a) if a.kind == Organization.OrgKind.HOUSE else _faith_of_org(a)
+	var fb := faith_of_house(b) if b.kind == Organization.OrgKind.HOUSE else _faith_of_org(b)
+	if fa == null or fb == null:
+		return 0.0
+	return (1.0 if fa.org_id == fb.org_id else -1.0) * division()
+
+
+## A body that is not a family holds whatever its leader's family holds. A guild
+## run for three generations by a house of priests is a house of priests' guild,
+## which is how a faith reaches the trades at all.
+static func _faith_of_org(org: Organization) -> Organization:
+	var head := GameState.get_current_leader(org.org_id)
+	if head != null and head.house_org_id != &"":
+		return faith_of_house(GameState.get_organization(head.house_org_id))
+	return null
+
+
+## How badly a region and the people set over it disagree about what is true.
+##
+## This is the link that lets a revelation cost a country something. A valley
+## that has taken up a new faith while the family holding it keeps the old one is
+## a valley that does what it is told slowly, and a country full of them is a
+## country a preacher can take.
+static func friction_in(s: SettlementState) -> float:
+	if s == null or s.religion_id == &"":
+		return 0.0
+	var split := division()
+	if split <= 0.0:
+		return 0.0
+	var friction := 0.0
+	var house := GameState.get_organization(s.ruling_house_id)
+	if house != null and house.faith_id != &"" and house.faith_id != s.religion_id:
+		friction += 0.6
+	var realm := dominant_faith()
+	if realm != null and realm.org_id != s.religion_id:
+		friction += 0.4
+	return clampf(friction, 0.0, 1.0) * split
+
+
+## How much of the world one faith holds, 0..1 — the ground a theocratic claim on
+## the state stands on.
+static func reach_of(faith: Organization) -> float:
+	if faith == null:
+		return 0.0
+	var total := 0
+	var held := 0
+	for id in GameState.world.settlements:
+		total += 1
+		if GameState.world.settlements[id].religion_id == faith.org_id:
+			held += 1
+	return 0.0 if total == 0 else float(held) / float(total)
+
+
 # ------------------------------------------------------------------- readers
 
 ## The faith a house keeps: its own if it has declared one, otherwise whatever is

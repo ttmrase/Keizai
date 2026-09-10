@@ -464,10 +464,15 @@ func _apply_dissolution(e: HistoryEvent) -> void:
 	org.power_drivers.clear()
 	var leader: NotableIndividual = people.get(org.leader_person_id)
 	if leader != null:
-		var tenure := leader.current_tenure()
-		if tenure != null and tenure.org_id == org.org_id:
+		var tenure := leader.tenure_in(org.org_id)
+		if tenure != null:
 			tenure.end_tick = e.tick
 			tenure.end_event_id = e.event_id
+		# A state that fell rather than merely ended turned its head out, and
+		# whoever comes next has to weigh that they were the last one.
+		if bool(e.payload.get("depose_ruler", false)) \
+				and not leader.deposed_from.has(org.org_id):
+			leader.deposed_from.append(org.org_id)
 	org.leader_person_id = &""
 	# Whatever it still held reverts to the parent it broke away from.
 	var parent: Organization = organizations.get(org.parent_org_id)
@@ -560,7 +565,8 @@ func step_resources(tick: int) -> void:
 
 		var unrest_target: float = clampf(
 			SimConfig.UNREST_FROM_STARVATION * starvation_severity
-				+ SimConfig.UNREST_FROM_MONSTERS * threat,
+				+ SimConfig.UNREST_FROM_MONSTERS * threat
+				+ SimConfig.UNREST_FROM_FAITH * Religion.friction_in(s),
 			0.0, 1.0)
 		s.unrest = move_toward(s.unrest, unrest_target, SimConfig.UNREST_ADJUST_RATE)
 

@@ -63,6 +63,9 @@ func _advance_one_tick() -> void:
 		EventBus.power_recalculated.emit(current_tick)
 	if current_tick % SimConfig.IDEOLOGY_DRIFT_EPOCH_TICKS == 0:
 		PoliticalSystemGenerator.drift_all(current_tick)
+	# Ruptures are considered after everything that could have caused one has been
+	# read for this season, and before the rules that react to the world it leaves.
+	Incidents.consider_all(current_tick)
 	HousePartition.step(current_tick)
 	RulesEngine.evaluate_tick(current_tick)
 	EventBus.tick_advanced.emit(current_tick)

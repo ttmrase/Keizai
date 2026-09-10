@@ -25,6 +25,11 @@ enum EventType {
 	CONFLICT_RESOLVED,
 	DISSOLVED,
 	RENAMED,
+	## A rupture: something that does not happen in the ordinary course of a
+	## century and rearranges the board when it does. Its mechanical consequences
+	## go through the ordinary events — a death, a transfer of power — and this is
+	## the headline that says what they were all part of.
+	INCIDENT,
 	EPOCH_SUMMARY,
 }
 
@@ -44,6 +49,7 @@ const TYPE_NAMES := {
 	EventType.CONFLICT_RESOLVED: "CONFLICT_RESOLVED",
 	EventType.DISSOLVED: "DISSOLVED",
 	EventType.RENAMED: "RENAMED",
+	EventType.INCIDENT: "INCIDENT",
 	EventType.EPOCH_SUMMARY: "EPOCH_SUMMARY",
 }
 

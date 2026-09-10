@@ -24,6 +24,10 @@ const HONOUR_WEIGHT := 0.30
 ## And what the other great families think of a house that has knighted its whole
 ## household — a currency they also hold, cheapened by somebody else's generosity.
 const INFLATION_WEIGHT := 0.28
+## And what they believe. Worth nothing in a world that all prays the same way —
+## agreeing costs nothing when there is nothing to disagree about — and a great
+## deal in one that has just split down the middle.
+const FAITH_WEIGHT := 0.34
 
 const ADJUST_RATE := 0.12
 
@@ -174,11 +178,17 @@ static func _target_relation(a: Organization, b: Organization, facts: Dictionary
 	# hold the same coin and did not spend it.
 	score -= INFLATION_WEIGHT * clampf(float(facts["over_titled"].get(b.org_id, 0.0)), 0.0, 1.0)
 
+	# And what the two of them believe, once there is more than one answer.
+	score += FAITH_WEIGHT * Religion.alignment(a, b)
+
 	return clampf(score, -1.0, 1.0)
 
 
 static func _crown_house_id() -> StringName:
-	var polity := GameState.root_of_kind(Organization.OrgKind.POLITICAL_SYSTEM)
+	# The realm that actually governs, not the first one ever founded — a state
+	# that has been refounded leaves the old one standing in the record with
+	# nobody at its head.
+	var polity := HouseRank.dominant_realm()
 	if polity == null:
 		return &""
 	var monarch := GameState.get_current_leader(polity.org_id)

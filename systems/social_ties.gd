@@ -27,6 +27,9 @@ const IDEOLOGY_BACKING := 0.55
 const OFFICE_BACKING := 0.35
 const PATRON_BACKING := 0.45
 const LAND_BACKING := 0.30
+## And what the two of them believe. Worth nothing where the world all prays the
+## same way, and a great deal where it does not — see Religion.division().
+const FAITH_BACKING := 0.32
 ## Ideological distance at which two bodies stop having anything in common.
 const IDEOLOGY_SPAN := 0.34
 ## Below this a backer is not worth listing; it keeps the record to real ties.
@@ -64,11 +67,16 @@ static func refresh_all(tick: int) -> void:
 		_settle_seats(polity)
 
 
-## Guilds and factions: the bodies that have a following rather than a bloodline.
+## Guilds, factions and faiths: the bodies that have a following rather than a
+## bloodline. Faiths belong here for the same reason the others do — a temple
+## whose seat one family has held for three generations is that family's temple,
+## and the houses that hold its faith are its constituency in exactly the way a
+## trade is a faction's.
 static func _political_bodies() -> Array[Organization]:
 	var out: Array[Organization] = []
 	out.append_array(GameState.organizations_of_kind(Organization.OrgKind.GUILD))
 	out.append_array(GameState.organizations_of_kind(Organization.OrgKind.FACTION))
+	out.append_array(GameState.organizations_of_kind(Organization.OrgKind.RELIGION))
 	return out
 
 
@@ -179,6 +187,7 @@ static func _settle_support_base(org: Organization) -> void:
 		if head != null and head.house_org_id == house.org_id:
 			backing += OFFICE_BACKING
 		backing += LAND_BACKING * _land_sympathy(org, house.held_settlement_ids)
+		backing += FAITH_BACKING * _faith_backing(org, house)
 		if backing >= SUPPORT_FLOOR:
 			support[house.org_id] = clampf(backing, 0.0, 1.0)
 
@@ -189,8 +198,27 @@ static func _settle_support_base(org: Organization) -> void:
 				backing += PATRON_BACKING
 			if backing >= SUPPORT_FLOOR:
 				support[guild.org_id] = clampf(backing, 0.0, 1.0)
+		# A faith stands behind a body of opinion that wants what it wants, which
+		# is how a revelation becomes a policy rather than only a liturgy.
+		for faith in GameState.organizations_of_kind(Organization.OrgKind.RELIGION):
+			var backing := _ideological_backing(org, faith) * IDEOLOGY_BACKING
+			backing *= clampf(Religion.reach_of(faith) * 2.0, 0.0, 1.0)
+			if backing >= SUPPORT_FLOOR:
+				support[faith.org_id] = clampf(backing, 0.0, 1.0)
 
 	org.support_base = support
+
+
+## Whether this family holds this body's faith. For a faith itself that is
+## simply whether the house belongs to it; for anything else it is whose chapel
+## the head of it prays in, which is how a temple reaches the guild halls.
+static func _faith_backing(org: Organization, house: Organization) -> float:
+	if org.kind == Organization.OrgKind.RELIGION:
+		var held := Religion.faith_of_house(house)
+		if held == null:
+			return 0.0
+		return Religion.division() if held.org_id == org.org_id else -Religion.division()
+	return Religion.alignment(org, house)
 
 
 ## 1.0 for two bodies that believe the same thing, 0.0 once they are further

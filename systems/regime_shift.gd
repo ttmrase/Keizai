@@ -29,6 +29,9 @@ const COOLDOWN_TICKS := 400
 const CHAMBER_PLURALITY := 0.40
 ## Unrest at which the street is a claimant in its own right.
 const STREET_FLOOR := 0.45
+## How much of the world one faith must hold before the altar is a claim on the
+## throne rather than a matter for the temple.
+const ALTAR_REACH := 0.55
 
 const LEGITIMACY_DRIFT := 0.02
 ## Legitimacy a regime keeps when nobody at all is challenging it.
@@ -88,7 +91,8 @@ static func _claimant(polity: Organization) -> Dictionary:
 	var best := {}
 	var best_hold := 0.0
 
-	for candidate in [_chamber_claim(polity), _trade_claim(polity), _street_claim(polity)]:
+	for candidate in [_chamber_claim(polity), _trade_claim(polity), _street_claim(polity),
+			_altar_claim(polity)]:
 		if candidate.is_empty():
 			continue
 		if float(candidate["hold"]) > best_hold:
@@ -152,6 +156,28 @@ static func _street_claim(polity: Organization) -> Dictionary:
 	}
 
 
+## The altar. A faith most of the country holds, with a priesthood to speak for
+## it, is a claim on the country — and a country whose regions are split between
+## faiths is exactly the country that cannot refuse one.
+static func _altar_claim(polity: Organization) -> Dictionary:
+	var faith := Religion.dominant_faith()
+	if faith == null or faith.leader_person_id == &"":
+		return {}
+	if polity.ideology.legitimacy_basis == PoliticalSystemAxes.LegitimacyBasis.THEOCRATIC:
+		return {}
+	var reach := Religion.reach_of(faith)
+	if reach < ALTAR_REACH:
+		return {}
+	var hold := reach * clampf(faith.power_score / maxf(1.0, polity.power_score), 0.0, 1.0)
+	return {
+		"org": faith,
+		"ground": "信仰",
+		"hold": hold,
+		"basis": PoliticalSystemAxes.LegitimacyBasis.THEOCRATIC,
+		"structure": PoliticalSystemAxes.DecisionStructure.OLIGARCHIC_COUNCIL,
+	}
+
+
 static func _differs(polity: Organization, other: Organization) -> bool:
 	if other.ideology == null:
 		return false
@@ -160,6 +186,16 @@ static func _differs(polity: Organization, other: Organization) -> bool:
 
 
 # ------------------------------------------------------------------ the fall
+
+## An upheaval imposed from outside this system's own reckoning — a rupture that
+## has already happened, being run through the ordinary machinery so that what
+## follows it is the same shape as any other fall. See Incidents.
+static func force_overturn(polity: Organization, claimant: Dictionary, tick: int) -> void:
+	if polity == null or polity.ideology == null or not polity.is_active():
+		return
+	polity.last_fired_tick[&"regime_shift"] = tick
+	_overturn(polity, claimant, tick)
+
 
 static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> void:
 	var winner: Organization = claimant["org"]
@@ -177,6 +213,20 @@ static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> 
 	# Blood keeps the throne only where the new order still runs on blood.
 	var deposed := basis != PoliticalSystemAxes.LegitimacyBasis.HEREDITARY
 	var ruler := GameState.get_person(polity.leader_person_id)
+
+	# What a country rests on changing is not the same event as how it decides
+	# changing. A chamber that reorganizes itself is the same state under new
+	# arrangements; a country that stops belonging to a bloodline and starts
+	# belonging to its members is a different state, and the old one has fallen.
+	# So the second kind founds a successor and lets the old regime die, which is
+	# what makes the lineage of a country readable as a lineage at all.
+	if basis != polity.ideology.legitimacy_basis:
+		_refound(polity, winner, basis, structure, axis_shift,
+			String(claimant.get("ground", "")), ruler, tick)
+		var patron_of_winner := GameState.get_organization(winner.patron_house_id)
+		if patron_of_winner != null and patron_of_winner.is_active():
+			Retainers.reward_and_punish(patron_of_winner, tick)
+		return
 
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
@@ -208,6 +258,72 @@ static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> 
 	var patron := GameState.get_organization(winner.patron_house_id)
 	if patron != null and patron.is_active():
 		Retainers.reward_and_punish(patron, tick)
+
+
+## The old state falls and a successor is founded out of it, carrying the whole
+## country with it. The successor records the fallen regime as its parent, so a
+## reader can walk a republic back through the junta it replaced to the kingdom
+## the whole thing started as.
+static func _refound(polity: Organization, winner: Organization, basis: int,
+		structure: int, axis_shift: Dictionary, ground: String,
+		ruler: NotableIndividual, tick: int) -> void:
+	var heir := Organization.new()
+	heir.org_id = GameState.mint_org_id()
+	heir.kind = Organization.OrgKind.POLITICAL_SYSTEM
+	heir.archetype_id = polity.archetype_id
+	heir.parent_org_id = polity.org_id
+	heir.founding_tick = tick
+	heir.member_count = polity.member_count
+	heir.resources = polity.resources.duplicate()
+	heir.governs_settlement_ids = polity.governs_settlement_ids.duplicate()
+	heir.legitimacy = FRESH_LEGITIMACY
+
+	heir.ideology = polity.ideology.clone()
+	heir.ideology.legitimacy_basis = basis
+	heir.ideology.decision_structure = structure
+	for key in axis_shift:
+		var axis := StringName(key)
+		heir.ideology.set_axis(axis, lerpf(heir.ideology.get_axis(axis),
+			float(axis_shift[key]), AXIS_SEIZURE))
+	heir.ideology_baseline = heir.ideology.clone()
+
+	var profile := ContentRegistry.get_power_profile(heir.archetype_id)
+	heir.leadership_title = profile.default_leadership_title if profile != null \
+		else polity.leadership_title
+	var named := PoliticalSystemGenerator.name_and_describe(heir, true, polity)
+	heir.display_name = named["display_name"]
+	heir.description = named["description"]
+
+	# The seat is deliberately left empty: it is filled next tick under whatever
+	# rules the country now runs on, which is the whole point of the exercise.
+	HistoryLog.emit_event(
+		HistoryEvent.EventType.SCHISM,
+		tick,
+		"%sは倒れ、%sが%sに代わって国を継いだ。" % [polity.display_name,
+			heir.display_name, "その座" if ruler == null else ruler.full_name],
+		{
+			"organization": heir.to_dict(),
+			"schism_kind": "refounding",
+			"reason": ground,
+			"seceded_settlements": Organization._names_to_strings(
+				polity.governs_settlement_ids),
+			"claimant_org_id": String(winner.org_id),
+			"founder_married_in": false,
+		},
+		heir.org_id,
+		&"",
+		polity.origin_event_id)
+
+	HistoryLog.emit_event(
+		HistoryEvent.EventType.DISSOLVED,
+		tick,
+		"%sはここに終わった。" % polity.display_name,
+		{"succeeded_by": String(heir.org_id), "depose_ruler": true},
+		polity.org_id,
+		polity.leader_person_id,
+		polity.origin_event_id)
+
+	Aftermath.settle_deposed(ruler, polity, tick)
 
 
 ## How the winner will decide things. A guild that buys a country runs it the way
