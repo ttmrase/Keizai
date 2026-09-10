@@ -111,6 +111,11 @@ static func _marry_away(person: NotableIndividual, from_house: Organization,
 	var partner := _best_match(person, from_house, tick)
 	if partner == null:
 		return &""
+	# Moved into the partner's family first, so the marriage that follows is
+	# recorded between the people they have become. Left to the ordinary rule a
+	# man being married away would pull his bride into the house that had just
+	# thrown him out, which is the opposite of the point.
+	HouseNaming.adopt_into_house(person, partner.house_org_id)
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.MARRIAGE,
 		tick,
