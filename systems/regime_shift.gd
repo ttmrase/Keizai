@@ -24,6 +24,12 @@ extends RefCounted
 const UPHEAVAL_THRESHOLD := 0.34
 ## Regimes are not overturned twice in a lifetime.
 const COOLDOWN_TICKS := 400
+## Ending a country takes more than amending one. A claim strong enough to make
+## the chamber sit differently is not automatically strong enough to say the
+## state itself is finished, so the second kind is held to a harder bar and the
+## pressure keeps building until it clears — which is also what stops a bad
+## century producing a new country every other decade.
+const REFOUNDING_THRESHOLD := 0.48
 
 ## Seats a bloc needs before the chamber is a claim on the country.
 const CHAMBER_PLURALITY := 0.40
@@ -67,11 +73,24 @@ static func _consider(polity: Organization, tick: int) -> void:
 	var drift := 0.0
 	if polity.ideology_baseline != null:
 		drift = polity.ideology.ideological_distance(polity.ideology_baseline)
-	if hold - polity.legitimacy + drift < UPHEAVAL_THRESHOLD:
+	var margin := hold - polity.legitimacy + drift
+	if margin < UPHEAVAL_THRESHOLD:
+		return
+	if _would_refound(polity, claimant) and margin < REFOUNDING_THRESHOLD:
 		return
 
 	polity.last_fired_tick[&"regime_shift"] = tick
 	_overturn(polity, claimant, tick)
+
+
+## Whether this claim would end the state rather than rearrange it.
+static func _would_refound(polity: Organization, claimant: Dictionary) -> bool:
+	var winner: Organization = claimant["org"]
+	var basis: int = claimant.get("basis", -1)
+	if basis < 0:
+		basis = winner.ideology.legitimacy_basis if winner.ideology != null \
+			else PoliticalSystemAxes.LegitimacyBasis.ELECTED
+	return basis != polity.ideology.legitimacy_basis
 
 
 ## Legitimacy drains while somebody else is holding the country up and recovers

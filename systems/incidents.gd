@@ -36,13 +36,13 @@ const KIND_LABELS := {
 ## Nothing on this scale twice in a lifetime, of any kind.
 const GLOBAL_COOLDOWN := 260
 ## And nothing of the same kind twice in three.
-const KIND_COOLDOWN := 700
+const KIND_COOLDOWN := 1100
 ## Checked rarely: these are not seasonal questions.
 const CHECK_INTERVAL := 20
 
 # --- 破門 ---
 ## A faith needs most of the world before it can afford to cut somebody out of it.
-const EXCOMM_REACH := 0.5
+const EXCOMM_REACH := 0.65
 ## And the world has to have more than one answer for the cutting to mean anything.
 const EXCOMM_DIVISION := 0.3
 ## What being cut out costs a family in standing, and its servants in loyalty.
@@ -111,13 +111,22 @@ static func _try_excommunication(tick: int) -> bool:
 	if Religion.reach_of(faith) < EXCOMM_REACH:
 		return false
 
-	# The most powerful family holding out against it, and holding ground that
-	# believes otherwise than they do.
+	# Not merely a family that believes something else — an eccentric is left to
+	# it. The one that gets cut out is a great house of a rival confession that
+	# is already ruling over the faithful, and only where the faith is strong
+	# enough that the mark will actually stick to it.
 	var target: Organization = null
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if house.standing != Organization.Standing.NOBLE or house.faith_id == faith.org_id:
 			continue
 		if house.held_settlement_ids.is_empty() or house.honour <= -0.5:
+			continue
+		# A rival confession with ground of its own, not one man's opinion.
+		if Religion.reach_of(GameState.get_organization(house.faith_id)) <= 0.0:
+			continue
+		# And a faith that cannot outweigh the family it is condemning has
+		# condemned nothing.
+		if faith.power_score < house.power_score:
 			continue
 		var holds_the_faithful := false
 		for settlement_id in house.held_settlement_ids:
