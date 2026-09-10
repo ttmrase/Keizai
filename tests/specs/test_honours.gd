@@ -121,7 +121,9 @@ func _check_a_knighthood_is_worth_less_when_everyone_has_one() -> void:
 		served += 1
 	check_gt(float(served), 3.0, "there should be households in service to knight")
 
-	for i in 20:
+	# The world revalues a rank slowly, so this is a century of seasons rather
+	# than a handful — which is also the case the damping exists for.
+	for i in 200:
 		HouseRank.refresh_all(SimClock.current_tick)
 
 	var total := 0.0

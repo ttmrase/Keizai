@@ -36,6 +36,13 @@ extends Resource
 ## Rolling count of disasters that began recently. Drives the temple faction's
 ## power without it needing to read the history log.
 @export var recent_disaster_pressure: float = 0.0
+
+## How far the bar for a rank in service currently stands above where it started.
+## A knighthood is worth what the world says it is worth, and the world changes
+## its mind slowly — moved a little each epoch toward what the current spread of
+## titles deserves, rather than recomputed outright, which would flip a whole
+## cohort of households up and down a rung together every other season.
+@export var service_rank_inflation: float = 0.0
 ## Largest magnitude among currently active disasters; drives the mage guild.
 @export var peak_disaster_magnitude: float = 0.0
 ## Aggregate suppression applied to monster growth by whoever is hunting them.
@@ -76,6 +83,7 @@ func to_dict() -> Dictionary:
 		"monster_spawn_rate": monster_spawn_rate,
 		"active_disasters": disasters,
 		"recent_disaster_pressure": recent_disaster_pressure,
+		"service_rank_inflation": service_rank_inflation,
 		"peak_disaster_magnitude": peak_disaster_magnitude,
 		"monster_suppression": monster_suppression,
 		"faith_concentration": faith_concentration,
@@ -108,6 +116,7 @@ static func from_dict(d: Dictionary) -> WorldState:
 		disasters.append(DisasterInstance.from_dict(entry))
 	w.active_disasters = disasters
 	w.recent_disaster_pressure = float(d.get("recent_disaster_pressure", 0.0))
+	w.service_rank_inflation = float(d.get("service_rank_inflation", 0.0))
 	w.peak_disaster_magnitude = float(d.get("peak_disaster_magnitude", 0.0))
 	w.monster_suppression = float(d.get("monster_suppression", 0.0))
 	w.faith_concentration = float(d.get("faith_concentration", 0.0))

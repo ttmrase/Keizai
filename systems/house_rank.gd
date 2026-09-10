@@ -138,9 +138,20 @@ const SERVICE_MARGIN := 0.09
 ## granted are worth about what they were before.
 const SERVICE_REFERENCE := 0.55
 const INFLATION_SHIFT := 0.40
+## And how fast the world changes its mind. Slowly, and by less per epoch than
+## the hysteresis margin: recomputing the bar outright each epoch makes a whole
+## cohort of households sitting on a boundary rise and fall a rung together every
+## other season, and the chronicle announces every one of them.
+const INFLATION_ADJUST := 0.015
 
 
+## What the bar currently stands at — a world value, moved gradually.
 static func service_bar_shift() -> float:
+	return GameState.world.service_rank_inflation
+
+
+## And where the current spread of titles says it ought to stand.
+static func _inflation_target() -> float:
 	var total := 0.0
 	var count := 0
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
@@ -154,7 +165,9 @@ static func service_bar_shift() -> float:
 
 
 static func _rank_service_houses(tick: int) -> void:
-	var inflation := service_bar_shift()
+	GameState.world.service_rank_inflation = move_toward(
+		GameState.world.service_rank_inflation, _inflation_target(), INFLATION_ADJUST)
+	var inflation := GameState.world.service_rank_inflation
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if house.standing != Organization.Standing.RETAINER:
 			continue
