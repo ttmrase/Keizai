@@ -13,6 +13,10 @@ const FILTERS := [
 	{"label": "人物", "types": [HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.DEATH,
 		HistoryEvent.EventType.MARRIAGE]},
 	{"label": "災厄", "types": [HistoryEvent.EventType.DISASTER_OCCURRED]},
+	# The households in service generate most of the births, marriages and deaths
+	# in the world. Left in the main feed they bury everything else, so they get
+	# a page of their own rather than being thrown away.
+	{"label": "側近家", "types": [], "service": true},
 ]
 
 var _filter_index := 0
@@ -90,12 +94,15 @@ func _rebuild() -> void:
 		child.queue_free()
 
 	var wanted: Array = FILTERS[_filter_index]["types"]
+	var only_service: bool = FILTERS[_filter_index].get("service", false)
 	var matched := 0
 	var last_year := -99999
 
 	for i in range(HistoryLog.buffer.size() - 1, -1, -1):
 		var e: HistoryEvent = HistoryLog.buffer[i]
 		if not wanted.is_empty() and not wanted.has(e.event_type):
+			continue
+		if Retainers.is_service_household_event(e) != only_service:
 			continue
 		if e.description.strip_edges().is_empty():
 			continue
@@ -111,7 +118,7 @@ func _rebuild() -> void:
 
 	if matched == 0:
 		var empty := Label.new()
-		empty.text = "まだ何も起きていない。"
+		empty.text = "側近家の家中に目立った動きはない。" if only_service else "まだ何も起きていない。"
 		empty.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		empty.add_theme_font_size_override("font_size", 18)
 		_list.add_child(empty)

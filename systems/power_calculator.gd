@@ -166,17 +166,17 @@ static func _leadership_bonus(org: Organization) -> float:
 static func _pedigree_bonus(org: Organization, profile: PowerProfile) -> float:
 	if profile.rank_sensitivity <= 0.0:
 		return 0.0
-	var tier := 0
+	var standing := 0.0
 	if org.kind == Organization.OrgKind.HOUSE:
-		tier = org.rank_tier
+		standing = HouseRank.precedence(org)
 	elif org.patron_house_id != &"":
-		tier = HouseRank.tier_of(org.patron_house_id)
+		standing = HouseRank.precedence(GameState.get_organization(org.patron_house_id))
 	else:
-		tier = HouseRank.tier_of_person(GameState.get_current_leader(org.org_id))
-	if tier <= 0:
+		standing = HouseRank.precedence_of_person(GameState.get_current_leader(org.org_id))
+	if standing <= 0.0:
 		return 0.0
 	var regard := HouseRank.regard_in_realm(HouseRank.dominant_realm())
-	return profile.rank_sensitivity * regard * float(tier) * 4.0
+	return profile.rank_sensitivity * regard * standing * 2.0
 
 
 ## Ranked snapshot for the dashboard.

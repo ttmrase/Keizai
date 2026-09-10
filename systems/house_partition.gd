@@ -11,17 +11,20 @@ extends RefCounted
 ##   跡目不当   the heir is not up to it and a better sibling will not serve them
 ##   駆け落ち   a match beneath the family's rank that the family will not have,
 ##              so the couple leave with nothing and start again a rank lower
-##   幼君       the head dies leaving children too young to hold anything, and a
-##              grown kinsman takes the house while another line walks out
 ##
 ## Each writes its own sentence and its own kind of branch: the eloping couple
 ## are cast down to retainers, the passed-over sibling takes half the household
-## with them, the rival to a child heir takes a third and a grudge.
+## with them.
+##
+## A head dying with only young children used to be a third cause here, and it
+## was the wrong shape: what happens then is that the seat goes sideways and
+## somebody is passed over, which is a contested succession. It lives in
+## SuccessionResolver now, where the argument can end in a retirement instead of
+## always costing the family a branch.
 
 const CHECK_INTERVAL := 40
 
 const UNFIT_COOLDOWN := 600
-const MINORITY_COOLDOWN := 400
 const ELOPEMENT_COOLDOWN := 120
 ## Above this much isolation the marriage is a decision rather than a scandal:
 ## the family needed it, and the couple stay.
@@ -36,12 +39,14 @@ const UNFIT_MARGIN := 2.0
 
 
 static func step(tick: int) -> void:
-	if tick % CHECK_INTERVAL != 0:
-		return
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
-		if _try_unfit_heir(house, tick):
+		# Staggered per family rather than checked for all of them on the same
+		# tick. Asking every house at once means that whenever the conditions are
+		# generally true, five families have the same crisis in the same season,
+		# which reads as a bug because it is one.
+		if (tick + absi(hash(house.org_id))) % CHECK_INTERVAL != 0:
 			continue
-		_try_minority(house, tick)
+		_try_unfit_heir(house, tick)
 
 
 # ------------------------------------------------------------- an unfit heir
@@ -92,44 +97,6 @@ static func _fitness(p: NotableIndividual) -> float:
 		if UNFIT_TRAITS.has(tag):
 			score -= 1.5
 	return score
-
-
-# ------------------------------------------------------- a head who died early
-
-## The head is dead and the direct heirs are children. A grown kinsman keeps the
-## house standing, and whichever line is not holding it decides it would rather
-## hold its own.
-static func _try_minority(house: Organization, tick: int) -> bool:
-	if tick - int(house.last_fired_tick.get(&"minority", -999999)) < MINORITY_COOLDOWN:
-		return false
-	var head := GameState.get_person(house.leader_person_id)
-	if head == null or not head.is_alive() or not head.is_adult(tick):
-		return false
-
-	# The late head's own children, still too young to have held anything.
-	var minors := 0
-	var grown_kin: NotableIndividual = null
-	for member in GameState.house_members(house.org_id):
-		if member.person_id == head.person_id:
-			continue
-		if not member.is_adult(tick):
-			if head.children_ids.has(member.person_id):
-				continue
-			minors += 1
-		elif member.current_tenure() == null and grown_kin == null:
-			grown_kin = member
-	# Only interesting where the seat passed sideways: the current head is not a
-	# child of the previous one, and there are children who were passed over.
-	if minors < 2 or grown_kin == null:
-		return false
-	if head.father_id != &"" and GameState.get_person(head.father_id) != null:
-		return false
-
-	house.last_fired_tick[&"minority"] = tick
-	var rule := _branch_rule(house, &"minority",
-		"幼い直子を差し置いて家督が横に流れ、{leader}は{parent}を出て{branch}を興した。",
-		Vector2(0.25, 0.4), {"centralization": -0.35, "tradition_reform": -0.2})
-	return SchismResolver.create_branch(house, rule, tick, grown_kin) != null
 
 
 # ---------------------------------------------------------------- elopement

@@ -292,6 +292,27 @@ func _apply_succession(e: HistoryEvent) -> void:
 	org.leader_person_id = heir.person_id
 	_open_tenure(heir, org, e)
 
+	# How the losing claimant took it. Standing down and being cut off are both
+	# discrete facts about a person, like a leadership, so they change here and
+	# nowhere else — folded into the succession they came out of rather than
+	# recorded separately, because they are the same thing happening.
+	var loser: NotableIndividual = people.get(StringName(e.payload.get("loser_id", "")))
+	if loser == null:
+		return
+	var retire_from := StringName(e.payload.get("retire_from", ""))
+	if retire_from != &"" and not loser.retired_from.has(retire_from):
+		loser.retired_from.append(retire_from)
+	if bool(e.payload.get("disinherit", false)):
+		loser.disinherited_tick = e.tick
+		var seat := loser.current_tenure()
+		if seat != null:
+			seat.end_tick = e.tick
+			seat.end_event_id = e.event_id
+		for id in organizations:
+			var held: Organization = organizations[id]
+			if held.leader_person_id == loser.person_id:
+				held.leader_person_id = &""
+
 
 func _apply_power_transfer(e: HistoryEvent) -> void:
 	var to_org: Organization = organizations.get(e.subject_org_id)

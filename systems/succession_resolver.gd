@@ -30,27 +30,48 @@ static func resolve(org: Organization, tick: int) -> void:
 	var previous_id := _previous_leader_id(org)
 	var previous := GameState.get_person(previous_id)
 	var contested := candidates.size() > 1 and rule != null and rule.allow_dispute
+	var minority := contested and _is_a_minority(org, previous, tick)
+
+	var fallout := {}
+	if contested:
+		fallout = _settle_dispute(org, candidates, winner, minority, tick, rule)
 
 	var text := "%sの%sに%sが就いた。" % [org.display_name, org.leadership_title, winner.full_name]
 	if contested:
-		text = "%sの%sをめぐる争いの末、%sが座に就いた。" \
-			% [org.display_name, org.leadership_title, winner.full_name]
+		text = "%s%sの%sをめぐる争いの末、%sが座に就いた。%s" % [
+			"幼い直子を差し置いて、" if minority else "",
+			org.display_name, org.leadership_title, winner.full_name,
+			fallout.get("text", "")]
+
+	var payload := {
+		"previous_leader_id": String(previous_id),
+		"contested": contested,
+		"claimants": candidates.size(),
+	}
+	if minority:
+		payload["minority"] = true
+	if not fallout.is_empty():
+		payload["severity"] = fallout["severity_name"]
+		payload["loser_id"] = String(fallout["loser"].person_id)
+		if fallout["severity"] == Severity.RETIREMENT:
+			payload["retire_from"] = String(org.org_id)
+		elif fallout["severity"] == Severity.DISINHERITANCE:
+			payload["disinherit"] = true
 
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.SUCCESSION,
 		tick,
 		text,
-		{
-			"previous_leader_id": String(previous_id),
-			"contested": contested,
-			"claimants": candidates.size(),
-		},
+		payload,
 		org.org_id,
 		winner.person_id,
 		previous.death_event_id if previous != null else org.origin_event_id)
 
-	if contested:
-		_maybe_break_away(org, candidates, winner, tick, rule)
+	if not fallout.is_empty():
+		_settle_backers(org, fallout, tick)
+		if fallout["severity"] == Severity.DEPARTURE:
+			SchismResolver.create_branch(org, _succession_schism_rule(org, rule), tick,
+				fallout["loser"])
 
 
 # ---------------------------------------------------------------- candidates
@@ -66,6 +87,10 @@ static func _eligible(candidates: Array[NotableIndividual],
 		if p == null or not p.is_alive():
 			continue
 		if _already_leads_kind(p, org.kind):
+			continue
+		# Somebody who stood down from this seat is not put forward for it again,
+		# and somebody who was cut off is not put forward for anything.
+		if p.is_disinherited() or p.has_retired_from(org.org_id):
 			continue
 		out.append(p)
 	return out
@@ -228,26 +253,199 @@ static func _claim_weight(p: NotableIndividual, org: Organization, tick: int,
 			and p.has_tag(&"pious"):
 		w += 1.5
 	# Where birth counts, it counts here. A duke's son walks into a temple or a
-	# counting house; under a popular assembly the same name buys him nothing.
-	w += HouseRank.weight_for(org) * float(HouseRank.tier_of_person(p)) * 0.7
+	# counting house; under a popular assembly the same name buys him nothing,
+	# and a knight's son never had much to spend.
+	w += HouseRank.weight_for(org) * HouseRank.precedence_of_person(p) * 0.35
 	return maxf(0.1, w)
 
 
 # ------------------------------------------------------------------ fallout
 
-static func _maybe_break_away(org: Organization, candidates: Array[NotableIndividual],
-		winner: NotableIndividual, tick: int, rule: TriggerRule) -> void:
-	var rng := RngService.stream(&"rules")
-	var chance := rule.schism_probability_on_loss if rule != null else DEFAULT_SCHISM_CHANCE_ON_LOSS
-	for loser in candidates:
-		if loser.person_id == winner.person_id:
+## How badly a contested succession ends. Most quarrels are settled by somebody
+## standing aside; a real one costs the family a branch; the worst end with a
+## claimant cut off entirely.
+enum Severity { RETIREMENT, DEPARTURE, DISINHERITANCE }
+
+const SEVERITY_NAMES := {
+	Severity.RETIREMENT: "retirement",
+	Severity.DEPARTURE: "departure",
+	Severity.DISINHERITANCE: "disinheritance",
+}
+
+## Heat above which the loser leaves with a following, and above which they are
+## cut off instead.
+const DEPARTURE_HEAT := 0.78
+const DISINHERITANCE_HEAT := 0.97
+
+## What sharpens a quarrel: a close-run contest, an ambitious loser, a seat worth
+## having, and a succession that went sideways over the late head's own children.
+const CLOSENESS_HEAT := 0.45
+const AMBITION_HEAT := 0.28
+const STAKES_HEAT := 0.22
+const MINORITY_HEAT := 0.18
+
+
+## Works out who lost, how badly they took it, and who backed whom. Nothing is
+## recorded here — the caller folds it into the one succession event, so the
+## chronicle reads as a single thing that happened rather than three.
+static func _settle_dispute(org: Organization, candidates: Array[NotableIndividual],
+		winner: NotableIndividual, minority: bool, tick: int, rule: TriggerRule) -> Dictionary:
+	var loser: NotableIndividual = null
+	var loser_weight := -1.0
+	var winner_weight := maxf(0.01, _claim_weight(winner, org, tick, rule))
+	for p in candidates:
+		if p.person_id == winner.person_id:
 			continue
-		var personal_chance := chance * (1.8 if loser.has_tag(&"ambitious") else 0.6)
-		if rng.randf() >= personal_chance:
+		var w := _claim_weight(p, org, tick, rule)
+		if w > loser_weight:
+			loser_weight = w
+			loser = p
+	if loser == null:
+		return {}
+
+	var heat := CLOSENESS_HEAT * clampf(loser_weight / winner_weight, 0.0, 1.0)
+	if loser.has_tag(&"ambitious"):
+		heat += AMBITION_HEAT
+	if loser.has_tag(&"cautious"):
+		heat -= AMBITION_HEAT
+	heat += STAKES_HEAT * clampf(HouseRank.precedence(org) / 8.0, 0.0, 1.0)
+	if minority:
+		heat += MINORITY_HEAT
+	heat += RngService.stream(&"rules").randf_range(-0.18, 0.18)
+
+	var severity := Severity.RETIREMENT
+	if heat >= DISINHERITANCE_HEAT:
+		severity = Severity.DISINHERITANCE
+	elif heat >= DEPARTURE_HEAT:
+		severity = Severity.DEPARTURE
+
+	# A claimant only storms off to found a house if there is a house to found.
+	# Where the world has no room for another, the quarrel ends the quiet way
+	# instead of the chronicle recording a departure that never happened.
+	if severity == Severity.DEPARTURE \
+			and not SchismResolver.has_room_for_branch(org, _succession_schism_rule(org, rule)):
+		severity = Severity.RETIREMENT
+
+	var backers := {}
+	if severity != Severity.RETIREMENT:
+		backers = _take_sides(org, winner, loser)
+
+	return {
+		"severity": severity,
+		"severity_name": SEVERITY_NAMES[severity],
+		"loser": loser,
+		"backers": backers,
+		"text": _fallout_text(severity, winner, loser, backers),
+	}
+
+
+static func _fallout_text(severity: Severity, winner: NotableIndividual,
+		loser: NotableIndividual, backers: Dictionary) -> String:
+	var taken := _sides_text(winner, loser, backers)
+	match severity:
+		Severity.RETIREMENT:
+			return "%sは争わずに隠居した。" % loser.full_name
+		Severity.DEPARTURE:
+			return "%s%sは家を出た。" % [taken, loser.full_name]
+	return "%s%sは廃嫡され、家を追われた。" % [taken, loser.full_name]
+
+
+## Who the households in service came out for. Named, because whose side they
+## took is the thing their own standing then rests on, and a family that reads
+## the room wrong should be seen doing it.
+static func _sides_text(winner: NotableIndividual, loser: NotableIndividual,
+		backers: Dictionary) -> String:
+	if backers.is_empty():
+		return ""
+	var for_winner: Array[String] = []
+	var for_loser: Array[String] = []
+	for house_id in backers:
+		var house := GameState.get_organization(house_id)
+		if house == null:
 			continue
-		var split_rule := _succession_schism_rule(org, rule)
-		SchismResolver.create_branch(org, split_rule, tick, loser)
-		return   # one break-away per succession keeps the tree readable
+		if bool(backers[house_id]):
+			for_winner.append(house.display_name)
+		else:
+			for_loser.append(house.display_name)
+	if for_loser.is_empty():
+		return "%sはこぞって%sを推した。" % ["・".join(for_winner.slice(0, 2)), winner.full_name]
+	if for_winner.is_empty():
+		return "%sは%sを推したが及ばなかった。" % ["・".join(for_loser.slice(0, 2)), loser.full_name]
+	return "%sは%sを、%sは%sを推し、家中は割れた。" % [
+		"・".join(for_winner.slice(0, 2)), winner.full_name,
+		"・".join(for_loser.slice(0, 2)), loser.full_name]
+
+
+## A succession only goes sideways like this when the late head left children too
+## young to hold anything, which is the sharpest way for a family to lose one.
+static func _is_a_minority(org: Organization, previous: NotableIndividual, tick: int) -> bool:
+	if org.kind != Organization.OrgKind.HOUSE or previous == null:
+		return false
+	for child_id in previous.children_ids:
+		var child := GameState.get_person(child_id)
+		if child != null and child.is_alive() and not child.is_adult(tick):
+			return true
+	return false
+
+
+# --------------------------------------------------------- the families below
+
+## Which way each household in service jumps. They back whoever they are closer
+## to — by blood, by belief, and by whether the liege has been worth serving —
+## and the choice is what their own standing then rests on.
+static func _take_sides(org: Organization, winner: NotableIndividual,
+		loser: NotableIndividual) -> Dictionary:
+	var out := {}
+	for house in Retainers.retainers_of(org.org_id):
+		var for_winner := _affinity_to(house, winner) + house.loyalty * 0.4
+		var for_loser := _affinity_to(house, loser)
+		if is_equal_approx(for_winner, for_loser):
+			continue
+		out[house.org_id] = for_winner > for_loser
+	return out
+
+
+static func _affinity_to(house: Organization, claimant: NotableIndividual) -> float:
+	var score := 0.0
+	# Blood already shared is the plainest reason to prefer somebody.
+	for member in GameState.house_members(house.org_id):
+		if member.spouse_ids.has(claimant.person_id):
+			score += 0.6
+		if claimant.father_id != &"" and member.person_id == claimant.father_id:
+			score += 0.4
+	if house.ideology != null:
+		var trait_bias := 0.0
+		if claimant.has_tag(&"just"):
+			trait_bias += 0.2
+		if claimant.has_tag(&"martial"):
+			trait_bias += house.ideology.get_axis(&"militarism_pacifism") * 0.3
+		if claimant.has_tag(&"pious"):
+			trait_bias += house.ideology.get_axis(&"secular_theocratic") * 0.3
+		score += trait_bias
+	# Derived rather than rolled, so the same world settles the same way twice.
+	score += float(absi(hash(str(house.org_id, ":", claimant.person_id))) % 1000) / 3000.0
+	return score
+
+
+## Standing in service is not held, it is earned in the liege's quarrels — and
+## lost in them. Favour is a continuous value like power and loyalty, so it moves
+## here rather than through the record; what it is worth is read back as a rank.
+const BACKING_REWARD := 0.55
+const BACKING_PENALTY := 0.45
+
+
+static func _settle_backers(org: Organization, fallout: Dictionary, tick: int) -> void:
+	var backers: Dictionary = fallout.get("backers", {})
+	for house_id in backers:
+		var house := GameState.get_organization(house_id)
+		if house == null or not house.is_active():
+			continue
+		if bool(backers[house_id]):
+			house.favour += BACKING_REWARD
+			house.loyalty = clampf(house.loyalty + 0.15, 0.0, 1.0)
+		else:
+			house.favour = maxf(0.0, house.favour - BACKING_PENALTY)
+			house.loyalty = clampf(house.loyalty - 0.25, 0.0, 1.0)
 
 
 ## A synthetic rule describing "the losing claimant takes their followers and

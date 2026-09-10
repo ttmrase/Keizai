@@ -18,6 +18,17 @@ extends RefCounted
 const TIER_NAMES: Array[String] = ["男爵", "子爵", "伯爵", "侯爵", "公爵"]
 const UNTITLED := "郷士"
 
+## The families in service have their own ladder, and it sits entirely below the
+## peerage: the highest of them still stands under the lowest baron. Almost all
+## of them are 従士 — that is what being in service ordinarily means — and the
+## rungs above are earned in their liege's quarrels rather than held by birth.
+const SERVICE_TITLES: Array[String] = ["従士", "下級騎士", "騎士", "準男爵"]
+
+## One scale both ladders are read on, so anywhere rank counts, a baronet counts
+## for less than a baron without every caller having to know the two tables.
+const NOBLE_PRECEDENCE_BASE := 4.0
+const SERVICE_PRECEDENCE_STEP := 0.5
+
 ## Composite standing needed to reach each tier, highest first.
 const TIER_THRESHOLDS: Array[float] = [2.35, 1.70, 1.05, 0.55, 0.0]
 
@@ -51,6 +62,8 @@ static func refresh_all(tick: int) -> void:
 	var strongest := 1.0
 	for h in houses:
 		strongest = maxf(strongest, h.power_score)
+
+	_rank_service_houses(tick)
 
 	var crowned := _crowned_houses()
 	var officed := _houses_holding_office()
@@ -99,6 +112,35 @@ static func _standing_of(house: Organization, strongest: float, crowned: Diction
 	return standing
 
 
+## Favour above which a family in service is worth a rung, per rung. Almost
+## nobody clears the first: standing in service is earned in a liege's quarrels,
+## and most families are never asked to take a side.
+const SERVICE_THRESHOLDS: Array[float] = [0.35, 0.75, 1.2]
+## And what a season of nobody asking is worth, which is a little less each time.
+const FAVOUR_DECAY := 0.004
+const SERVICE_MARGIN := 0.09
+
+
+static func _rank_service_houses(tick: int) -> void:
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing != Organization.Standing.RETAINER:
+			continue
+		house.favour = move_toward(house.favour, 0.0, FAVOUR_DECAY)
+		var previous := house.rank_tier
+		var tier := 0
+		for i in SERVICE_THRESHOLDS.size():
+			# Clear the bar by a margin to rise, fall below it by one to sink,
+			# or a family hovering on a threshold is knighted and unknighted
+			# every few seasons and the chronicle says so every time.
+			var bar: float = SERVICE_THRESHOLDS[i]
+			bar += SERVICE_MARGIN if i + 1 > previous else -SERVICE_MARGIN
+			if house.favour >= bar:
+				tier = i + 1
+		house.rank_tier = clampi(tier, previous - MAX_TIER_STEP, previous + MAX_TIER_STEP)
+		if house.rank_tier != previous and house.founding_tick < tick:
+			_chronicle(house, previous, tick)
+
+
 ## Hysteresis: a house has to clear the threshold by a margin to rise, and fall
 ## below it by the same margin to sink. Without it a family hovering on a
 ## boundary is promoted and demoted every epoch, and the chronicle fills with it.
@@ -141,8 +183,9 @@ static func _chronicle(house: Organization, previous: int, tick: int) -> void:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.IDEOLOGY_SHIFT,
 		tick,
-		"%sの家格は%sから%sへと%s。" % [house.display_name, TIER_NAMES[previous],
-			TIER_NAMES[house.rank_tier], "上がった" if risen else "下がった"],
+		"%sの家格は%sから%sへと%s。" % [house.display_name,
+			tier_name(previous, house.standing), tier_name(house.rank_tier, house.standing),
+			"上がった" if risen else "下がった"],
 		{"from_tier": previous, "to_tier": house.rank_tier, "transient": true},
 		house.org_id,
 		house.leader_person_id,
@@ -156,14 +199,40 @@ static func tier_of(house_org_id: StringName) -> int:
 	return house.rank_tier if house != null and house.kind == Organization.OrgKind.HOUSE else 0
 
 
-static func tier_name(tier: int) -> String:
-	return TIER_NAMES[clampi(tier, 0, TIER_NAMES.size() - 1)]
+static func tier_name(tier: int, standing: int = Organization.Standing.NOBLE) -> String:
+	if standing == Organization.Standing.NOBLE:
+		return TIER_NAMES[clampi(tier, 0, TIER_NAMES.size() - 1)]
+	return SERVICE_TITLES[clampi(tier, 0, SERVICE_TITLES.size() - 1)]
+
+
+## What a house is called, from the house itself.
+static func title_of_house(house: Organization) -> String:
+	if house == null or house.kind != Organization.OrgKind.HOUSE:
+		return ""
+	return tier_name(house.rank_tier, house.standing)
+
+
+## Where a family stands on the one ladder that runs through both: 従士 at 0,
+## 準男爵 at 1.5, 男爵 at 4, 公爵 at 8. Everything that reads rank reads this, so
+## the lower titles count for something and never for as much.
+static func precedence(house: Organization) -> float:
+	if house == null or house.kind != Organization.OrgKind.HOUSE:
+		return 0.0
+	if house.standing == Organization.Standing.NOBLE:
+		return NOBLE_PRECEDENCE_BASE + float(house.rank_tier)
+	return float(house.rank_tier) * SERVICE_PRECEDENCE_STEP
+
+
+static func precedence_of_person(person: NotableIndividual) -> float:
+	if person == null or person.house_org_id == &"":
+		return 0.0
+	return precedence(GameState.get_organization(person.house_org_id))
 
 
 ## The peerage title a house head carries. Only meaningful where the regime cares
 ## about pedigree; a republic calls the same person a mayor.
 static func title_of(house_org_id: StringName) -> String:
-	return tier_name(tier_of(house_org_id))
+	return title_of_house(GameState.get_organization(house_org_id))
 
 
 ## The rank of the house a person belongs to, 0 for anyone unattached.
@@ -171,6 +240,12 @@ static func tier_of_person(person: NotableIndividual) -> int:
 	if person == null or person.house_org_id == &"":
 		return 0
 	return tier_of(person.house_org_id)
+
+
+## What a rank is worth to whoever is reading it: the realm's regard for birth,
+## multiplied by where the family stands on the one ladder.
+static func standing_value_of(person: NotableIndividual) -> float:
+	return regard_in_realm(dominant_realm()) * precedence_of_person(person)
 
 
 ## How much this world currently cares about pedigree, 0..1. A hereditary

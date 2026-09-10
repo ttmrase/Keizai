@@ -34,6 +34,7 @@ func _ready() -> void:
 	_print_house_relations()
 	_print_power_table()
 	_print_upheavals()
+	_print_family_quarrels()
 	_print_chronicle_highlights()
 	_print_people_census()
 	_print_family_tree()
@@ -174,6 +175,25 @@ func _print_upheavals() -> void:
 		shown += 1
 	if shown == 0:
 		print("  （体制はついに揺らがなかった）")
+
+
+## A few of the family quarrels, in full. The excerpt above only ever reaches the
+## founding, and how these read is most of whether they work.
+func _print_family_quarrels() -> void:
+	print("\n--- 家督争い(直近) ---")
+	var shown := 0
+	for i in range(HistoryLog.backbone.size() - 1, -1, -1):
+		var e: HistoryEvent = HistoryLog.backbone[i]
+		if e.event_type != HistoryEvent.EventType.SUCCESSION:
+			continue
+		if not bool(e.payload.get("contested", false)):
+			continue
+		print("  %-10s %s" % [SimClock.format_tick(e.tick), e.description])
+		shown += 1
+		if shown >= 8:
+			return
+	if shown == 0:
+		print("  （争いのない継承ばかりだった）")
 
 
 func _print_chronicle_highlights() -> void:
@@ -329,6 +349,17 @@ func _print_event_tally() -> void:
 					key = "家の興り・%s" % e.payload.get("reason", "")
 				else:
 					key = "領地の移動"
+			HistoryEvent.EventType.SUCCESSION:
+				if not bool(e.payload.get("contested", false)):
+					key = "継承(無風)"
+				else:
+					key = "継承争い・%s" % {
+						"retirement": "隠居",
+						"departure": "分家",
+						"disinheritance": "廃嫡",
+					}.get(e.payload.get("severity", ""), "不明")
+					if bool(e.payload.get("minority", false)):
+						key += "(幼君)"
 			HistoryEvent.EventType.MARRIAGE:
 				key = "婚姻(家格越え)" if bool(e.payload.get("across_rank", false)) else "婚姻"
 			HistoryEvent.EventType.IDEOLOGY_SHIFT:
@@ -373,7 +404,7 @@ func _print_houses() -> void:
 				Retainers.describe_loyalty(house.loyalty), house.loyalty]
 		print("  %-12s %-4s %-6s %-6s %-8s 領%d名%d%s"
 			% [house.display_name, house.standing_label(),
-				HouseRank.tier_name(house.rank_tier) if house.is_noble() else "—",
+				HouseRank.title_of_house(house),
 				HouseCharacter.label(house.character_id),
 				faith.display_name if faith != null else "無信",
 				house.held_settlement_ids.size(), house.member_count, extra])

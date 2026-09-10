@@ -699,3 +699,52 @@ line that had died out, and the world ground down to exactly the cap. And the
 per-archetype cap, which exists so a world does not fill with seven lookalike
 guilds, must not apply to houses at all — every family in the world shares one
 archetype, so it would have forbidden the second family outright.
+
+---
+
+## Fifth iteration: how a family quarrel ends
+
+A contested succession had one outcome — a die roll, and either a cadet branch
+or nothing. That is the wrong shape for the commonest crisis in the game, and it
+was the only shape a minority could take, so a head dying with young children
+always cost the family a branch.
+
+**Three severities.** `SuccessionResolver` now settles a dispute by heat: how
+close the contest was, whether the loser is the sort to make something of it,
+what the seat is worth, and whether the succession went sideways over the late
+head's own children. Below the first threshold the loser stands down — 隠居 —
+and is never put forward for that seat again, though they may still hold office
+elsewhere. Above it they leave and found a house. Above the second they are cut
+off entirely: barred from every seat anywhere, and their line barred from the
+house they were cut out of.
+
+Two details make it read honestly. A departure is only announced if the world
+has room for the house it implies, so `SchismResolver.has_room_for_branch()` is
+checked *before* the event is written rather than the chronicle recording a
+storming-off that the ceiling silently prevented. And the whole outcome is
+folded into the one succession event rather than emitted as three, because it is
+one thing that happened; standing down and being disinherited are discrete facts
+about a person, like a leadership, so they go through the record and change
+nowhere else.
+
+**The households below take sides.** At the sharper two severities each retainer
+family of the disputing house comes out for a claimant, chosen from blood
+already shared, what it believes, and how it has been treated — derived rather
+than rolled, so the same world settles the same way twice. Backing the winner
+earns favour; backing the loser loses it. The chronicle names them, because
+whose side a family took is what its own standing then rests on.
+
+**A ladder below the peerage.** 従士 / 下級騎士 / 騎士 / 準男爵, read off that
+favour rather than held by birth, and decaying, so a title won in one
+generation's quarrel is gone two later. Both ladders are read through one
+`HouseRank.precedence()` — 従士 at 0, 準男爵 at 1.5, 男爵 at 4, 公爵 at 8 — so
+everywhere rank counts, a baronet counts for something and never for as much as
+the lowest baron, without every caller knowing two tables.
+
+**Two things that were simply wrong.** The minority check ran for every house on
+the same tick, so whenever its conditions were generally true five families had
+the same crisis in the same season; the periodic house checks are now staggered
+by house. And the chronicle drowned: three retainer families under each of eight
+houses generate most of the births, marriages and deaths in the world, and the
+fall of a regime sat between two births in a knight's household. Those get their
+own filter rather than being thrown away.

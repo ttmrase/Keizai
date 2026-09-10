@@ -16,15 +16,7 @@ extends RefCounted
 ## contested successions alike — so this is the one place the ceiling holds.
 static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 		leader_override: NotableIndividual = null) -> Organization:
-	if GameState.organizations_of_kind(parent.kind).size() >= _ceiling_for(rule):
-		return null
-	var archetype: StringName = rule.branch_archetype_id if rule.branch_archetype_id != &"" \
-		else parent.archetype_id
-	# The per-archetype cap exists so the world does not fill with seven
-	# lookalike guilds. Every family in the world shares one archetype, so
-	# applying it to houses would forbid the second family outright.
-	if parent.kind != Organization.OrgKind.HOUSE \
-			and _count_of(archetype) >= SimConfig.MAX_ACTIVE_PER_ARCHETYPE:
+	if not has_room_for_branch(parent, rule):
 		return null
 
 	var rng := RngService.stream(&"rules")
@@ -148,6 +140,23 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 	return GameState.get_organization(branch.org_id)
 
 
+## Whether the world has room for this branch at all. Separated out so a caller
+## can find out *before* announcing that somebody stormed off to found their own
+## house — the chronicle should not record a departure that never happened.
+static func has_room_for_branch(parent: Organization, rule: TriggerRule) -> bool:
+	if GameState.organizations_of_kind(parent.kind).size() >= _ceiling_for(rule):
+		return false
+	var archetype: StringName = rule.branch_archetype_id if rule.branch_archetype_id != &"" \
+		else parent.archetype_id
+	# The per-archetype cap exists so the world does not fill with seven
+	# lookalike guilds. Every family in the world shares one archetype, so
+	# applying it to houses would forbid the second family outright.
+	if parent.kind != Organization.OrgKind.HOUSE \
+			and _count_of(archetype) >= SimConfig.MAX_ACTIVE_PER_ARCHETYPE:
+		return false
+	return true
+
+
 ## How many bodies of this kind the world will carry. A society always has room
 ## for something it has never had before, so a branch that introduces a genuinely
 ## new kind of institution is allowed past the ordinary ceiling — otherwise a
@@ -178,7 +187,7 @@ static func _find_leader(parent: Organization, tick: int,
 	for p in GameState.living_people():
 		if not p.is_adult(tick) or p.current_tenure() != null:
 			continue
-		if p.age_years(tick) > 62:
+		if p.age_years(tick) > 62 or p.is_disinherited():
 			continue
 		var weight := 1.0
 		if p.has_tag(&"ambitious"):

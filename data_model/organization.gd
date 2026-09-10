@@ -110,6 +110,11 @@ const STANDING_LABELS := {
 ## HOUSE: how a retainer family currently feels about the house it serves, 0..1.
 ## Read off marriages, land and how the liege has treated it, not accumulated.
 @export var loyalty: float = 0.75
+## HOUSE (retainer): standing earned in the liege's own quarrels. Backing the
+## claimant who wins is how a family in service gets anywhere; backing the one
+## who loses is how it gets put back down. Decays toward nothing, so a favour
+## three generations old is not a rank.
+@export var favour: float = 0.0
 ## HOUSE: what kind of family this is — priests, soldiers, courtiers, scholars.
 ## Shapes what it is good at and what it tends to produce.
 @export var character_id: StringName = &""
@@ -201,6 +206,8 @@ func to_dict() -> Dictionary:
 	if faith_id != &"":
 		d["faith_id"] = String(faith_id)
 	d["loyalty"] = loyalty
+	if not is_zero_approx(favour):
+		d["favour"] = favour
 	return d
 
 
@@ -265,6 +272,7 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.character_id = StringName(d.get("character_id", ""))
 	o.faith_id = StringName(d.get("faith_id", ""))
 	o.loyalty = float(d.get("loyalty", 0.75))
+	o.favour = float(d.get("favour", 0.0))
 	return o
 
 

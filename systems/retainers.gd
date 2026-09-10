@@ -463,6 +463,34 @@ static func retainers_of(liege_id: StringName) -> Array[Organization]:
 	return out
 
 
+## Whether an event is the private life of a family in service — a birth, a
+## marriage, a death among the households below the nobility.
+##
+## Three retainer families under each of eight houses generate most of the
+## domestic events in the world, and they bury everything else: a chronicle where
+## the fall of a regime sits between two births in a knight's household is not a
+## chronicle anybody reads. They get their own filter instead.
+static func is_service_household_event(e: HistoryEvent) -> bool:
+	match e.event_type:
+		HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.DEATH:
+			return _serves(GameState.get_person(e.subject_person_id))
+		HistoryEvent.EventType.MARRIAGE:
+			if e.related_person_ids.is_empty():
+				return false
+			for id in e.related_person_ids:
+				if not _serves(GameState.get_person(id)):
+					return false
+			return true
+	return false
+
+
+static func _serves(person: NotableIndividual) -> bool:
+	if person == null:
+		return false
+	var house := GameState.get_organization(person.house_org_id)
+	return house != null and house.standing == Organization.Standing.RETAINER
+
+
 static func describe_loyalty(value: float) -> String:
 	if value >= 0.75:
 		return "忠実"

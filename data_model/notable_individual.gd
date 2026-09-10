@@ -42,6 +42,23 @@ var full_name: String:
 
 @export var role_history: Array[RoleTenure] = []
 
+## Seats this person has stood down from. Withdrawing from a contest is not the
+## same as losing one: a retired claimant keeps their place in the family and may
+## still hold office elsewhere, but will not be put forward for this seat again.
+@export var retired_from: Array[StringName] = []
+## When this person was disinherited, or -1. Being cut off is the harder end of
+## the same argument — barred from every seat anywhere, and their line barred
+## from the house they were cut out of.
+@export var disinherited_tick: int = -1
+
+
+func has_retired_from(org_id: StringName) -> bool:
+	return retired_from.has(org_id)
+
+
+func is_disinherited() -> bool:
+	return disinherited_tick >= 0
+
 
 func is_alive() -> bool:
 	return death_tick < 0
@@ -117,6 +134,10 @@ func to_dict() -> Dictionary:
 		d["personality_tags"] = Organization._names_to_strings(personality_tags)
 	if not roles.is_empty():
 		d["role_history"] = roles
+	if not retired_from.is_empty():
+		d["retired_from"] = Organization._names_to_strings(retired_from)
+	if disinherited_tick >= 0:
+		d["disinherited_tick"] = disinherited_tick
 	return d
 
 
@@ -141,4 +162,6 @@ static func from_dict(d: Dictionary) -> NotableIndividual:
 	for r in d.get("role_history", []):
 		roles.append(RoleTenure.from_dict(r))
 	p.role_history = roles
+	p.retired_from = Organization._strings_to_names(d.get("retired_from", []))
+	p.disinherited_tick = int(d.get("disinherited_tick", -1))
 	return p
