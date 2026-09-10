@@ -362,6 +362,7 @@ static func _make_founder(surname: String, sex: String, age_years: int,
 	p.given_name = NameGenerator.given_name(sex)
 	p.birth_tick = -age_years * SimConfig.TICKS_PER_YEAR
 	p.house_org_id = house_id
+	p.birth_house_org_id = house_id
 	p.is_founder_generation = true
 	p.personality_tags = Demography.roll_personality(rng)
 	return p

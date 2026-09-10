@@ -196,6 +196,12 @@ static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> 
 		polity.leader_person_id,
 		polity.origin_event_id)
 
+	# What became of the ruler the new order turned out. Recorded rather than
+	# left to the reader: a chronicle that deposes somebody and never mentions
+	# them again is a record of an argument, not of a life.
+	if deposed:
+		Aftermath.settle_deposed(ruler, polity, tick)
+
 	# A body owned by a family means a family has taken the state, and a family
 	# that has taken the state settles its accounts: a rival stripped of its land
 	# and lowered, its own most loyal servants raised in that rival's place.

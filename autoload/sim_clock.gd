@@ -55,6 +55,10 @@ func _advance_one_tick() -> void:
 		RegimeShift.consider_all(current_tick)
 		PolityFormEvaluator.refresh_all(current_tick)
 		HouseRelations.refresh_all(current_tick)
+		# Precedence is granted last, once the standings it responds to are
+		# current: the crown answers this season's friends and enemies, not the
+		# ones it had before the chamber moved.
+		Honours.consider_all(current_tick)
 		HouseCharacter.refresh_all(current_tick)
 		EventBus.power_recalculated.emit(current_tick)
 	if current_tick % SimConfig.IDEOLOGY_DRIFT_EPOCH_TICKS == 0:

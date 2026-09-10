@@ -826,3 +826,73 @@ The scope is settled by a pure function (`LineageGraphView.kin_scope`) rather
 than inside the view, which is what lets the suite assert the rule directly:
 everybody drawn is on the line, born to it, or married to it, and somebody's
 cousin is always left out.
+
+---
+
+## Eighth iteration: granted rank, and what happens afterwards
+
+**A cadet line is a family going out of itself.** Three bugs turned out to be one
+bug wearing different hats: a woman who had married into a house could stand for
+its headship, could be the loser who walked out with a cadet branch, and — since
+a branch takes the founder's household with it — could rename the husband whose
+family it actually was. The fix is a fact the world was not keeping: which house
+somebody was *born* into, as distinct from the one they belong to now.
+`house_org_id` moves when they marry, when a cadet line takes them, when another
+family takes them in; `birth_house_org_id` never moves. A first attempt used a
+"married in" flag and was wrong in a case that comes up often — a daughter who
+married away and came home widowed is still of the blood she was born to, and the
+flag said otherwise. Being of a family's blood is now `HouseNaming.is_of_the_blood`:
+born to it, or born to a house it is a cadet line of. Everything that asks "may
+they inherit this, may they take this name away" asks that.
+
+**The crown stands outside the peerage.** A title is a thing the crown grants; a
+crown that granted itself one would be standing in its own order of precedence. So
+while a family wears a crown in a realm that runs on blood it holds no county
+title at all, outranks every title there is, and vacates a duke's place for
+somebody else — one of the things a dynasty actually loses on the way up. Losing
+the crown puts the family back in the order like anybody else.
+
+**And it grants and strips.** `Honours` gives the monarchy the one power over the
+nobility it ought to have: not armies, but the order of precedence and who stands
+where in it. A crown with enemies answers them first and a crown at peace confirms
+its friends; the house raised is grateful and the house stripped remembers it for
+a reign, both read back through `HouseRelations` as facts rather than as a nudge.
+What an honour does *not* do is pin a family in place — the peerage is still read
+off what a house holds, so an honour moves it up the order and a house that then
+loses everything slides back down regardless.
+
+**A knighthood is worth what the world says it is worth.** The lower ladder is a
+liege's to hand out and nobody outside can forbid it, which is the point: the
+check on it is not permission but worth. `HouseRank.service_bar_shift` raises the
+bar for every household in the world in proportion to how many of them are already
+titled, so generosity is self-cancelling; peers resent a family cheapening a coin
+they also hold; and a house that has titled its whole household finds none of them
+distinguished by it and the loyalty it was buying leaking back out.
+
+**Nobody vanishes.** A chronicle that disinherits somebody and never mentions them
+again is a record of an argument, not of a life. `Aftermath` works out where each
+of them went, from things the world already knows — who is on good terms with
+whom, who has blood in common, what a name is worth: recognised with a line of
+their own, married away, taken in, or put out of society altogether, in that order
+of preference. The same for households: a family in service whose master has died
+out takes the vacant county if it has a claim, otherwise transfers to whichever
+great house it has marriage or land in common with, and if the realm has no great
+houses left at all, stops being in service and goes back among the people.
+
+**The former king re-elected.** Not a bug, and now not a coincidence either. When
+a regime falls the deposed head's tenure closes and the seat is refilled next tick
+under the new rules — and since that person is old, well-connected and unoccupied,
+the ordinary weighting picked them straight back up. They are now recorded as
+having been deposed *from that seat*, and a claim on it is worth an eighth of what
+it would otherwise be: not barred, because a country that has just pulled down its
+king and cannot govern without him has happened and should be able to happen here,
+but rare, and remarked on in its own sentence when it does.
+
+**Two drawing fixes.** Every descent line between two rows used to turn at the same
+height, so the horizontal runs of unrelated families lay end to end on one long
+line and read as a single connection — a child's parents apparently joined to the
+person their child married. Neighbours on a row now take different routes down.
+And a second marriage was invisible, because the layout draws at most one partner
+beside anybody: the rest are drawn as a dashed link, shown when the chart has
+already been narrowed to one person or when somebody is picked out, since forty
+families' worth of them at once is a cross-hatch rather than information.

@@ -48,6 +48,22 @@ func _ready() -> void:
 		await _settle()
 		await _capture("%s/%s.png" % [_out_dir, tab["id"]])
 
+	# The chronicle narrowed to one family, which is how a house is followed.
+	shell.show_tab("chronicle")
+	await _settle()
+	var chronicle: Control = shell._screens["chronicle"]
+	var followed: Organization = null
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE \
+				and (followed == null or house.power_score > followed.power_score):
+			followed = house
+	if followed != null:
+		chronicle._on_house_chosen(followed.org_id)
+		await _settle()
+		await _capture("%s/chronicle_house.png" % _out_dir)
+		chronicle._on_house_button()          # back to the whole world
+		await _settle()
+
 	# The lineage screen is worth two shots: institutions and people.
 	shell.show_tab("lineage")
 	await _settle()

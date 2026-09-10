@@ -21,11 +21,18 @@ const FILTERS := [
 
 var _filter_index := 0
 var _shown := PAGE
+## When set, only what happened to this family is shown. A chronicle of the whole
+## world is the point of the screen and also the reason one family's story is
+## impossible to follow in it.
+var _house_filter: StringName = &""
 
 @onready var _tabs: HBoxContainer = $Rows/Filters
 @onready var _list: VBoxContainer = $Rows/Scroll/List
 @onready var _scroll: ScrollContainer = $Rows/Scroll
 @onready var _more: Button = $Rows/More
+@onready var _house_button: Button = $Rows/HouseRow/House
+@onready var _picker: PanelContainer = $Picker
+@onready var _picker_list: VBoxContainer = $Picker/Scroll/List
 
 
 func _ready() -> void:
@@ -41,18 +48,101 @@ func _ready() -> void:
 		_tabs.add_child(button)
 
 	_more.pressed.connect(_on_more)
+	_house_button.pressed.connect(_on_house_button)
 	EventBus.event_recorded.connect(_on_event_recorded)
-	EventBus.game_loaded.connect(_rebuild)
-	EventBus.world_reset.connect(_rebuild)
+	EventBus.game_loaded.connect(_on_world_changed)
+	EventBus.world_reset.connect(_on_world_changed)
+	_picker.visible = false
 	_sync_tabs()
+	_sync_house_button()
+	_rebuild()
+
+
+## A house filter cannot survive into a world where that house never existed.
+func _on_world_changed() -> void:
+	if GameState.get_organization(_house_filter) == null:
+		_house_filter = &""
+		_sync_house_button()
 	_rebuild()
 
 
 func on_shown() -> void:
+	_sync_house_button()
 	_rebuild()
 
 
+# --------------------------------------------------------- one family's news
+
+func _on_house_button() -> void:
+	if _house_filter != &"":
+		_house_filter = &""
+		_sync_house_button()
+		_shown = PAGE
+		_rebuild()
+		return
+	_open_picker()
+
+
+func _open_picker() -> void:
+	for child in _picker_list.get_children():
+		child.queue_free()
+	var houses := GameState.organizations_of_kind(Organization.OrgKind.HOUSE)
+	houses.sort_custom(func(a, b):
+		var pa := HouseRank.precedence(a)
+		var pb := HouseRank.precedence(b)
+		return pa > pb if not is_equal_approx(pa, pb) else String(a.org_id) < String(b.org_id))
+	for house in houses:
+		var button := Button.new()
+		button.text = "%s　%s" % [house.display_name, HouseRank.title_of_house(house)]
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.custom_minimum_size = Vector2(0, 48)
+		button.add_theme_font_size_override("font_size", 17)
+		button.pressed.connect(_on_house_chosen.bind(house.org_id))
+		_picker_list.add_child(button)
+	_picker.visible = true
+
+
+func _on_house_chosen(house_id: StringName) -> void:
+	_house_filter = house_id
+	_picker.visible = false
+	_shown = PAGE
+	_sync_house_button()
+	_rebuild()
+	_scroll.scroll_vertical = 0
+
+
+func _sync_house_button() -> void:
+	var house := GameState.get_organization(_house_filter)
+	_house_button.text = "家で絞る" if house == null else "%sの記事のみ　✕" % house.display_name
+	_house_button.add_theme_color_override("font_color",
+		Palette.TEXT_MUTED if house == null else Palette.ACCENT)
+
+
+## Whether this is news about a particular family: something that happened to the
+## house itself, or to somebody who belongs to it.
+func _concerns_house(e: HistoryEvent, house_id: StringName) -> bool:
+	if e.subject_org_id == house_id:
+		return true
+	if _belongs(e.subject_person_id, house_id):
+		return true
+	for id in e.related_person_ids:
+		if _belongs(id, house_id):
+			return true
+	for key in ["from_house_id", "to_house_id", "granted_by", "liege_house_id"]:
+		if StringName(e.payload.get(key, "")) == house_id:
+			return true
+	# A cadet house leaving is news for the family it left.
+	var born: Dictionary = e.payload.get("organization", {})
+	return StringName(born.get("parent_org_id", "")) == house_id
+
+
+func _belongs(person_id: StringName, house_id: StringName) -> bool:
+	var p := GameState.get_person(person_id)
+	return p != null and p.house_org_id == house_id
+
+
 func _on_filter(index: int) -> void:
+	_picker.visible = false
 	_filter_index = index
 	_shown = PAGE
 	_sync_tabs()
@@ -104,6 +194,8 @@ func _rebuild() -> void:
 			continue
 		if Retainers.is_service_household_event(e) != only_service:
 			continue
+		if _house_filter != &"" and not _concerns_house(e, _house_filter):
+			continue
 		if e.description.strip_edges().is_empty():
 			continue
 		matched += 1
@@ -118,7 +210,10 @@ func _rebuild() -> void:
 
 	if matched == 0:
 		var empty := Label.new()
-		empty.text = "側近家の家中に目立った動きはない。" if only_service else "まだ何も起きていない。"
+		if _house_filter != &"":
+			empty.text = "この家に伝えるべきことはまだない。"
+		else:
+			empty.text = "側近家の家中に目立った動きはない。" if only_service else "まだ何も起きていない。"
 		empty.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		empty.add_theme_font_size_override("font_size", 18)
 		_list.add_child(empty)

@@ -38,6 +38,32 @@ static func adopt_into_house(person: NotableIndividual, house_org_id: StringName
 	person.family_name = surname_of(house_org_id)
 
 
+## Whether somebody is of a family's own blood, as opposed to belonging to its
+## household.
+##
+## Born to it, or born to a house this one is a cadet line of — a branch is a
+## family going out of itself, so its founders and everyone who left with them
+## are of its blood, and so is everyone born under the new name afterwards.
+##
+## What it excludes is everyone who came in from outside: a bride, a husband who
+## married into a house with no sons, somebody another family took in. They carry
+## the name and belong to the household, and the name is not theirs to inherit or
+## to take away.
+static func is_of_the_blood(person: NotableIndividual, house: Organization) -> bool:
+	if person == null or house == null:
+		return false
+	if person.birth_house_org_id == &"":
+		return person.house_org_id == house.org_id
+	var walk := house
+	var guard := 0
+	while walk != null and guard < 32:
+		if walk.org_id == person.birth_house_org_id:
+			return true
+		walk = GameState.get_organization(walk.parent_org_id)
+		guard += 1
+	return false
+
+
 ## Re-applies a house's surname to every living member. Called after a rename and
 ## after a branch takes its members with it.
 static func restyle_members(house_org_id: StringName) -> int:

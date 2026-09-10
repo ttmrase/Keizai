@@ -52,9 +52,16 @@ static func refresh_all(tick: int) -> void:
 	# The peerage is the nobility's own order of precedence. A retainer family
 	# stands outside it entirely — that is what being a retainer means — and
 	# ranking them alongside would give the world thirty-two dukes.
+	#
+	# So does the royal house, at the other end. A title is a thing the crown
+	# grants; a crown that granted itself one would be standing in its own order
+	# of precedence, which is not what a crown is. While a family wears it they
+	# hold no county title at all, and the duke's place they vacate goes to
+	# somebody else — one of the things a dynasty actually loses on the way up.
+	var royal := royal_house_id()
 	var houses: Array[Organization] = []
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
-		if house.standing == Organization.Standing.NOBLE:
+		if house.standing == Organization.Standing.NOBLE and house.org_id != royal:
 			houses.append(house)
 	if houses.is_empty():
 		return
@@ -109,6 +116,9 @@ static func _standing_of(house: Organization, strongest: float, crowned: Diction
 		standing += OFFICE_WEIGHT
 	var years := float(tick - house.founding_tick) / SimConfig.TICKS_PER_YEAR
 	standing += AGE_WEIGHT * clampf(years / AGE_SATURATION, 0.0, 1.0)
+	# And what the crown has said about them, which is worth something for as
+	# long as anyone still remembers the reign that said it.
+	standing += house.honour
 	return standing
 
 
@@ -121,7 +131,30 @@ const FAVOUR_DECAY := 0.004
 const SERVICE_MARGIN := 0.09
 
 
+## What a knighthood is worth is settled by the whole world, not by the house
+## that granted it. A liege may knight whoever it likes among its own servants
+## and nobody outside can stop it — but the more of them there are, the less the
+## rank distinguishes anybody, so the bar rises for everyone until the honours
+## granted are worth about what they were before.
+const SERVICE_REFERENCE := 0.55
+const INFLATION_SHIFT := 0.40
+
+
+static func service_bar_shift() -> float:
+	var total := 0.0
+	var count := 0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing != Organization.Standing.RETAINER:
+			continue
+		total += float(house.rank_tier)
+		count += 1
+	if count == 0:
+		return 0.0
+	return maxf(0.0, total / float(count) - SERVICE_REFERENCE) * INFLATION_SHIFT
+
+
 static func _rank_service_houses(tick: int) -> void:
+	var inflation := service_bar_shift()
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if house.standing != Organization.Standing.RETAINER:
 			continue
@@ -132,7 +165,7 @@ static func _rank_service_houses(tick: int) -> void:
 			# Clear the bar by a margin to rise, fall below it by one to sink,
 			# or a family hovering on a threshold is knighted and unknighted
 			# every few seasons and the chronicle says so every time.
-			var bar: float = SERVICE_THRESHOLDS[i]
+			var bar: float = SERVICE_THRESHOLDS[i] + inflation
 			bar += SERVICE_MARGIN if i + 1 > previous else -SERVICE_MARGIN
 			if house.favour >= bar:
 				tier = i + 1
@@ -202,13 +235,41 @@ static func tier_of(house_org_id: StringName) -> int:
 static func tier_name(tier: int, standing: int = Organization.Standing.NOBLE) -> String:
 	if standing == Organization.Standing.NOBLE:
 		return TIER_NAMES[clampi(tier, 0, TIER_NAMES.size() - 1)]
+	if standing == Organization.Standing.COMMONER:
+		return ""
 	return SERVICE_TITLES[clampi(tier, 0, SERVICE_TITLES.size() - 1)]
+
+
+## The name the crown is known by instead of a title, while it holds one.
+const ROYAL_TITLE := "王家"
+
+
+## The family whose blood currently sits on the throne of a realm that runs on
+## blood. A republic's president heads no royal house, however grand his family:
+## what makes a house royal is a crown that is inherited.
+static func royal_house_id() -> StringName:
+	var realm := dominant_realm()
+	if realm == null or realm.ideology == null:
+		return &""
+	if realm.ideology.legitimacy_basis != PoliticalSystemAxes.LegitimacyBasis.HEREDITARY:
+		return &""
+	var monarch := GameState.get_current_leader(realm.org_id)
+	if monarch == null or monarch.house_org_id == &"":
+		return &""
+	var house := GameState.get_organization(monarch.house_org_id)
+	return house.org_id if house != null and house.is_active() else &""
+
+
+static func is_royal(house: Organization) -> bool:
+	return house != null and house.org_id != &"" and house.org_id == royal_house_id()
 
 
 ## What a house is called, from the house itself.
 static func title_of_house(house: Organization) -> String:
 	if house == null or house.kind != Organization.OrgKind.HOUSE:
 		return ""
+	if is_royal(house):
+		return ROYAL_TITLE
 	return tier_name(house.rank_tier, house.standing)
 
 
@@ -218,8 +279,13 @@ static func title_of_house(house: Organization) -> String:
 static func precedence(house: Organization) -> float:
 	if house == null or house.kind != Organization.OrgKind.HOUSE:
 		return 0.0
+	# The crown holds no title and outranks every title there is.
+	if is_royal(house):
+		return NOBLE_PRECEDENCE_BASE + float(TIER_NAMES.size())
 	if house.standing == Organization.Standing.NOBLE:
 		return NOBLE_PRECEDENCE_BASE + float(house.rank_tier)
+	if house.standing == Organization.Standing.COMMONER:
+		return 0.0
 	return float(house.rank_tier) * SERVICE_PRECEDENCE_STEP
 
 

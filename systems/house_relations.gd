@@ -17,6 +17,13 @@ const IDEOLOGY_WEIGHT := 0.42
 const GUILD_RIVALRY_WEIGHT := 0.30
 const SHARED_CAUSE_WEIGHT := 0.18
 const CROWN_ENVY_WEIGHT := 0.22
+## What the crown has said about a family, felt toward the crown itself: a house
+## it has raised is grateful, a house it has stripped is not. This is the whole
+## of what an honour buys, and the whole of what it costs.
+const HONOUR_WEIGHT := 0.30
+## And what the other great families think of a house that has knighted its whole
+## household — a currency they also hold, cheapened by somebody else's generosity.
+const INFLATION_WEIGHT := 0.28
 
 const ADJUST_RATE := 0.12
 
@@ -99,6 +106,13 @@ static func _gather(houses: Array[Organization]) -> Dictionary:
 		if holder != null and holder.house_org_id != &"":
 			office_holder[org.org_id] = holder.house_org_id
 
+	# How far each family has titled its own servants above the world's ordinary
+	# run. Worked out once here rather than per pair, which would rescan every
+	# household in the world a hundred times an epoch.
+	var over_titled := {}
+	for house in houses:
+		over_titled[house.org_id] = Honours.service_excess(house)
+
 	return {
 		"marriages": marriage_ties,
 		"blood": blood_ties,
@@ -106,6 +120,7 @@ static func _gather(houses: Array[Organization]) -> Dictionary:
 		"office_holder": office_holder,
 		"members_in": members_in,
 		"crown": _crown_house_id(),
+		"over_titled": over_titled,
 	}
 
 
@@ -149,6 +164,15 @@ static func _target_relation(a: Organization, b: Organization, facts: Dictionary
 	var crown: StringName = facts["crown"]
 	if crown != &"" and (a.org_id == crown) != (b.org_id == crown):
 		score -= CROWN_ENVY_WEIGHT
+		# Except by whoever it has just honoured, and doubly by whoever it has
+		# just put down. Only felt toward the crown: a favour from anybody else
+		# is not a favour.
+		var subject: Organization = b if a.org_id == crown else a
+		score += HONOUR_WEIGHT * clampf(subject.honour, -1.0, 1.0)
+
+	# A house that has titled its whole household is resented by its equals, who
+	# hold the same coin and did not spend it.
+	score -= INFLATION_WEIGHT * clampf(float(facts["over_titled"].get(b.org_id, 0.0)), 0.0, 1.0)
 
 	return clampf(score, -1.0, 1.0)
 

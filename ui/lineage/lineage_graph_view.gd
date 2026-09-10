@@ -19,7 +19,9 @@ const NODE_SIZE := Vector2(330.0, 62.0)
 const H_GAP := 26.0
 ## Spouses sit shoulder to shoulder, close enough to read as one household.
 const SPOUSE_GAP := 10.0
-const ROW_HEIGHT := 116.0
+## Deep enough that a descent line has room to turn twice between two rows
+## without running along the top of the boxes below it.
+const ROW_HEIGHT := 138.0
 const CHEVRON_WIDTH := 46.0
 
 var source: LineageSource
@@ -44,8 +46,18 @@ var _collapsed: Dictionary = {}
 
 var _positions: Dictionary = {}      # id -> Vector2 (top-left, world space)
 var _edges: Array = []               # [parent_id, child_id]
-var _spouse_edges: Array = []        # [id, partner_id]
+var _spouse_edges: Array = []        # [id, partner_id] drawn shoulder to shoulder
+## Marriages to somebody who is not the partner drawn beside them: a second
+## match after a widowing, or a spouse who is already in a household of their
+## own. Without these the chart silently says a person married once.
+var _distant_marriages: Array = []   # [id, partner_id]
 var _partner_of: Dictionary = {}     # id -> the spouse drawn beside them
+## Which of several routes a descent line takes through the gap between rows.
+## Every line from one row to the next used to turn at the same height, so the
+## horizontal runs of unrelated families lay end to end on one long line and read
+## as a single connection — a child's parents apparently joined to the person
+## their child married.
+var _descent_lane: Dictionary = {}   # parent id -> lane index
 ## Where a node's children hang from: the midpoint of the couple, if there is one.
 var _child_anchor: Dictionary = {}
 var _hidden_counts: Dictionary = {}  # id -> descendants folded away
@@ -87,6 +99,8 @@ func rebuild() -> void:
 	_positions.clear()
 	_edges.clear()
 	_spouse_edges.clear()
+	_distant_marriages.clear()
+	_descent_lane.clear()
 	_partner_of.clear()
 	_child_anchor.clear()
 	_hidden_counts.clear()
@@ -129,7 +143,7 @@ func _settle_bounds() -> void:
 # ------------------------------------------------------- generational layout
 
 ## Horizontal room between two households on the same row.
-const GEN_H_GAP := 34.0
+const GEN_H_GAP := 46.0
 ## Sweeps spent reducing crossings, and then straightening descent lines. Both
 ## are heuristics; a couple of passes buys most of the legibility.
 const ORDER_SWEEPS := 4
@@ -137,6 +151,8 @@ const PLACE_PASSES := 4
 ## Guard against a record where somebody is their own remote in-law, which would
 ## otherwise keep pushing rows down forever.
 const MAX_ROW_PASSES := 16
+## How many distinct heights a descent line may turn at between two rows.
+const DESCENT_LANES := 4
 
 
 ## Lays the whole family out by generation, as one chart.
@@ -200,7 +216,15 @@ func _layout_generational() -> void:
 		widths.append(NODE_SIZE.x * units[i].size() + SPOUSE_GAP * (units[i].size() - 1))
 	var x := _place_rows(by_row, row_keys, parents_of, children_of, widths)
 
-	_commit_units(units, unit_of, rows, x, widths, ids, link_parent)
+	# Neighbours on a row take different routes down, so their horizontal runs
+	# never lie on the same line and cannot be read as one.
+	var lanes := {}
+	for key in row_keys:
+		var list: Array = by_row[key]
+		for k in list.size():
+			lanes[list[k]] = k % DESCENT_LANES
+
+	_commit_units(units, unit_of, rows, x, widths, ids, link_parent, lanes)
 
 
 ## True while the reduced view is the one being drawn. Settled once per layout in
@@ -410,7 +434,8 @@ func _desired_x(unit: int, neighbours: Dictionary, x: Dictionary,
 
 
 func _commit_units(units: Array, unit_of: Dictionary, rows: Array[int], x: Dictionary,
-		widths: Array[float], ids: Array[StringName], link_parent: Dictionary) -> void:
+		widths: Array[float], ids: Array[StringName], link_parent: Dictionary,
+		lanes: Dictionary) -> void:
 	var leftmost := INF
 	for i in units.size():
 		leftmost = minf(leftmost, float(x.get(i, 0.0)))
@@ -426,9 +451,11 @@ func _commit_units(units: Array, unit_of: Dictionary, rows: Array[int], x: Dicti
 		var centre: float = left + widths[i] * 0.5
 		for member in members:
 			_child_anchor[member] = centre
+			_descent_lane[member] = int(lanes.get(i, 0))
 		if members.size() == 2:
 			_spouse_edges.append([members[0], members[1]])
 			_partner_of[members[0]] = members[1]
+			_partner_of[members[1]] = members[0]
 
 	# One descent line per person, hung from the middle of the household above.
 	for id in ids:
@@ -438,6 +465,19 @@ func _commit_units(units: Array, unit_of: Dictionary, rows: Array[int], x: Dicti
 		if unit_of.get(anchor, -1) == unit_of[id]:
 			continue
 		_edges.append([anchor, id])
+
+	# Every other marriage: a second match after a widowing, or one to somebody
+	# who heads a household of their own and is drawn there instead. Recorded
+	# once per pair, from whichever of the two comes first by id.
+	for id in ids:
+		if not _positions.has(id):
+			continue
+		for spouse_id in source.spouses(id):
+			if _partner_of.get(id, &"") == spouse_id or not _positions.has(spouse_id):
+				continue
+			if String(id) > String(spouse_id):
+				continue
+			_distant_marriages.append([id, spouse_id])
 
 
 ## In focus mode the tree is rooted at the highest visible ancestor rather than
@@ -783,6 +823,14 @@ func _draw_tree() -> void:
 		var right := to_screen(b + Vector2(0, NODE_SIZE.y * 0.5))
 		draw_line(left, right, Palette.ACCENT, maxf(1.5, 3.0 * view_zoom))
 
+	# Only where they can be read. Forty families' worth of second marriages drawn
+	# across the whole chart at once is a cross-hatch, not information — so they
+	# appear when the chart is already narrowed to one person, or when somebody is
+	# picked out and the question is who else they married.
+	for pair in _distant_marriages:
+		if _focus_active or pair[0] == selected_id or pair[1] == selected_id:
+			_draw_distant_marriage(pair[0], pair[1])
+
 	for edge in _edges:
 		var from_pos: Vector2 = _positions.get(edge[0], Vector2.ZERO)
 		var to_pos: Vector2 = _positions.get(edge[1], Vector2.ZERO)
@@ -792,12 +840,47 @@ func _draw_tree() -> void:
 		var anchor_x: float = _child_anchor.get(edge[0], from_pos.x + NODE_SIZE.x * 0.5)
 		var start := to_screen(Vector2(anchor_x, from_pos.y + NODE_SIZE.y))
 		var end := to_screen(to_pos + Vector2(NODE_SIZE.x * 0.5, 0))
-		var mid_y := (start.y + end.y) * 0.5
+		# The height this line turns at is its parent's, not everybody's. Sharing
+		# one height put the horizontal runs of unrelated families on a single
+		# line, which read as a connection that was never in the record.
+		var lane: int = int(_descent_lane.get(edge[0], 0))
+		var turn_world: float = from_pos.y + NODE_SIZE.y \
+			+ (ROW_HEIGHT - NODE_SIZE.y) * (LANE_FIRST + LANE_STEP * float(lane))
+		var mid_y := to_screen(Vector2(0.0, turn_world)).y
 		draw_polyline([start, Vector2(start.x, mid_y), Vector2(end.x, mid_y), end],
 			Palette.LINE, maxf(1.0, 2.0 * view_zoom))
 
 	for id in _positions:
 		_draw_node(id)
+
+
+## Where in the gap between two rows a descent line makes its turn, as a
+## fraction of that gap.
+const LANE_FIRST := 0.26
+const LANE_STEP := 0.15
+
+
+## A marriage between two people who are not drawn side by side — a remarriage,
+## or a match between the heads of two houses. Drawn as a link between the two
+## boxes rather than the bar a couple gets, so it reads as "also married to"
+## without pretending they share a household on the chart.
+func _draw_distant_marriage(a_id: StringName, b_id: StringName) -> void:
+	var a: Vector2 = _positions[a_id]
+	var b: Vector2 = _positions[b_id]
+	var left := a if a.x <= b.x else b
+	var right := b if a.x <= b.x else a
+	var from := to_screen(left + Vector2(NODE_SIZE.x, NODE_SIZE.y * 0.5))
+	var to := to_screen(right + Vector2(0.0, NODE_SIZE.y * 0.5))
+	var colour := Palette.ACCENT
+	colour.a = 0.45
+	var width := maxf(1.0, 2.0 * view_zoom)
+	# Dashed by hand: a solid line at this weight is mistaken for descent.
+	var span := to - from
+	var steps := maxi(3, int(span.length() / (11.0 * maxf(view_zoom, 0.4))))
+	for i in range(0, steps, 2):
+		var s0 := from + span * (float(i) / float(steps))
+		var s1 := from + span * (float(mini(i + 1, steps)) / float(steps))
+		draw_line(s0, s1, colour, width)
 
 
 func _draw_node(id: StringName) -> void:

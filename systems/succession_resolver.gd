@@ -56,6 +56,11 @@ static func resolve(org: Organization, tick: int) -> void:
 			fallout.get("text", "")]
 	elif inherited:
 		text = "%sの%sを%sが継いだ。" % [org.display_name, org.leadership_title, winner.full_name]
+	elif winner.was_deposed_from(org.org_id):
+		# Rare and worth remarking on: the order that pulled somebody down could
+		# find nobody else to put in their place.
+		text = "%sは、かつて追われたはずの%sを改めて%sに戴いた。" % [
+			org.display_name, winner.full_name, org.leadership_title]
 	elif candidates.size() > 1:
 		text = "%sは%sに%sを選んだ。" % [org.display_name, org.leadership_title, winner.full_name]
 	else:
@@ -90,6 +95,12 @@ static func resolve(org: Organization, tick: int) -> void:
 		if fallout["severity"] == Severity.DEPARTURE:
 			SchismResolver.create_branch(org, _succession_schism_rule(org, rule), tick,
 				fallout["loser"])
+		elif fallout["severity"] == Severity.DISINHERITANCE \
+				and org.kind == Organization.OrgKind.HOUSE:
+			# Cut off from the family is not the end of the person. Where they go
+			# next is worked out and written down, so the record can be followed
+			# past the quarrel that threw them out of it.
+			Aftermath.settle_outcast(fallout["loser"], org, &"disinheritance", tick)
 
 
 static func _weighted_choice(candidates: Array[NotableIndividual], org: Organization,
@@ -245,12 +256,20 @@ static func _patron_house_candidates(org: Organization, tick: int) -> Array[Nota
 
 
 ## The house's own adults, children of the late head first.
+##
+## Its own blood, and only that. Somebody who married in belongs to the household
+## and carries its name, but the name is not theirs to inherit or to take away:
+## letting them stand puts an outsider at the head of a family, and — when they
+## lose — sends them off to found a cadet line that renames the partner whose
+## family it actually was.
 static func _house_candidates(org: Organization, tick: int) -> Array[NotableIndividual]:
 	var previous := GameState.get_person(_previous_leader_id(org))
 	var direct: Array[NotableIndividual] = []
 	var kin: Array[NotableIndividual] = []
 	for member in GameState.house_members(org.org_id):
 		if not member.is_adult(tick) or member.current_tenure() != null:
+			continue
+		if not HouseNaming.is_of_the_blood(member, org):
 			continue
 		if previous != null and previous.children_ids.has(member.person_id):
 			direct.append(member)
@@ -339,7 +358,18 @@ static func _claim_weight(p: NotableIndividual, org: Organization, tick: int,
 	# counting house; under a popular assembly the same name buys him nothing,
 	# and a knight's son never had much to spend.
 	w += HouseRank.weight_for(org) * HouseRank.precedence_of_person(p) * 0.35
+
+	# Somebody this very seat threw out carries the fallen order with them. Not
+	# barred — a country that has just pulled down its king and cannot govern
+	# without him has happened, and is worth being able to happen here — but the
+	# name that was deposed is the one everybody has just finished blaming.
+	if p.was_deposed_from(org.org_id):
+		w *= ANCIEN_REGIME_PENALTY
 	return maxf(0.1, w)
+
+
+## What being the last regime's head is worth to the one that replaced it.
+const ANCIEN_REGIME_PENALTY := 0.12
 
 
 # ------------------------------------------------------------------ fallout

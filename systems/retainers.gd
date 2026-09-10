@@ -56,6 +56,14 @@ static func refresh_all(tick: int) -> void:
 	if retainers.is_empty():
 		return
 	_raise_holders_for_unheld_land(retainers, tick)
+	# Whoever did not rise over their old master's ground has to find a new one.
+	# Done after the claims are settled, so a household with a county coming to it
+	# is not transferred away the season before it arrives.
+	for house in _retainer_houses():
+		var liege := GameState.get_organization(house.liege_house_id)
+		if liege == null or not liege.is_active():
+			Aftermath.settle_masterless(house, tick)
+	retainers = _retainer_houses()
 	_keep_a_nobility(tick)
 	for house in retainers:
 		_settle_loyalty(house)
@@ -132,6 +140,11 @@ static func _keep_a_nobility(tick: int) -> void:
 		return
 
 	var candidates := _retainer_houses()
+	# Families that fell out of service entirely are still families, and a realm
+	# short of great houses is in no position to be particular.
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.COMMONER and house.member_count > 0:
+			candidates.append(house)
 	candidates.sort_custom(func(a, b):
 		return a.power_score > b.power_score if not is_equal_approx(a.power_score, b.power_score) \
 			else String(a.org_id) < String(b.org_id))
@@ -203,6 +216,9 @@ static func _settle_loyalty(house: Organization) -> void:
 	# resented for it.
 	if liege.rank_tier >= 3 and house.held_settlement_ids.is_empty():
 		target -= NEGLECT_PENALTY
+	# And one that raised the whole household to the same rung bought nothing:
+	# a title every neighbour holds singles nobody out.
+	target -= Honours.sameness_penalty(house)
 	house.loyalty = move_toward(house.loyalty, clampf(target, 0.0, 1.0), LOYALTY_ADJUST)
 
 
@@ -231,17 +247,25 @@ static func _try_revolt(house: Organization, tick: int) -> bool:
 	house.last_fired_tick[&"revolt"] = tick
 	var seized: StringName = liege.held_settlement_ids[0]
 	var settlement: SettlementState = GameState.world.settlements.get(seized)
+	# Whether this was the last of it. A house stripped of one county among
+	# several has been humiliated; a house stripped of its only one has been
+	# ended as a great family, and goes into the service of the servants who
+	# ended it — which is where the next four generations of grievance start.
+	var ruined := liege.held_settlement_ids.size() <= 1
 
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
-		"%sは%sへの忠義を捨て、%sを実力で奪った。"
+		"%sは%sへの忠義を捨て、%sを実力で奪った。%s"
 			% [house.display_name, liege.display_name,
-				settlement.display_name if settlement != null else "その領"],
+				settlement.display_name if settlement != null else "その領",
+				"領を失った%sは家格を落とし、いまや%sの家中に列なる。"
+					% [liege.display_name, house.display_name] if ruined else ""],
 		{
 			"house_rising": true,
 			"seized_settlement": String(seized),
 			"from_house_id": String(liege.org_id),
+			"demote_source": ruined,
 			"reason": "revolt",
 			"legitimacy_cost": 0.12,
 		},

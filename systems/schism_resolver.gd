@@ -126,6 +126,11 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 			"reason": reason,
 			"seceded_settlements": Organization._names_to_strings(seceded),
 			"moved_person_ids": Organization._names_to_strings(moved),
+			# Whether the line that walked out was the family's own blood. Always
+			# should be, for a house — a cadet branch is a family going out of
+			# itself, and anchoring one on somebody who married in renames the
+			# partner whose name it was. Recorded so the suite can say so.
+			"founder_married_in": not HouseNaming.is_of_the_blood(leader, parent),
 		},
 		branch.org_id,
 		leader.person_id,
@@ -193,8 +198,13 @@ static func _find_leader(parent: Organization, tick: int,
 		if p.has_tag(&"ambitious"):
 			weight += 2.0
 		# Somebody already inside the organization's own house is the likeliest
-		# person to lead a split from it.
-		if parent.kind == Organization.OrgKind.HOUSE and p.house_org_id == parent.org_id:
+		# person to lead a split from it — but only its own blood. A woman who
+		# married in belongs to the household and carries its name; she does not
+		# found a cadet line of a family she was not born to, and letting her do
+		# it renames her husband, who is the one the name actually belongs to.
+		if parent.kind == Organization.OrgKind.HOUSE:
+			if p.house_org_id != parent.org_id or not HouseNaming.is_of_the_blood(p, parent):
+				continue
 			weight += 2.5
 		candidates.append(p)
 		weights.append(weight)
@@ -209,7 +219,8 @@ static func _find_leader(parent: Organization, tick: int,
 ## Taking the descendants without their spouses splits married couples between
 ## two houses, which is visible in the family tree as a pair with two different
 ## surnames and no reason for it. Whoever married into this line goes where the
-## line goes.
+## line goes. The line is always anchored on somebody born to the house, so this
+## never runs the other way and renames the partner whose name it was.
 static func _line_of(leader: NotableIndividual) -> Array[StringName]:
 	var out: Array[StringName] = [leader.person_id]
 	_take_spouses(leader, out)

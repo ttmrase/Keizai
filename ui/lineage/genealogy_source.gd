@@ -200,6 +200,34 @@ func detail(id: StringName) -> String:
 			traits.append(TRAIT_LABELS.get(tag, String(tag)))
 		lines.append("[color=#9a9080]気質[/color]  %s" % "、".join(traits))
 
+	if p.is_disinherited():
+		lines.append("[color=#c85a4a]廃嫡[/color]  %d年"
+			% int(p.disinherited_tick / SimConfig.TICKS_PER_YEAR))
+	if not p.deposed_from.is_empty():
+		var lost: Array[String] = []
+		for org_id in p.deposed_from:
+			var seat := GameState.get_organization(org_id)
+			if seat != null:
+				lost.append(seat.display_name)
+		if not lost.is_empty():
+			lines.append("[color=#c85a4a]追われた座[/color]  %s" % "、".join(lost))
+	# What became of them after the house around them fell. The chronicle said it
+	# once when it happened; a life should carry it afterwards.
+	var fate := Aftermath.fate_label(p.fate)
+	if not fate.is_empty():
+		lines.append("[color=#9a9080]その後[/color]  %d年・%s"
+			% [int(p.fate_tick / SimConfig.TICKS_PER_YEAR), fate])
+	if p.house_org_id == &"" and not p.is_founder_generation:
+		lines.append("[color=#9a9080]身分[/color]  家を持たぬ身")
+	else:
+		# Which house someone belongs to and whose blood they are come apart the
+		# moment they marry, and the difference decides what they may inherit.
+		var home := GameState.get_organization(p.house_org_id)
+		var born := GameState.get_organization(p.birth_house_org_id)
+		if home != null and not HouseNaming.is_of_the_blood(p, home):
+			lines.append("[color=#9a9080]家との関係[/color]  %sへ入った身（血筋は%s）" % [
+				home.display_name, born.display_name if born != null else "他家"])
+
 	var founder := GenealogyValidator.founder_of(id)
 	if founder != null and founder.person_id != id:
 		lines.append("[color=#9a9080]始祖[/color]  %s" % founder.full_name)

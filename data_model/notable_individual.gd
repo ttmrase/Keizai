@@ -36,6 +36,14 @@ var full_name: String:
 
 ## Which house this person belongs to. Succession searches heirs within it.
 @export var house_org_id: StringName = &""
+## The house this person was born into, which never changes. `house_org_id` says
+## which household they belong to now — it moves when they marry, when a cadet
+## line takes them with it, when another family takes them in — and this says
+## whose blood they are. The difference decides who may head a family and who may
+## found a cadet line of it: somebody who married in carries the name and cannot
+## inherit or take it away, and a daughter who married out and came home widowed
+## is still of the blood she was born to.
+@export var birth_house_org_id: StringName = &""
 
 ## Open-ended traits that bias rule weights (e.g. &"ambitious", &"pious").
 @export var personality_tags: Array[StringName] = []
@@ -50,6 +58,15 @@ var full_name: String:
 ## the same argument — barred from every seat anywhere, and their line barred
 ## from the house they were cut out of.
 @export var disinherited_tick: int = -1
+## Seats this person was turned out of when the order that seated them fell.
+## Not the same as standing down: a deposed ruler keeps every claim they had,
+## and carries the old regime with them wherever they go next.
+@export var deposed_from: Array[StringName] = []
+## Where a life ended up after the house around it collapsed — taken in by
+## another family, married away, or put out of society altogether. Recorded so
+## the chronicle can say what became of somebody rather than losing them.
+@export var fate: StringName = &""
+@export var fate_tick: int = -1
 
 
 func has_retired_from(org_id: StringName) -> bool:
@@ -58,6 +75,10 @@ func has_retired_from(org_id: StringName) -> bool:
 
 func is_disinherited() -> bool:
 	return disinherited_tick >= 0
+
+
+func was_deposed_from(org_id: StringName) -> bool:
+	return deposed_from.has(org_id)
 
 
 func is_alive() -> bool:
@@ -138,6 +159,13 @@ func to_dict() -> Dictionary:
 		d["retired_from"] = Organization._names_to_strings(retired_from)
 	if disinherited_tick >= 0:
 		d["disinherited_tick"] = disinherited_tick
+	if birth_house_org_id != &"":
+		d["birth_house_org_id"] = String(birth_house_org_id)
+	if not deposed_from.is_empty():
+		d["deposed_from"] = Organization._names_to_strings(deposed_from)
+	if fate != &"":
+		d["fate"] = String(fate)
+		d["fate_tick"] = fate_tick
 	return d
 
 
@@ -164,4 +192,8 @@ static func from_dict(d: Dictionary) -> NotableIndividual:
 	p.role_history = roles
 	p.retired_from = Organization._strings_to_names(d.get("retired_from", []))
 	p.disinherited_tick = int(d.get("disinherited_tick", -1))
+	p.birth_house_org_id = StringName(d.get("birth_house_org_id", ""))
+	p.deposed_from = Organization._strings_to_names(d.get("deposed_from", []))
+	p.fate = StringName(d.get("fate", ""))
+	p.fate_tick = int(d.get("fate_tick", -1))
 	return p

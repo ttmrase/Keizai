@@ -23,6 +23,14 @@ const RELATION_FLOOR := 0.2
 const UNLIT := 0.15
 ## And how far forward the ties that were chosen come.
 const LIT_WIDTH := 1.8
+## Room to leave around a family so its circle and its name are its own. Two
+## great houses seated in the same county, or a crowded ring of servants, used to
+## be drawn on top of each other and read as one.
+const SPOT_MARGIN := 30.0
+## Passes of pushing crowded families apart. It settles well before this.
+const RELAX_PASSES := 30
+## A house on its own ground gives way less readily than a household orbiting it.
+const NOBLE_YIELD := 0.3
 
 @onready var _canvas: PannableCanvas = $Canvas
 @onready var _detail: PanelContainer = $Detail
@@ -120,6 +128,58 @@ func _settle_spots() -> void:
 		# A crowded ring is pushed out and staggered, so the names have room.
 		var reach := ORBIT + float(total) * 9.0 + (26.0 if index % 2 == 1 else 0.0)
 		_spots[house.org_id] = anchor + Vector2(cos(angle), sin(angle)) * reach
+
+	_relax_spots()
+
+
+## Pushes apart anything drawn on top of anything else.
+##
+## Seats are placed where the land is, and the land does not care how many
+## families are sitting on it: two great houses holding the same county, or a
+## house with six servants in a ring meant for three, ended up as one blot with
+## the names stacked. Nothing here changes where a family belongs — it only stops
+## two of them occupying the same spot on the page. Sorted first, so a replay of
+## the same world settles the same way.
+func _relax_spots() -> void:
+	var ids: Array = _spots.keys()
+	ids.sort_custom(func(a, b): return String(a) < String(b))
+	var room := {}
+	var give := {}
+	for id in ids:
+		var house := GameState.get_organization(id)
+		room[id] = _radius_of(house) + SPOT_MARGIN
+		give[id] = NOBLE_YIELD if house != null \
+			and house.standing == Organization.Standing.NOBLE else 1.0
+
+	for pass_index in RELAX_PASSES:
+		var settled := true
+		for i in ids.size():
+			for j in range(i + 1, ids.size()):
+				var a: StringName = ids[i]
+				var b: StringName = ids[j]
+				var apart: Vector2 = _spots[b] - _spots[a]
+				var wanted: float = float(room[a]) + float(room[b])
+				var gap := apart.length()
+				if gap >= wanted:
+					continue
+				settled = false
+				# Two families placed at exactly the same point have no direction
+				# to move apart in, so one is chosen from their ids.
+				var away: Vector2 = apart / gap if gap > 0.01 \
+					else Vector2(cos(float(absi(hash(a)) % 360)), sin(float(absi(hash(b)) % 360)))
+				var push := away * (wanted - gap)
+				var yield_a: float = float(give[a])
+				var yield_b: float = float(give[b])
+				var share: float = yield_a + yield_b
+				_spots[a] -= push * (yield_a / share)
+				_spots[b] += push * (yield_b / share)
+		if settled:
+			break
+
+	for id in ids:
+		var at: Vector2 = _spots[id]
+		_spots[id] = Vector2(clampf(at.x, 60.0, FIELD.x - 60.0),
+			clampf(at.y, 60.0, FIELD.y - 60.0))
 
 
 ## Everyone the chosen family answers to, is answered by, or has an opinion of.
@@ -305,6 +365,27 @@ func _show_detail(id: StringName) -> void:
 		HouseRank.title_of_house(house), HouseCharacter.label(house.character_id)])
 	lines.append("[color=#9a9080]当主[/color]  %s"
 		% (head.full_name if head != null else "不在"))
+
+	# Why this family exists at all, for every family that was not simply always
+	# here. The founding houses came out of nothing and have nothing to say.
+	var story := HousePartition.origin_story(house)
+	if not story.is_empty():
+		lines.append("[color=#9a9080]分かれた理由[/color]  %s年・%sより%s" % [
+			story["year"], story["parent"], story["label"]])
+		if not String(story["text"]).is_empty():
+			lines.append("[color=#6a6357]%s[/color]" % story["text"])
+
+	var offices := GameState.offices_of_house(id)
+	if not offices.is_empty():
+		var seats: Array[String] = []
+		for seat in offices:
+			var held: Organization = seat["org"]
+			seats.append("%s%s" % [held.display_name, seat["title"]])
+		lines.append("[color=#9a9080]現任の役[/color]  %s" % "、".join(seats))
+
+	var honour := Honours.honour_label(house)
+	if not honour.is_empty():
+		lines.append("[color=#9a9080]王家との間柄[/color]  %s" % honour)
 
 	var land: Array[String] = []
 	for settlement_id in house.held_settlement_ids:

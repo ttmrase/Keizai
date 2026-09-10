@@ -243,6 +243,9 @@ static func _record_birth(mother: NotableIndividual, father: NotableIndividual, 
 	child.mother_id = mother.person_id
 	# The child belongs to its father's house, and takes that house's name.
 	child.house_org_id = father.house_org_id if father.house_org_id != &"" else mother.house_org_id
+	# Whose blood they are, settled once and never revised. Where they live moves;
+	# this does not.
+	child.birth_house_org_id = child.house_org_id
 	child.given_name = NameGenerator.given_name(child.sex)
 	child.family_name = HouseNaming.surname_of(child.house_org_id)
 	if child.family_name == "":

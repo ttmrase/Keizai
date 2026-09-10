@@ -475,7 +475,7 @@ func _check_a_house_has_a_chart_of_its_own() -> void:
 	check(ids.size() < GameState.people.size(),
 		"and it should be one family, not the whole record")
 
-	var married_in := 0
+	var married_in_count := 0
 	for id in ids:
 		var p := GameState.get_person(id)
 		check(p != null, "everybody on the chart should exist")
@@ -488,8 +488,8 @@ func _check_a_house_has_a_chart_of_its_own() -> void:
 				joined = true
 		check(joined, "%s is on the chart, so is of the house or married into it"
 			% p.full_name)
-		married_in += 1
-	check_gt(float(married_in), 0.0, "and the marriages that joined it should show")
+		married_in_count += 1
+	check_gt(float(married_in_count), 0.0, "and the marriages that joined it should show")
 
 	# Nobody who left the house is on it, however they left.
 	var inside := {}

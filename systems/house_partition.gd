@@ -69,6 +69,11 @@ static func _try_unfit_heir(house: Organization, tick: int) -> bool:
 			continue
 		if not _is_sibling(member, head):
 			continue
+		# A sister who married away and came home widowed is still of the blood;
+		# somebody who only ever married into the household is not, and a cadet
+		# line anchored on them renames the partner whose name it was.
+		if not HouseNaming.is_of_the_blood(member, house):
+			continue
 		if challenger == null or _fitness(member) > _fitness(challenger):
 			challenger = member
 	if challenger == null or _fitness(challenger) - head_fitness < UNFIT_MARGIN:
@@ -123,6 +128,11 @@ static func try_elopement(a: NotableIndividual, b: NotableIndividual, tick: int)
 		lesser_partner = a
 	var noble_house := GameState.get_organization(noble_partner.house_org_id)
 	if noble_house == null:
+		return false
+	# The branch is a line of the great house going out of it, so it has to be
+	# that house's own blood walking. Somebody who married in years ago and was
+	# widowed is disowned without a cadet line being founded in their name.
+	if not HouseNaming.is_of_the_blood(noble_partner, noble_house):
 		return false
 	if tick - int(noble_house.last_fired_tick.get(&"elopement", -999999)) < ELOPEMENT_COOLDOWN:
 		return false
@@ -185,3 +195,25 @@ const REASON_LABELS := {
 
 static func reason_label(schism_kind: StringName) -> String:
 	return REASON_LABELS.get(schism_kind, "分派")
+
+
+## The quarrel a cadet house came out of, read back off the event that founded
+## it. Empty for a founding family, which came out of nothing.
+##
+## Nothing is stored for this: the schism already recorded what kind of quarrel
+## it was and the sentence the chronicle printed at the time, so every screen
+## that wants to explain a house reads the same event rather than keeping a copy.
+static func origin_story(org: Organization) -> Dictionary:
+	if org == null or org.kind != Organization.OrgKind.HOUSE or org.origin_event_id == &"":
+		return {}
+	var origin := HistoryLog.find_event(org.origin_event_id)
+	if origin == null or origin.event_type != HistoryEvent.EventType.SCHISM:
+		return {}
+	var parent := GameState.get_organization(org.parent_org_id)
+	return {
+		"label": reason_label(StringName(origin.payload.get("schism_kind", ""))),
+		"reason": String(origin.payload.get("reason", "")),
+		"text": origin.description,
+		"parent": parent.display_name if parent != null else "",
+		"year": int(org.founding_tick / SimConfig.TICKS_PER_YEAR),
+	}

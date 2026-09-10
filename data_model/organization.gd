@@ -115,6 +115,13 @@ const STANDING_LABELS := {
 ## who loses is how it gets put back down. Decays toward nothing, so a favour
 ## three generations old is not a rank.
 @export var favour: float = 0.0
+
+## HOUSE — standing the crown has conferred or taken away. The peerage is still
+## read off what a family actually holds, so an honour moves a house up the order
+## of precedence rather than pinning it there: one the crown favours and which
+## then loses everything slides back down regardless. Decays, because a favour
+## two reigns old is a story rather than a claim.
+@export var honour: float = 0.0
 ## HOUSE: what kind of family this is — priests, soldiers, courtiers, scholars.
 ## Shapes what it is good at and what it tends to produce.
 @export var character_id: StringName = &""
@@ -208,6 +215,8 @@ func to_dict() -> Dictionary:
 	d["loyalty"] = loyalty
 	if not is_zero_approx(favour):
 		d["favour"] = favour
+	if not is_zero_approx(honour):
+		d["honour"] = honour
 	return d
 
 
@@ -273,6 +282,7 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.faith_id = StringName(d.get("faith_id", ""))
 	o.loyalty = float(d.get("loyalty", 0.75))
 	o.favour = float(d.get("favour", 0.0))
+	o.honour = float(d.get("honour", 0.0))
 	return o
 
 

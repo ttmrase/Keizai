@@ -137,6 +137,33 @@ func house_members(house_id: StringName, only_living := true) -> Array[NotableIn
 	return out
 
 
+## Every seat in the world currently held by somebody of this family — the guild
+## halls, the temples, the chamber, the throne.
+##
+## This is what a great house actually is, as distinct from what it owns: a
+## family with three of its own at the head of things is running the country
+## whatever its title says, and a duke with none of them is a duke and nothing
+## else. Read from the tenures rather than stored, so it is never stale.
+func offices_of_house(house_id: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if house_id == &"":
+		return out
+	for org in active_organizations():
+		if org.kind == Organization.OrgKind.HOUSE:
+			continue
+		var holder: NotableIndividual = people.get(org.leader_person_id)
+		if holder == null or not holder.is_alive() or holder.house_org_id != house_id:
+			continue
+		out.append({"org": org, "person": holder, "title": org.leadership_title})
+	out.sort_custom(func(a, b):
+		var x: Organization = a["org"]
+		var y: Organization = b["org"]
+		if x.kind != y.kind:
+			return x.kind < y.kind
+		return String(x.org_id) < String(y.org_id))
+	return out
+
+
 func children_of(person_id: StringName, only_living := true) -> Array[NotableIndividual]:
 	var out: Array[NotableIndividual] = []
 	var p: NotableIndividual = people.get(person_id)
@@ -414,6 +441,11 @@ func _apply_regime_change(polity: Organization, e: HistoryEvent) -> void:
 			if tenure != null:
 				tenure.end_tick = e.tick
 				tenure.end_event_id = e.event_id
+			# Turned out by the order that replaced them. They keep every claim
+			# they had — but they carry the fallen regime with them, and whoever
+			# comes next has to weigh that.
+			if not ruler.deposed_from.has(polity.org_id):
+				ruler.deposed_from.append(polity.org_id)
 		# Left empty on purpose: the seat is filled again next tick under
 		# whatever rules the country now runs on, which is the whole point.
 		polity.leader_person_id = &""

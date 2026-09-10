@@ -146,6 +146,17 @@ func detail(id: StringName) -> String:
 					places.append(s.display_name)
 			if not places.is_empty():
 				lines.append("[color=#9a9080]所領[/color]  %s" % "、".join(places))
+		var offices := GameState.offices_of_house(org.org_id)
+		if not offices.is_empty():
+			var seats: Array[String] = []
+			for seat in offices:
+				var held: Organization = seat["org"]
+				var holder: NotableIndividual = seat["person"]
+				seats.append("%s%s（%s）" % [held.display_name, seat["title"], holder.given_name])
+			lines.append("[color=#9a9080]現任の役[/color]  %s" % "、".join(seats))
+		var honour := Honours.honour_label(org)
+		if not honour.is_empty():
+			lines.append("[color=#9a9080]王家との間柄[/color]  %s" % honour)
 		var standing := _relations_text(org)
 		if not standing.is_empty():
 			lines.append("[color=#9a9080]他家との関係[/color]  %s" % standing)
@@ -164,19 +175,26 @@ func detail(id: StringName) -> String:
 ## the time. A family looking at its own cadet branches should be able to see
 ## which one left over an unfit heir and which one over a marriage.
 func _why_it_branched(org: Organization) -> String:
-	if org.origin_event_id == &"":
-		return ""
-	var origin := HistoryLog.find_event(org.origin_event_id)
-	if origin == null or origin.event_type != HistoryEvent.EventType.SCHISM:
-		return ""
-	var kind := StringName(origin.payload.get("schism_kind", ""))
-	var lines: Array[String] = ["[color=#9a9080]分かれた理由[/color]  %s"
-		% HousePartition.reason_label(kind)]
-	var reason: String = origin.payload.get("reason", "")
-	if not reason.is_empty():
-		lines[0] += "（%s）" % reason
-	if not origin.description.is_empty():
-		lines.append("[color=#6a6357]%s[/color]" % origin.description)
+	var story := HousePartition.origin_story(org)
+	if story.is_empty():
+		# Guilds, factions and faiths branch too, and their founding events say
+		# so in the same shape; only the peerage labels are house-flavoured.
+		if org.origin_event_id == &"":
+			return ""
+		var origin := HistoryLog.find_event(org.origin_event_id)
+		if origin == null or origin.event_type != HistoryEvent.EventType.SCHISM:
+			return ""
+		story = {
+			"label": HousePartition.reason_label(
+				StringName(origin.payload.get("schism_kind", ""))),
+			"reason": String(origin.payload.get("reason", "")),
+			"text": origin.description,
+		}
+	var lines: Array[String] = ["[color=#9a9080]分かれた理由[/color]  %s" % story["label"]]
+	if not String(story.get("reason", "")).is_empty():
+		lines[0] += "（%s）" % story["reason"]
+	if not String(story.get("text", "")).is_empty():
+		lines.append("[color=#6a6357]%s[/color]" % story["text"])
 	return "\n".join(lines)
 
 

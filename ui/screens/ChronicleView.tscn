@@ -1,6 +1,18 @@
-[gd_scene load_steps=2 format=3 uid="uid://bkeizaichron01"]
+[gd_scene load_steps=3 format=3 uid="uid://bkeizaichron01"]
 
 [ext_resource type="Script" path="res://ui/screens/chronicle_view.gd" id="1_chronicle"]
+
+[sub_resource type="StyleBoxFlat" id="picker_style"]
+bg_color = Color(0.164706, 0.14902, 0.125490, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.227451, 0.207843, 0.172549, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [node name="ChronicleView" type="Control"]
 layout_mode = 3
@@ -28,6 +40,17 @@ theme_override_constants/separation = 8
 layout_mode = 2
 theme_override_constants/separation = 4
 
+[node name="HouseRow" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="House" type="Button" parent="Rows/HouseRow"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "家で絞る"
+
 [node name="Scroll" type="ScrollContainer" parent="Rows"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -42,3 +65,24 @@ theme_override_constants/separation = 10
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "さらに読む"
+
+[node name="Picker" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 100.0
+offset_right = -12.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("picker_style")
+
+[node name="Scroll" type="ScrollContainer" parent="Picker"]
+layout_mode = 2
+
+[node name="List" type="VBoxContainer" parent="Picker/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
