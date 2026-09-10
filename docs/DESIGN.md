@@ -896,3 +896,65 @@ And a second marriage was invisible, because the layout draws at most one partne
 beside anybody: the rest are drawn as a dashed link, shown when the chart has
 already been narrowed to one person or when somebody is picked out, since forty
 families' worth of them at once is a cross-hatch rather than information.
+
+---
+
+## Ninth iteration: faith that costs something, ruptures, and a state that can end
+
+**Faith was an ornament.** It had its own lineage, its own conversion rules and
+its own screen, and nothing outside it read any of that. It now runs through the
+same joints the other four elements run through — house relations, the support
+base, regional unrest, and the claim on the state — with one rule holding all of
+it together: everything scales by `Religion.division()`. A world that all prays
+the same way has no religious politics, because agreeing is worth nothing when
+there is nothing to disagree about. A world that has just split has little else.
+That makes a revelation change the character of a century rather than only its
+liturgy, and it means the mechanism costs nothing at all in worlds where faith
+is not the interesting question.
+
+The strongest of those joints is the smallest: a region set under a family of
+another confession does what it is told slowly, which is unrest, which is a claim
+on the state. One line in the unrest target, and belief reaches politics without
+any system knowing about both.
+
+**Incidents.** Everything here moves by degrees, which is right for almost
+everything and wrong for the moments a history is remembered by. Four ruptures —
+破門, 暗殺, 王都制圧, 民衆蜂起 — each wanting two or three independent pressures
+at once, each resolving in a season, each leaving a different world behind. Their
+mechanical consequences go through the ordinary record (a death, a transfer, a
+regime falling); the INCIDENT event is the headline they were part of, and it is
+never compacted away.
+
+The 事件 screen shows the log and, more usefully, the pressures: how close each
+rupture stands and the one thing most in its way. That is the loop the whole game
+is supposed to have — the player turns four dials and watches what they were
+doing — and it had nowhere to be read before. A calm world produces no incidents
+at all, which is not a failure of tuning: if you want to see the kingdom fall, the
+conditions are yours to make.
+
+Calibration mattered more than the mechanism. The first version fired
+excommunication nine times in two thousand quiet years, because a divided world
+with one great house of another confession met the conditions permanently and the
+only limit was a cooldown. That is weather, not a rupture. The conditions became
+conditions: two thirds of the world rather than half, a rival confession holding
+ground of its own rather than one man's opinion, and a faith that can actually
+outweigh the family it condemns.
+
+**A state can end.** The regime system changed what a country rested on and left
+the same organization standing, so a kingdom that became a republic was the same
+kingdom with different adjectives, and the polity lineage never branched. Now the
+distinction is drawn where it belongs: a chamber reorganizing itself is the same
+country under new arrangements, and a country that stops belonging to a bloodline
+and starts belonging to its members is a different country. The second kind founds
+a successor recording the fallen state as its parent and taking the whole country
+with it, so the lineage screen walks a republic back through the junta to the
+kingdom it all started as — and a ruler deposed by any of them carries that
+through every state founded out of it.
+
+Two calibrations came out of this. A refounded state is a new organization, so it
+started with an empty record of when it last fell and the "not twice in a
+lifetime" rule never applied to it: a hard century chain-collapsed into a hundred
+and sixty states. The successor now inherits the settlement of the upheaval that
+made it. And ending a country is held to a harder bar than amending one, so a
+claim strong enough to rearrange the chamber does not automatically declare the
+state finished — the pressure keeps building until it clears.
