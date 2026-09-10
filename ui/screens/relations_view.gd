@@ -94,8 +94,11 @@ func _settle_spots() -> void:
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if house.standing == Organization.Standing.NOBLE:
 			nobles.append(house)
-		else:
+		elif house.standing == Organization.Standing.RETAINER:
 			retainers.append(house)
+		# A family that has fallen out of service altogether is not part of this
+		# web any more — that is what falling out of it means. It keeps its place
+		# in the family tree and the chronicle, and loses its place on the field.
 
 	var crowding := {}
 	for house in nobles:

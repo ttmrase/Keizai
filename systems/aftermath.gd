@@ -172,6 +172,7 @@ static func _shelter(person: NotableIndividual, from_house: Organization,
 	if best == null:
 		return &""
 	HouseNaming.adopt_into_house(person, best.org_id)
+	_take_the_household(person, best)
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
@@ -190,6 +191,7 @@ static func _cast_down(person: NotableIndividual, from_house: Organization,
 		tick: int) -> StringName:
 	var kept := person.family_name
 	person.house_org_id = &""
+	_take_the_household(person, null)
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
@@ -339,6 +341,25 @@ static func _standing_of(person: NotableIndividual, from_house: Organization) ->
 	if person.has_tag(&"martial") or person.has_tag(&"scholarly"):
 		standing += 0.3
 	return standing
+
+
+## Whatever happens to somebody happens to the person they are married to. A
+## couple left in two different houses is a household split down the middle, and
+## the family tree shows it as a pair with two surnames and no reason for it.
+##
+## The exception is the one that already governs marriage: somebody who heads a
+## family of their own does not leave it, whatever becomes of their spouse.
+static func _take_the_household(person: NotableIndividual, into: Organization) -> void:
+	var spouse := Demography.living_spouse(person)
+	if spouse == null:
+		return
+	var theirs := GameState.get_organization(spouse.house_org_id)
+	if theirs != null and theirs.leader_person_id == spouse.person_id:
+		return
+	if into == null:
+		spouse.house_org_id = &""
+		return
+	HouseNaming.adopt_into_house(spouse, into.org_id)
 
 
 static func _house_name(house_org_id: StringName) -> String:
