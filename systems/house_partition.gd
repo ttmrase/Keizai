@@ -89,6 +89,13 @@ static func _is_sibling(a: NotableIndividual, b: NotableIndividual) -> bool:
 	return a.mother_id != &"" and a.mother_id == b.mother_id
 
 
+## What a family sees in somebody as a prospective head. Read from the outside
+## too: whether a succession is disputed at all turns on whether the heir is
+## visibly worse than a sibling, which is the same question.
+static func fitness(p: NotableIndividual) -> float:
+	return _fitness(p)
+
+
 static func _fitness(p: NotableIndividual) -> float:
 	var score := 0.0
 	for tag in p.personality_tags:

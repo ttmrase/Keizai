@@ -748,3 +748,35 @@ by house. And the chronicle drowned: three retainer families under each of eight
 houses generate most of the births, marriages and deaths in the world, and the
 fall of a regime sat between two births in a knight's household. Those get their
 own filter rather than being thrown away.
+
+---
+
+## Sixth iteration: most successions are not quarrels
+
+Three corrections, all of them about the same thing: the world was louder than
+it should have been, and quieter than it should have been about why.
+
+**Inheritance is the default again.** A contested succession ran a weighted draw
+whenever there was more than one candidate, and since almost every household
+with two grown children has more than one candidate, almost every succession was
+a quarrel. Now an inherited seat goes to the eldest, sons before daughters, and
+nobody says anything unless somebody has a reason: the heir is visibly worse
+than a sibling, an ambitious rival sees an opening, or the seat is going sideways
+over the late head's own children. A body that fills its seats by choosing
+somebody is not disputing anything at all, so a guild electing its next master is
+recorded as an election and gets no fallout ladder. Four centuries went from
+876 quarrels against 692 quiet successions to 290 against 1,148.
+
+**A branch says why it exists.** Nothing new is stored for this: the schism that
+founded a cadet house already records what kind of quarrel it was and the
+sentence the chronicle printed at the time, so the family screen reads it back.
+A house looking at its own branches can see which one left over an unfit heir
+and which one over a marriage.
+
+**A screen for where everyone stands.** The lineage screens answer where a
+family came from; nothing answered where it stands now. `RelationsView` places
+the great houses on the ground they hold, rings each with the families in its
+service, and draws the two relationships the world actually runs on — what the
+nobility thinks of each other, and how far the households below them can be
+trusted. It computes nothing of its own: HouseRelations, Retainers and HouseRank
+already hold all of it, and this is a reading rather than a second copy.

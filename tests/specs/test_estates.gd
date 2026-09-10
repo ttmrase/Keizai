@@ -13,6 +13,8 @@ func run() -> void:
 	_check_houses_have_a_character_that_counts()
 	_check_households_split_for_reasons()
 	_check_both_ranks_survive_the_centuries()
+	_check_most_successions_are_quiet()
+	_check_a_branch_says_why_it_exists()
 	_check_the_roll_of_leaders()
 	_check_the_spine_is_house_heads()
 	finish()
@@ -317,6 +319,70 @@ func _check_both_ranks_survive_the_centuries() -> void:
 				and bool(e.payload.get("house_rising", false)):
 			risings += 1
 	check_gt(float(risings), 0.0, "somebody should have risen in four centuries")
+
+
+## A weighted draw between every grown child turned nearly every succession into
+## a quarrel, because nearly every household has more than one grown child. An
+## inherited seat should pass to the eldest and nobody should say anything.
+func _check_most_successions_are_quiet() -> void:
+	SimTestHarness.eventful_world(8112, 2400)
+	var quiet := 0
+	var disputed := 0
+	for e in HistoryLog.backbone:
+		if e.event_type != HistoryEvent.EventType.SUCCESSION:
+			continue
+		if bool(e.payload.get("contested", false)):
+			disputed += 1
+		else:
+			quiet += 1
+	check_gt(float(quiet + disputed), 20.0, "four centuries should have filled some seats")
+	check_gt(float(quiet), float(disputed),
+		"most successions should pass without a quarrel (%d quiet, %d disputed)"
+			% [quiet, disputed])
+
+	# And where a seat is inherited and nobody objects, it goes to the eldest,
+	# sons before daughters.
+	SimTestHarness.fresh_world(8113)
+	var house := GameState.root_of_kind(Organization.OrgKind.HOUSE)
+	var tick := SimClock.current_tick
+	var grown: Array[NotableIndividual] = []
+	for member in GameState.house_members(house.org_id):
+		if member.is_adult(tick) and member.current_tenure() == null:
+			grown.append(member)
+	if grown.size() < 2:
+		return
+	var heir := SuccessionResolver._presumptive_heir(grown, house, tick, null)
+	for other in grown:
+		if other.person_id == heir.person_id:
+			continue
+		if other.sex == heir.sex:
+			check(heir.birth_tick <= other.birth_tick,
+				"the elder of two of the same sex inherits")
+		else:
+			check_eq(heir.sex, "m", "a son inherits before a daughter")
+
+
+## The record already holds why a cadet house exists; the family screen should be
+## able to read it back rather than the reason being lost the moment it happened.
+func _check_a_branch_says_why_it_exists() -> void:
+	SimTestHarness.eventful_world(8114, 2000)
+	var source := OrganizationLineageSource.new()
+	source.root_kinds = [Organization.OrgKind.HOUSE]
+	var explained := 0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.founding_tick <= 0 or house.parent_org_id == &"":
+			continue
+		var origin := HistoryLog.find_event(house.origin_event_id)
+		if origin == null or origin.event_type != HistoryEvent.EventType.SCHISM:
+			continue
+		explained += 1
+		var detail := source.detail(house.org_id)
+		check(detail.contains("分かれた理由"),
+			"%s should say why it broke away" % house.display_name)
+		check(detail.contains(HousePartition.reason_label(
+			StringName(origin.payload.get("schism_kind", "")))),
+			"%s should name the kind of quarrel it was" % house.display_name)
+	check_gt(float(explained), 0.0, "the run should have produced a cadet house to explain")
 
 
 func _check_the_roll_of_leaders() -> void:

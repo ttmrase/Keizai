@@ -59,6 +59,14 @@ func _ready() -> void:
 	# Families are their own screen now, so it gets its own shot.
 	lineage._show_houses()
 	await _settle()
+	# Opened on a family that broke away from another, so the sheet shows why.
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.founding_tick > 0 and house.parent_org_id != &"":
+			lineage._graph.selected_id = house.org_id
+			lineage._show_detail(house.org_id)
+			lineage._graph.center_on_node(house.org_id)
+			break
+	await _settle()
 	await _capture("%s/lineage_houses.png" % _out_dir)
 
 	lineage._show_people()
@@ -83,6 +91,17 @@ func _ready() -> void:
 		lineage._update_focus_note()
 		await _settle()
 		await _capture("%s/lineage_focus.png" % _out_dir)
+
+	# The relations field, with a house picked out so the sheet is showing.
+	shell.show_tab("relations")
+	await _settle()
+	var relations: Control = shell._screens["relations"]
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE and relations._spots.has(house.org_id):
+			relations._on_tapped(relations._spots[house.org_id])
+			break
+	await _settle()
+	await _capture("%s/relations.png" % _out_dir)
 
 	# A settlement selected on the map, so the detail sheet is visible.
 	shell.show_tab("map")

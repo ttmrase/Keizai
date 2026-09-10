@@ -100,6 +100,9 @@ func detail(id: StringName) -> String:
 	lines.append("[color=#9a9080]興り[/color]  %d年%s" % [
 		int(org.founding_tick / SimConfig.TICKS_PER_YEAR),
 		"" if parent == null else "（%sより分派）" % parent.display_name])
+	var why := _why_it_branched(org)
+	if not why.is_empty():
+		lines.append(why)
 	if not org.is_active():
 		lines.append("[color=#c85a4a]断絶[/color]  %d年"
 			% int(org.dissolved_tick / SimConfig.TICKS_PER_YEAR))
@@ -151,6 +154,29 @@ func detail(id: StringName) -> String:
 	if not roll.is_empty():
 		lines.append("[color=#9a9080]歴代の%s[/color]\n%s" % [org.leadership_title, roll])
 
+	return "\n".join(lines)
+
+
+## Why this body exists at all, read back off the event that created it.
+##
+## Nothing extra is stored for this: the schism that founded a branch already
+## records what kind of quarrel it was and the sentence the chronicle printed at
+## the time. A family looking at its own cadet branches should be able to see
+## which one left over an unfit heir and which one over a marriage.
+func _why_it_branched(org: Organization) -> String:
+	if org.origin_event_id == &"":
+		return ""
+	var origin := HistoryLog.find_event(org.origin_event_id)
+	if origin == null or origin.event_type != HistoryEvent.EventType.SCHISM:
+		return ""
+	var kind := StringName(origin.payload.get("schism_kind", ""))
+	var lines: Array[String] = ["[color=#9a9080]分かれた理由[/color]  %s"
+		% HousePartition.reason_label(kind)]
+	var reason: String = origin.payload.get("reason", "")
+	if not reason.is_empty():
+		lines[0] += "（%s）" % reason
+	if not origin.description.is_empty():
+		lines.append("[color=#6a6357]%s[/color]" % origin.description)
 	return "\n".join(lines)
 
 

@@ -13,6 +13,7 @@ const TABS := [
 	{"id": "map", "label": "世界", "scene": "res://ui/screens/WorldMapView.tscn"},
 	{"id": "chronicle", "label": "年代記", "scene": "res://ui/screens/ChronicleView.tscn"},
 	{"id": "lineage", "label": "系譜", "scene": "res://ui/screens/LineageView.tscn"},
+	{"id": "relations", "label": "関係", "scene": "res://ui/screens/RelationsView.tscn"},
 	{"id": "power", "label": "勢力", "scene": "res://ui/screens/PowerDashboard.tscn"},
 	{"id": "god", "label": "神の力", "scene": "res://ui/screens/GodPowerPanel.tscn"},
 ]

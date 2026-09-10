@@ -18,30 +18,48 @@ static func resolve(org: Organization, tick: int) -> void:
 		# so an institution really can outlive everyone willing to lead it.
 		return
 
-	var rng := RngService.stream(&"rules")
-	var weights: Array = []
-	for c in candidates:
-		weights.append(_claim_weight(c, org, tick, rule))
-
-	var winner: NotableIndividual = RngService.pick_weighted(&"rules", candidates, weights)
-	if winner == null:
-		return
-
 	var previous_id := _previous_leader_id(org)
 	var previous := GameState.get_person(previous_id)
-	var contested := candidates.size() > 1 and rule != null and rule.allow_dispute
-	var minority := contested and _is_a_minority(org, previous, tick)
+	var minority := _is_a_minority(org, previous, tick)
+
+	# A seat that is filled by choosing somebody is not a quarrel — a guild
+	# electing its next master is doing what it always does. Only an inherited
+	# seat can be disputed, and most of those are not: it goes to the eldest,
+	# sons before daughters, and nobody says anything. Running a weighted draw
+	# every time made a disputed succession out of every household that happened
+	# to have two grown children, which is nearly all of them.
+	var inherited := _is_inherited(org, rule)
+	var winner: NotableIndividual = null
+	var contested := false
+
+	if inherited:
+		winner = _presumptive_heir(candidates, org, tick, rule)
+		contested = candidates.size() > 1 and rule != null and rule.allow_dispute \
+			and _dispute_arises(org, candidates, winner, minority, tick, rule)
+		if contested:
+			winner = _weighted_choice(candidates, org, tick, rule)
+	else:
+		winner = _weighted_choice(candidates, org, tick, rule)
+	if winner == null:
+		return
+	minority = minority and contested
 
 	var fallout := {}
 	if contested:
 		fallout = _settle_dispute(org, candidates, winner, minority, tick, rule)
 
-	var text := "%sの%sに%sが就いた。" % [org.display_name, org.leadership_title, winner.full_name]
+	var text := ""
 	if contested:
 		text = "%s%sの%sをめぐる争いの末、%sが座に就いた。%s" % [
 			"幼い直子を差し置いて、" if minority else "",
 			org.display_name, org.leadership_title, winner.full_name,
 			fallout.get("text", "")]
+	elif inherited:
+		text = "%sの%sを%sが継いだ。" % [org.display_name, org.leadership_title, winner.full_name]
+	elif candidates.size() > 1:
+		text = "%sは%sに%sを選んだ。" % [org.display_name, org.leadership_title, winner.full_name]
+	else:
+		text = "%sの%sに%sが就いた。" % [org.display_name, org.leadership_title, winner.full_name]
 
 	var payload := {
 		"previous_leader_id": String(previous_id),
@@ -72,6 +90,71 @@ static func resolve(org: Organization, tick: int) -> void:
 		if fallout["severity"] == Severity.DEPARTURE:
 			SchismResolver.create_branch(org, _succession_schism_rule(org, rule), tick,
 				fallout["loser"])
+
+
+static func _weighted_choice(candidates: Array[NotableIndividual], org: Organization,
+		tick: int, rule: TriggerRule) -> NotableIndividual:
+	var weights: Array = []
+	for c in candidates:
+		weights.append(_claim_weight(c, org, tick, rule))
+	return RngService.pick_weighted(&"rules", candidates, weights)
+
+
+## Who takes the seat when nobody objects.
+##
+## The eldest child, sons before daughters — the plainest rule there is, and the
+## one a reader expects. Only inherited seats have a presumptive anybody; a body
+## that elects its officers is asked separately.
+static func _presumptive_heir(candidates: Array[NotableIndividual], org: Organization,
+		tick: int, rule: TriggerRule) -> NotableIndividual:
+	if candidates.is_empty():
+		return null
+	var heir := candidates[0]
+	for p in candidates:
+		if _precedes(p, heir):
+			heir = p
+	return heir
+
+
+## Male-preference primogeniture: an elder son before a younger, any son before
+## a daughter, an elder daughter before a younger.
+static func _precedes(a: NotableIndividual, b: NotableIndividual) -> bool:
+	if (a.sex == "m") != (b.sex == "m"):
+		return a.sex == "m"
+	return a.birth_tick < b.birth_tick
+
+
+static func _is_inherited(org: Organization, rule: TriggerRule) -> bool:
+	if org.ideology != null:
+		return org.ideology.legitimacy_basis == PoliticalSystemAxes.LegitimacyBasis.HEREDITARY
+	return rule == null or rule.method == TriggerRule.SuccessionMethod.PRIMOGENITURE
+
+
+## Whether anybody actually objects to the heir. Somebody has to have a reason:
+## the heir is visibly not up to it and a sibling is, an ambitious rival sees an
+## opening, or the seat is going sideways over the late head's own children.
+const OBJECTION_FITNESS_GAP := 1.4
+const AMBITIOUS_OBJECTION_CHANCE := 0.35
+const MINORITY_OBJECTION_CHANCE := 0.6
+
+
+static func _dispute_arises(org: Organization, candidates: Array[NotableIndividual],
+		heir: NotableIndividual, minority: bool, tick: int, rule: TriggerRule) -> bool:
+	if heir == null:
+		return false
+	var rng := RngService.stream(&"rules")
+	if minority and rng.randf() < MINORITY_OBJECTION_CHANCE:
+		return true
+
+	var heir_fitness := HousePartition.fitness(heir)
+	for p in candidates:
+		if p.person_id == heir.person_id:
+			continue
+		if HousePartition.fitness(p) - heir_fitness >= OBJECTION_FITNESS_GAP:
+			return true
+		if p.has_tag(&"ambitious") and rng.randf() < AMBITIOUS_OBJECTION_CHANCE:
+			return true
+	return false
 
 
 # ---------------------------------------------------------------- candidates
