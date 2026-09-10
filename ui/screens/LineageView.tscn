@@ -37,7 +37,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 104.0
+offset_top = 140.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2_graph")
@@ -49,7 +49,7 @@ anchor_right = 1.0
 offset_left = 12.0
 offset_top = 8.0
 offset_right = -12.0
-offset_bottom = 100.0
+offset_bottom = 136.0
 grow_horizontal = 2
 theme_override_constants/separation = 6
 
@@ -102,11 +102,24 @@ custom_minimum_size = Vector2(96, 44)
 layout_mode = 2
 text = "源流へ"
 
-[node name="FocusNote" type="Label" parent="Top"]
+[node name="NoteRow" type="HBoxContainer" parent="Top"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FocusNote" type="Label" parent="Top/NoteRow"]
 visible = false
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
 theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
 theme_override_font_sizes/font_size = 14
+
+[node name="ClearHouse" type="Button" parent="Top/NoteRow"]
+visible = false
+custom_minimum_size = Vector2(104, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "全家系へ"
 
 [node name="Results" type="PanelContainer" parent="."]
 visible = false
@@ -114,9 +127,9 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 12.0
-offset_top = 100.0
+offset_top = 140.0
 offset_right = -12.0
-offset_bottom = 420.0
+offset_bottom = 460.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("results_style")
 
@@ -155,12 +168,22 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.831373, 0.654902, 0.282353, 1)
 theme_override_font_sizes/font_size = 23
 
-[node name="Rename" type="Button" parent="Detail/Margin/Rows"]
+[node name="Actions" type="HBoxContainer" parent="Detail/Margin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Rename" type="Button" parent="Detail/Margin/Rows/Actions"]
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-size_flags_horizontal = 0
 theme_override_font_sizes/font_size = 16
 text = "名を改める"
+
+[node name="HouseTree" type="Button" parent="Detail/Margin/Rows/Actions"]
+visible = false
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "この家の家系図"
 
 [node name="Scroll" type="ScrollContainer" parent="Detail/Margin/Rows"]
 layout_mode = 2

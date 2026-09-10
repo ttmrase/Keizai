@@ -69,7 +69,14 @@ func _ready() -> void:
 	await _settle()
 	await _capture("%s/lineage_houses.png" % _out_dir)
 
-	lineage._show_people()
+	# That same family on its own: who carries the name, and who married into it.
+	lineage._open_house_tree()
+	lineage._toggle_scope()          # everyone, not just the heads
+	await _settle()
+	await _capture("%s/lineage_house_tree.png" % _out_dir)
+	lineage._toggle_scope()
+
+	lineage._show_all_people()
 	await _settle()
 
 	# The whole family at once: every house on one chart, joined by marriage.
@@ -91,6 +98,16 @@ func _ready() -> void:
 		lineage._update_focus_note()
 		await _settle()
 		await _capture("%s/lineage_focus.png" % _out_dir)
+
+	# And the chart a long press opens: one line of descent, with each generation
+	# of it shown beside its own brothers and sisters.
+	var kin_subject := _somebody_with_relatives()
+	if kin_subject != &"":
+		lineage._on_node_long_pressed(kin_subject)
+		await _settle()
+		await _capture("%s/lineage_kin.png" % _out_dir)
+	lineage._graph.clear_focus()
+	lineage._update_focus_note()
 
 	# The relations field, with a house picked out so the sheet is showing.
 	shell.show_tab("relations")
@@ -116,6 +133,29 @@ func _ready() -> void:
 
 	print("captured to %s" % _out_dir)
 	get_tree().quit(0)
+
+
+## Somebody far enough down the record to have ancestors above them, siblings
+## beside them and children below — so the chart shows all three.
+func _somebody_with_relatives() -> StringName:
+	var best := &""
+	var best_depth := -1
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		if p.father_id == &"" or p.children_ids.is_empty():
+			continue
+		var father := GameState.get_person(p.father_id)
+		if father == null or father.children_ids.size() < 2:
+			continue
+		var depth := 0
+		var walk := p
+		while walk != null and walk.father_id != &"" and depth < 20:
+			walk = GameState.get_person(walk.father_id)
+			depth += 1
+		if depth > best_depth:
+			best_depth = depth
+			best = id
+	return best
 
 
 func _settle() -> void:

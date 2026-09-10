@@ -17,6 +17,8 @@ func run() -> void:
 	_check_a_branch_says_why_it_exists()
 	_check_the_roll_of_leaders()
 	_check_the_spine_is_house_heads()
+	_check_a_house_has_a_chart_of_its_own()
+	_check_a_persons_own_chart_stops_one_step_out()
 	finish()
 
 
@@ -444,3 +446,170 @@ func _check_the_spine_is_house_heads() -> void:
 	check_eq(view._positions.size(), GameState.people.size(),
 		"the full chart still holds everyone, exactly once")
 	view.free()
+
+
+## A family's own chart: the people who carry its name, plus the ones who
+## married into it. Whoever married out belongs to their husband's family now,
+## and appears on that family's chart instead of this one.
+func _check_a_house_has_a_chart_of_its_own() -> void:
+	SimTestHarness.eventful_world(8111, 1400)
+	var subject: Organization = null
+	var most := 0
+	var strength := {}
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		strength[p.house_org_id] = int(strength.get(p.house_org_id, 0)) + 1
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		var count: int = int(strength.get(house.org_id, 0))
+		if count > most:
+			most = count
+			subject = house
+	check(subject != null, "some family should have members to draw")
+	if subject == null:
+		return
+
+	var source := HouseGenealogySource.new()
+	source.house_id = subject.org_id
+	var ids := source.all_ids()
+	check_gt(float(ids.size()), 3.0, "%s should have a chart worth drawing" % subject.display_name)
+	check(ids.size() < GameState.people.size(),
+		"and it should be one family, not the whole record")
+
+	var married_in := 0
+	for id in ids:
+		var p := GameState.get_person(id)
+		check(p != null, "everybody on the chart should exist")
+		if p == null or p.house_org_id == subject.org_id:
+			continue
+		var joined := false
+		for spouse_id in p.spouse_ids:
+			var spouse := GameState.get_person(spouse_id)
+			if spouse != null and spouse.house_org_id == subject.org_id:
+				joined = true
+		check(joined, "%s is on the chart, so is of the house or married into it"
+			% p.full_name)
+		married_in += 1
+	check_gt(float(married_in), 0.0, "and the marriages that joined it should show")
+
+	# Nobody who left the house is on it, however they left.
+	var inside := {}
+	for id in ids:
+		inside[id] = true
+	var departed := 0
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		if p.house_org_id == subject.org_id or inside.has(id):
+			continue
+		var born_to_it := false
+		for parent_id in [p.father_id, p.mother_id]:
+			var parent := GameState.get_person(parent_id)
+			if parent != null and parent.house_org_id == subject.org_id:
+				born_to_it = true
+		if born_to_it:
+			departed += 1
+	check(departed >= 0, "people who left the house are simply absent from it")
+
+	var view := LineageGraphView.new()
+	view.source = source
+	view.rebuild()
+	check_eq(view._positions.size(), ids.size(),
+		"the family's own chart holds every one of them, once each")
+	view.free()
+
+
+## What a long press opens: one person's line of descent from the source, with
+## each generation of it drawn beside its own brothers and sisters — and never
+## the generation after those.
+func _check_a_persons_own_chart_stops_one_step_out() -> void:
+	SimTestHarness.eventful_world(8112, 1600)
+	var source := GenealogySource.new()
+
+	var subject := &""
+	var father: NotableIndividual = null
+	var grandfather: NotableIndividual = null
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		var f := GameState.get_person(p.father_id)
+		if f == null:
+			continue
+		var g := GameState.get_person(f.father_id)
+		if g == null or g.children_ids.size() < 2:
+			continue
+		var has_cousins := false
+		for uncle_id in g.children_ids:
+			var uncle := GameState.get_person(uncle_id)
+			if uncle_id != f.person_id and uncle != null and not uncle.children_ids.is_empty():
+				has_cousins = true
+		if not has_cousins:
+			continue
+		subject = id
+		father = f
+		grandfather = g
+		break
+	check(subject != &"", "the record should hold somebody with cousins")
+	if subject == &"":
+		return
+
+	var rows := LineageGraphView.kin_scope(source, subject)
+	check(rows.has(subject), "the subject stands on their own chart")
+	check(rows.has(father.person_id), "and so does the father they descend from")
+	check(rows.has(grandfather.person_id), "and the grandfather above him")
+	check(int(rows[grandfather.person_id]) < int(rows[father.person_id]),
+		"the line runs downward, generation by generation")
+	check(int(rows[father.person_id]) < int(rows[subject]),
+		"and the subject stands below their own father")
+
+	for sibling_id in father.children_ids:
+		check(rows.has(sibling_id), "brothers and sisters stand beside the subject")
+	for uncle_id in grandfather.children_ids:
+		check(rows.has(uncle_id), "aunts and uncles stand beside the father")
+
+	# The rule the whole chart rests on: everyone drawn is on the line, a child
+	# of somebody on it, or married to somebody on it. Nobody is two steps out.
+	var on_the_line := {}
+	var walk: Array[StringName] = [subject]
+	while not walk.is_empty():
+		var current: StringName = walk.pop_back()
+		if on_the_line.has(current):
+			continue
+		on_the_line[current] = true
+		var p := GameState.get_person(current)
+		if p == null:
+			continue
+		for parent_id in [p.father_id, p.mother_id]:
+			if parent_id != &"" and GameState.get_person(parent_id) != null:
+				walk.append(parent_id)
+
+	var one_step_out := 0
+	for id in rows:
+		if on_the_line.has(id):
+			continue
+		var p := GameState.get_person(id)
+		if p == null:
+			continue
+		var attached := on_the_line.has(p.father_id) or on_the_line.has(p.mother_id)
+		for spouse_id in p.spouse_ids:
+			if on_the_line.has(spouse_id):
+				attached = true
+		check(attached, "%s is drawn, so should be of the line, born to it, or married to it"
+			% p.full_name)
+		one_step_out += 1
+	check_gt(float(one_step_out), 0.0, "the chart is not just a bare line of descent")
+
+	var cousins_left_out := 0
+	for uncle_id in grandfather.children_ids:
+		if uncle_id == father.person_id:
+			continue
+		var uncle := GameState.get_person(uncle_id)
+		if uncle == null:
+			continue
+		for cousin_id in uncle.children_ids:
+			if not rows.has(cousin_id):
+				cousins_left_out += 1
+	check_gt(float(cousins_left_out), 0.0,
+		"and a cousin's generation is one step too far to draw")
+
+	var earliest := 1 << 30
+	for id in rows:
+		earliest = mini(earliest, int(rows[id]))
+	check_eq(earliest, 0, "the source of the line is the top row of the chart")

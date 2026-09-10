@@ -17,6 +17,12 @@ const FIELD := Vector2(1000.0, 1450.0)
 const ORBIT := 132.0
 ## Relations weaker than this are not worth a line.
 const RELATION_FLOOR := 0.2
+## How far back everything unconnected to the chosen family is pushed. Pushed
+## back rather than hidden: a relations chart that drops the rest of the world
+## stops being a map of it, and the shape of the field is half the reading.
+const UNLIT := 0.15
+## And how far forward the ties that were chosen come.
+const LIT_WIDTH := 1.8
 
 @onready var _canvas: PannableCanvas = $Canvas
 @onready var _detail: PanelContainer = $Detail
@@ -26,6 +32,9 @@ const RELATION_FLOOR := 0.2
 var _selected_id: StringName = &""
 ## house id -> where it is drawn, settled once per refresh.
 var _spots: Dictionary = {}
+## Whoever the selected family is directly tied to, plus the family itself.
+## Settled when the selection changes, because it is asked once per line drawn.
+var _lit: Dictionary = {}
 
 
 func _ready() -> void:
@@ -51,6 +60,7 @@ func _on_recalculated(_tick: int) -> void:
 
 func _refresh() -> void:
 	_settle_spots()
+	_settle_lit()
 	_canvas.queue_redraw()
 	if _selected_id != &"":
 		_show_detail(_selected_id)
@@ -112,6 +122,38 @@ func _settle_spots() -> void:
 		_spots[house.org_id] = anchor + Vector2(cos(angle), sin(angle)) * reach
 
 
+## Everyone the chosen family answers to, is answered by, or has an opinion of.
+func _settle_lit() -> void:
+	_lit.clear()
+	if _selected_id == &"":
+		return
+	_lit[_selected_id] = true
+	var house := GameState.get_organization(_selected_id)
+	if house == null:
+		return
+	if house.standing == Organization.Standing.RETAINER:
+		if house.liege_house_id != &"":
+			_lit[house.liege_house_id] = true
+		return
+	for retainer in Retainers.retainers_of(_selected_id):
+		_lit[retainer.org_id] = true
+	for id in _spots:
+		var other := GameState.get_organization(id)
+		if other == null or other.org_id == _selected_id:
+			continue
+		if other.standing != Organization.Standing.NOBLE:
+			continue
+		var value := (HouseRelations.relation(_selected_id, id)
+			+ HouseRelations.relation(id, _selected_id)) * 0.5
+		if absf(value) >= RELATION_FLOOR:
+			_lit[id] = true
+
+
+## A line is only worth its full weight when it is one of the chosen family's.
+func _tie_is_lit(a: StringName, b: StringName) -> bool:
+	return _selected_id == &"" or a == _selected_id or b == _selected_id
+
+
 func _seat_of(house: Organization) -> StringName:
 	if house.dynasty_seat_settlement_id != &"":
 		return house.dynasty_seat_settlement_id
@@ -127,15 +169,19 @@ func _radius_of(house: Organization) -> float:
 
 func _draw_field() -> void:
 	var font := _canvas.get_theme_default_font()
-	_draw_relations()
-	_draw_allegiances()
+	# Twice over: everything the chosen family is not part of first, then its own
+	# ties on top, so a lit line is never crossed out by a dim one drawn later.
+	_draw_relations(false)
+	_draw_allegiances(false)
+	_draw_relations(true)
+	_draw_allegiances(true)
 	for id in _spots:
 		_draw_house(GameState.get_organization(id), font)
 
 
 ## What the great families think of each other. Only ties strong enough to have a
 ## name are drawn, or the field is a ball of string.
-func _draw_relations() -> void:
+func _draw_relations(lit_pass: bool) -> void:
 	var nobles: Array[Organization] = []
 	for id in _spots:
 		var house := GameState.get_organization(id)
@@ -150,26 +196,33 @@ func _draw_relations() -> void:
 				+ HouseRelations.relation(b.org_id, a.org_id)) * 0.5
 			if absf(value) < RELATION_FLOOR:
 				continue
+			var lit := _tie_is_lit(a.org_id, b.org_id)
+			if lit != lit_pass:
+				continue
 			var colour: Color = Palette.GOOD if value > 0.0 else Palette.DANGER
-			colour.a = clampf(absf(value), 0.25, 0.9)
+			colour.a = clampf(absf(value), 0.25, 0.9) * (1.0 if lit else UNLIT)
+			var weight := absf(value) * 5.0 * (LIT_WIDTH if lit else 1.0)
 			_canvas.draw_line(_canvas.to_screen(_spots[a.org_id]),
 				_canvas.to_screen(_spots[b.org_id]), colour,
-				maxf(1.0, absf(value) * 5.0 * _canvas.view_zoom))
+				maxf(1.0, weight * _canvas.view_zoom))
 
 
 ## And how far the households below them can be trusted.
-func _draw_allegiances() -> void:
+func _draw_allegiances(lit_pass: bool) -> void:
 	for id in _spots:
 		var house := GameState.get_organization(id)
 		if house == null or house.standing != Organization.Standing.RETAINER:
 			continue
 		if not _spots.has(house.liege_house_id):
 			continue
+		var lit := _tie_is_lit(id, house.liege_house_id)
+		if lit != lit_pass:
+			continue
 		var colour := Palette.severity(1.0 - house.loyalty)
-		colour.a = 0.75
+		colour.a = 0.75 * (1.0 if lit else UNLIT)
 		_canvas.draw_line(_canvas.to_screen(_spots[id]),
 			_canvas.to_screen(_spots[house.liege_house_id]), colour,
-			maxf(1.0, 2.0 * _canvas.view_zoom))
+			maxf(1.0, (2.0 * (LIT_WIDTH if lit else 1.0)) * _canvas.view_zoom))
 
 
 func _draw_house(house: Organization, font: Font) -> void:
@@ -179,12 +232,16 @@ func _draw_house(house: Organization, font: Font) -> void:
 	var radius := _radius_of(house) * _canvas.view_zoom
 	var noble := house.standing == Organization.Standing.NOBLE
 	var fill: Color = Palette.HOUSE if noble else Palette.HOUSE.darkened(0.45)
+	# A family with no part in the chosen one's affairs stays on the field, but
+	# recedes into it.
+	var dim: float = 1.0 if _selected_id == &"" or _lit.has(house.org_id) else 0.34
 
-	_canvas.draw_circle(centre, radius, fill.darkened(0.4))
-	_canvas.draw_arc(centre, radius, 0, TAU, 28, fill, maxf(1.0, 2.0 * _canvas.view_zoom))
+	_canvas.draw_circle(centre, radius, _shade(fill.darkened(0.4), dim))
+	_canvas.draw_arc(centre, radius, 0, TAU, 28, _shade(fill, dim),
+		maxf(1.0, 2.0 * _canvas.view_zoom))
 	if _wears_a_crown(house):
 		_canvas.draw_arc(centre, radius + 7.0 * _canvas.view_zoom, 0, TAU, 32,
-			Palette.ACCENT, maxf(1.0, 2.5 * _canvas.view_zoom))
+			_shade(Palette.ACCENT, dim), maxf(1.0, 2.5 * _canvas.view_zoom))
 	if house.org_id == _selected_id:
 		_canvas.draw_arc(centre, radius + 13.0 * _canvas.view_zoom, 0, TAU, 32,
 			Palette.TEXT, 2.0)
@@ -195,7 +252,16 @@ func _draw_house(house: Organization, font: Font) -> void:
 	var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	_canvas.draw_string(font, centre + Vector2(-width * 0.5, radius + 20.0 * _canvas.view_zoom),
 		label, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
-		Palette.TEXT if noble else Palette.TEXT_MUTED)
+		_shade(Palette.TEXT if noble else Palette.TEXT_MUTED, dim))
+
+
+## The same colour, further away.
+func _shade(colour: Color, amount: float) -> Color:
+	if is_equal_approx(amount, 1.0):
+		return colour
+	var out := colour
+	out.a *= amount
+	return out
 
 
 func _wears_a_crown(house: Organization) -> bool:
@@ -218,10 +284,12 @@ func _on_tapped(world_position: Vector2) -> void:
 			closest = id
 	if closest_distance > 90.0:
 		_selected_id = &""
+		_settle_lit()
 		_detail.visible = false
 		_canvas.queue_redraw()
 		return
 	_selected_id = closest
+	_settle_lit()
 	_show_detail(closest)
 	_canvas.queue_redraw()
 

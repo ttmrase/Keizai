@@ -780,3 +780,49 @@ service, and draws the two relationships the world actually runs on — what the
 nobility thinks of each other, and how far the households below them can be
 trusted. It computes nothing of its own: HouseRelations, Retainers and HouseRank
 already hold all of it, and this is a reading rather than a second copy.
+
+---
+
+## Seventh iteration: three ways to read the same record
+
+Nothing new is simulated here. All three changes are about a reader being able
+to ask a narrower question than "show me everything".
+
+**A tie you picked out should be the one you can see.** The relations field
+draws every strong opinion between the nobility plus a loyalty line for every
+household in service, which at forty families is a lot of string. Tapping a
+family now lights its own ties and pushes the rest back — back rather than away,
+because a relations chart that drops the rest of the world stops being a map of
+it, and the shape of the field is half the reading. The lit ties are drawn in a
+second pass so a bright line is never crossed out by a dim one laid over it.
+
+**A family's own chart.** The seamless generational chart is the truthful view
+and an unreadable one for a single question: four centuries wide, and finding
+one family in it means tracing a surname across a hundred boxes.
+`HouseGenealogySource` narrows it to one house using nothing new — a person's
+surname *is* their house, so membership is already recorded. A bride who married
+in is on it under her new name; a daughter who married out is not, because she
+belongs to her husband's family now and is on their chart instead. The one
+addition is a spouse who kept their own house — a woman who heads hers, or the
+man who married into it — since they never joined but the marriage did, and a
+household drawn with one half missing is not a household.
+
+**One person's own chart, from the source.** Held rather than tapped, because a
+phone has one finger and no second mouse button, and the tree already spends the
+tap on selection. What it draws is the subject's line of descent all the way
+back to the source, with every generation of that line shown beside its own
+brothers and sisters: siblings next to the subject, aunts and uncles next to the
+parents, great-aunts next to the grandparents. What it never draws is the
+generation after those — following a cousin's children is how a chart of one
+person turns back into the family tree it was opened from.
+
+Its rows mean something different from the whole chart's. There, a row is a band
+of time, which is right when the subject is the world; here a row is a remove
+from the source of this one line, so a line that married across the generations
+doesn't leave an empty row in the middle of itself. Where two routes disagree —
+a family that married back into its own cousins puts one ancestor at two
+different removes — the deeper route wins, so the line only ever runs downward.
+The scope is settled by a pure function (`LineageGraphView.kin_scope`) rather
+than inside the view, which is what lets the suite assert the rule directly:
+everybody drawn is on the line, born to it, or married to it, and somebody's
+cousin is always left out.

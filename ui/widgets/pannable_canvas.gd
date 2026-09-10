@@ -8,6 +8,10 @@ extends Control
 ## Subclasses draw in world coordinates and convert with to_screen().
 
 signal canvas_tapped(world_position: Vector2)
+## A press held in place rather than tapped. Used as a second verb on a node —
+## the family tree opens a person's own chart with it — so a phone with one
+## finger and no right mouse button still has two things it can say.
+signal canvas_long_pressed(world_position: Vector2)
 
 @export var min_zoom: float = 0.35
 @export var max_zoom: float = 3.0
@@ -22,7 +26,15 @@ var _last_drag_position := Vector2.ZERO
 var _touch_points: Dictionary = {}
 var _pinch_reference: float = 0.0
 
+## A press that has not moved and has not yet been let go of.
+var _press_started_ms: int = -1
+var _press_position := Vector2.ZERO
+var _long_press_fired := false
+
 const TAP_SLOP := 12.0
+## Long enough not to fire while someone is deciding where to drag, short enough
+## that holding still feels deliberate rather than broken.
+const LONG_PRESS_MS := 480
 
 
 func to_screen(world_position: Vector2) -> Vector2:
@@ -48,6 +60,26 @@ func set_zoom_about(new_zoom: float, screen_anchor: Vector2) -> void:
 	queue_redraw()
 
 
+## Watches a held press. Cheap enough to leave running: it is one comparison per
+## frame while nothing is pressed.
+func _process(_delta: float) -> void:
+	if _press_started_ms < 0 or _long_press_fired:
+		return
+	if _drag_moved >= TAP_SLOP or _touch_points.size() > 1:
+		_press_started_ms = -1
+		return
+	if Time.get_ticks_msec() - _press_started_ms < LONG_PRESS_MS:
+		return
+	_long_press_fired = true
+	canvas_long_pressed.emit(to_world(_press_position))
+
+
+func _begin_press(at: Vector2) -> void:
+	_press_started_ms = Time.get_ticks_msec()
+	_press_position = at
+	_long_press_fired = false
+
+
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		_handle_touch(event)
@@ -68,13 +100,16 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_dragging = true
 			_drag_moved = 0.0
 			_last_drag_position = event.position
+			_begin_press(event.position)
 		else:
 			_dragging = false
+			_press_started_ms = -1
 			_pinch_reference = _touch_spread()
 	else:
 		_touch_points.erase(event.index)
-		if _dragging and _drag_moved < TAP_SLOP:
+		if _dragging and _drag_moved < TAP_SLOP and not _long_press_fired:
 			canvas_tapped.emit(to_world(event.position))
+		_press_started_ms = -1
 		if _touch_points.is_empty():
 			_dragging = false
 
@@ -103,9 +138,11 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 			if event.pressed:
 				_dragging = true
 				_drag_moved = 0.0
+				_begin_press(event.position)
 			else:
-				if _dragging and _drag_moved < TAP_SLOP:
+				if _dragging and _drag_moved < TAP_SLOP and not _long_press_fired:
 					canvas_tapped.emit(to_world(event.position))
+				_press_started_ms = -1
 				_dragging = false
 
 

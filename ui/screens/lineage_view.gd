@@ -14,6 +14,9 @@ enum Mode { INSTITUTIONS, HOUSES, PEOPLE }
 var _institution_source := OrganizationLineageSource.new()
 var _house_source := OrganizationLineageSource.new()
 var _people_source := GenealogySource.new()
+## The same family chart narrowed to one house. Empty means the whole world.
+var _house_tree_source := HouseGenealogySource.new()
+var _focus_house: StringName = &""
 var _mode := Mode.INSTITUTIONS
 ## People view only: draw the heads of houses, without everyone who married in.
 var _spine_only := true
@@ -30,8 +33,10 @@ var _spine_only := true
 @onready var _detail: PanelContainer = $Detail
 @onready var _detail_title: Label = $Detail/Margin/Rows/Title
 @onready var _detail_body: RichTextLabel = $Detail/Margin/Rows/Scroll/Body
-@onready var _focus_note: Label = $Top/FocusNote
-@onready var _rename_button: Button = $Detail/Margin/Rows/Rename
+@onready var _focus_note: Label = $Top/NoteRow/FocusNote
+@onready var _clear_house_button: Button = $Top/NoteRow/ClearHouse
+@onready var _rename_button: Button = $Detail/Margin/Rows/Actions/Rename
+@onready var _house_tree_button: Button = $Detail/Margin/Rows/Actions/HouseTree
 
 var _rename_dialog: RenameDialog
 
@@ -40,12 +45,15 @@ func _ready() -> void:
 	_house_source.root_kinds = [Organization.OrgKind.HOUSE]
 	_org_button.pressed.connect(_show_institutions)
 	_house_button.pressed.connect(_show_houses)
-	_people_button.pressed.connect(_show_people)
+	_people_button.pressed.connect(_show_all_people)
 	_scope_button.pressed.connect(_toggle_scope)
 	_root_button.pressed.connect(_jump_to_root)
+	_clear_house_button.pressed.connect(_show_all_people)
+	_house_tree_button.pressed.connect(_open_house_tree)
 	_search.text_submitted.connect(_run_search)
 	_search.text_changed.connect(_on_search_changed)
 	_graph.node_selected.connect(_on_node_selected)
+	_graph.node_long_pressed.connect(_on_node_long_pressed)
 	EventBus.game_loaded.connect(_rebuild)
 	EventBus.world_reset.connect(_rebuild)
 
@@ -97,13 +105,34 @@ func _show_houses() -> void:
 	_rebuild()
 
 
+## The 人物 tab always means the whole family, so reaching for it is also how a
+## reader gets back out of one house's chart.
+func _show_all_people() -> void:
+	_focus_house = &""
+	_show_people()
+
+
 func _show_people() -> void:
 	_mode = Mode.PEOPLE
-	_graph.set_source(_people_source)
+	_house_tree_source.house_id = _focus_house
+	_graph.set_source(_people_source if _focus_house == &"" else _house_tree_source)
 	_graph.spine_mode = _spine_only
 	_search.placeholder_text = "人物を探す"
 	_sync_modes()
 	_rebuild()
+
+
+## Opens the selected house's own family chart: the people who carry its name,
+## and the spouses who married into it. Reached from the house itself, because
+## that is where a reader is when they want it.
+func _open_house_tree() -> void:
+	if _mode != Mode.HOUSES:
+		return
+	var house := GameState.get_organization(_graph.selected_id)
+	if house == null or house.kind != Organization.OrgKind.HOUSE:
+		return
+	_focus_house = house.org_id
+	_show_people()
 
 
 ## The whole record at once is a wall of boxes; the line of house heads is a
@@ -148,6 +177,7 @@ func _sync_modes() -> void:
 			Palette.ACCENT if active else Palette.TEXT_MUTED)
 
 	_scope_button.visible = _mode != Mode.INSTITUTIONS
+	_clear_house_button.visible = _mode == Mode.PEOPLE and _focus_house != &""
 	match _mode:
 		Mode.HOUSES:
 			_scope_button.text = "側近家も" if not _house_source.include_retainers else "主家のみ"
@@ -162,20 +192,32 @@ func _rebuild() -> void:
 	_update_focus_note()
 	if _graph.selected_id != &"":
 		_show_detail(_graph.selected_id)
+	else:
+		# Switching views drops the selection, and a sheet describing whatever was
+		# open in the last one is worse than no sheet at all.
+		_detail.visible = false
 
 
 func _update_focus_note() -> void:
 	var focused: bool = _graph.is_focused()
 	_root_button.text = "全体へ" if focused else "源流へ"
-	_focus_note.visible = focused
-	if focused:
+	_focus_note.visible = true
+	if _graph.is_kin_focus():
+		_focus_note.text = "個人の系図：源流までの直系と、その各代のきょうだいまでを表示しています"
+	elif focused:
 		_focus_note.text = "焦点表示中：選んだ相手とその前後の代だけを表示しています"
+	elif _mode == Mode.PEOPLE and _focus_house != &"":
+		var house := GameState.get_organization(_focus_house)
+		_focus_note.text = "%sの家系図：嫁いできた配偶者を含み、他家へ出た人は除いています" \
+			% (house.display_name if house != null else "この家")
 	elif _mode == Mode.PEOPLE and _spine_only:
-		_focus_note.visible = true
-		_focus_note.text = "当主のみ表示中：誰かを選ぶとその人の系譜が開きます"
+		_focus_note.text = "当主のみ表示中：長押しでその人の系図が開きます"
+	elif _mode == Mode.PEOPLE:
+		_focus_note.text = "長押しでその人の系図が開きます"
 	elif _mode == Mode.HOUSES and not _house_source.include_retainers:
-		_focus_note.visible = true
 		_focus_note.text = "主家のみ表示中：側近家は「側近家も」で開きます"
+	else:
+		_focus_note.visible = false
 
 
 func _current_source() -> LineageSource:
@@ -183,7 +225,7 @@ func _current_source() -> LineageSource:
 		Mode.HOUSES:
 			return _house_source
 		Mode.PEOPLE:
-			return _people_source
+			return _people_source if _focus_house == &"" else _house_tree_source
 	return _institution_source
 
 
@@ -237,6 +279,10 @@ func _jump_to_root() -> void:
 		var root := GenealogyValidator.root_ancestor(id)
 		if root != null:
 			root_id = root.org_id
+	elif _focus_house != &"":
+		# Inside one house the source of the line is that house's own earliest
+		# member; the world's founders are somebody else's chart.
+		root_id = _earliest_of(_house_tree_source.roots())
 	else:
 		var founder := GenealogyValidator.founder_of(id)
 		if founder != null:
@@ -246,6 +292,30 @@ func _jump_to_root() -> void:
 		_graph.center_on_node(root_id)
 		_show_detail(root_id)
 		_graph.queue_redraw()
+
+
+func _earliest_of(ids: Array[StringName]) -> StringName:
+	var best := &""
+	var best_tick := 1 << 62
+	for id in ids:
+		var p := GameState.get_person(id)
+		if p != null and p.birth_tick < best_tick:
+			best_tick = p.birth_tick
+			best = id
+	return best
+
+
+## Holding a person opens their own chart rather than selecting them: the line
+## they descend from, and everyone one step off it at every generation.
+func _on_node_long_pressed(id: StringName) -> void:
+	if id == &"":
+		return
+	if _mode == Mode.PEOPLE:
+		_graph.focus_on_kin(id)
+	else:
+		_graph.focus_on(id)
+	_update_focus_note()
+	_show_detail(id)
 
 
 func _on_node_selected(id: StringName) -> void:
@@ -263,4 +333,5 @@ func _show_detail(id: StringName) -> void:
 	_detail_title.text = source.label(id)
 	_detail_body.text = source.detail(id)
 	_rename_button.visible = _mode != Mode.PEOPLE
+	_house_tree_button.visible = _mode == Mode.HOUSES
 	_detail.visible = true

@@ -9,6 +9,9 @@ extends PannableCanvas
 ## editor-flavoured nodes do not, and neither layout is anything GraphEdit does.
 
 signal node_selected(id: StringName)
+## Held rather than tapped. The family tree answers it by opening that person's
+## own chart; the institution trees have nothing extra to say and ignore it.
+signal node_long_pressed(id: StringName)
 
 ## Wide enough for a generated regime name — "ヴァル峠の守旧的な世襲専制" and the
 ## like — to fit without clipping at reading zoom.
@@ -25,6 +28,12 @@ var selected_id: StringName = &""
 ## When set, only these ids are laid out — focus mode.
 var _visible_ids: Dictionary = {}
 var _focus_active := false
+## Which kind of focus is showing: the ancestry-and-descendants view, or the
+## one-step-from-the-line kinship chart.
+var _kin_focus := false
+## Rows to use in place of the source's own idea of a generation, for a chart
+## whose rows mean descent from one person rather than a band of time.
+var _row_hint: Dictionary = {}
 ## Draw only the line of house heads, without the people who married in. The
 ## whole record at once is a thousand boxes wide; this is the readable form of
 ## it, and any of those boxes opens the rest.
@@ -53,6 +62,7 @@ func _ready() -> void:
 	min_zoom = 0.18
 	max_zoom = 1.8
 	canvas_tapped.connect(_on_tapped)
+	canvas_long_pressed.connect(_on_long_pressed)
 	draw.connect(_draw_tree)
 	resized.connect(_on_resized)
 
@@ -259,7 +269,7 @@ func _unit_rows(units: Array, unit_of: Dictionary, link_parent: Dictionary) -> A
 	for members in units:
 		var deepest := 0
 		for member in members:
-			deepest = maxi(deepest, source.generation(member))
+			deepest = maxi(deepest, _generation_of(member))
 		rows.append(deepest)
 
 	for pass_index in MAX_ROW_PASSES:
@@ -282,6 +292,15 @@ func _unit_rows(units: Array, unit_of: Dictionary, link_parent: Dictionary) -> A
 		for i in rows.size():
 			rows[i] -= earliest
 	return rows
+
+
+## Which row a person belongs on. Normally the band of time they were born in;
+## in a kinship chart, their remove from the source of the line, so the rows are
+## the generations of that one descent and nothing is left standing in a gap.
+func _generation_of(id: StringName) -> int:
+	if _row_hint.has(id):
+		return int(_row_hint[id])
+	return source.generation(id)
 
 
 func _unit_links(unit_of: Dictionary, link_parent: Dictionary, parents_of: Dictionary,
@@ -566,6 +585,8 @@ func focus_on(id: StringName, ancestor_depth: int = 12, descendant_depth: int = 
 					_visible_ids[in_law_id] = true
 
 	_focus_active = true
+	_kin_focus = false
+	_row_hint.clear()
 	selected_id = id
 	rebuild()
 	# Focus mode exists to be legible, so it opens at reading zoom rather than
@@ -574,8 +595,115 @@ func focus_on(id: StringName, ancestor_depth: int = 12, descendant_depth: int = 
 	center_on_node(id)
 
 
+## How far back a kinship chart goes. It runs to the source of the line, so the
+## limit is only there to stop a record that somehow loops.
+const KIN_ANCESTOR_DEPTH := 24
+const KIN_ZOOM := 0.8
+const KIN_VERTICAL_ANCHOR := 0.46
+
+
+## One person's own chart: their line of descent from the source, and everyone
+## exactly one step off it.
+##
+## The difference from focus_on is what gets expanded. Focus mode opens the
+## subject downward — children, grandchildren, great-grandchildren — and shows
+## the ancestry as a thin thread above. This shows the thread and its immediate
+## family at every level: siblings beside the subject, aunts and uncles beside
+## the parents, great-aunts beside the grandparents, all the way up. What it
+## never does is expand any of them, because a chart that follows every cousin's
+## children is the whole family tree again, which is the thing this is an
+## alternative to.
+## The people a kinship chart shows, and the row each of them belongs on.
+##
+## Rows here mean remove from the source of the line rather than a band of time:
+## row 0 is the furthest ancestor, and every step down is one generation of this
+## person's own descent. That is what keeps the chart from leaving a whole row
+## empty whenever somebody married across the generations.
+##
+## Where two routes disagree — a family that married back into itself puts the
+## same person at two different removes — the deeper one wins, so the line only
+## ever runs downward.
+static func kin_scope(from: LineageSource, id: StringName) -> Dictionary:
+	var rows := {}
+	if from == null or not from.exists(id):
+		return rows
+
+	var above := {id: 0}
+	var frontier: Array = [id]
+	while not frontier.is_empty():
+		var current: StringName = frontier.pop_front()
+		var step: int = int(above[current]) + 1
+		if step > KIN_ANCESTOR_DEPTH:
+			continue
+		for parent_id in from.parents(current):
+			if not from.exists(parent_id):
+				continue
+			if above.has(parent_id) and int(above[parent_id]) >= step:
+				continue
+			above[parent_id] = step
+			frontier.append(parent_id)
+
+	var source_remove := 0
+	for ancestor_id in above:
+		source_remove = maxi(source_remove, int(above[ancestor_id]))
+
+	for ancestor_id in above:
+		rows[ancestor_id] = source_remove - int(above[ancestor_id])
+	# One step out from the line, and no further. A brother is drawn; his sons
+	# are not, because following them is how a chart of one person turns back
+	# into the family tree it was opened from.
+	for ancestor_id in above:
+		var row: int = int(rows[ancestor_id])
+		for child_id in from.children(ancestor_id):
+			if above.has(child_id) or not from.exists(child_id):
+				continue
+			rows[child_id] = maxi(int(rows.get(child_id, row + 1)), row + 1)
+		for spouse_id in from.spouses(ancestor_id):
+			if above.has(spouse_id) or not from.exists(spouse_id):
+				continue
+			rows[spouse_id] = maxi(int(rows.get(spouse_id, row)), row)
+	return rows
+
+
+## One person's own chart: their line of descent from the source, and everyone
+## exactly one step off it.
+##
+## The difference from focus_on is what gets expanded. Focus mode opens the
+## subject downward — children, grandchildren, great-grandchildren — and shows
+## the ancestry as a thin thread above. This shows the thread and its immediate
+## family at every level: siblings beside the subject, aunts and uncles beside
+## the parents, great-aunts beside the grandparents, all the way up.
+func focus_on_kin(id: StringName) -> void:
+	if source == null or not source.exists(id):
+		return
+	if not source.is_generational():
+		focus_on(id)
+		return
+
+	var rows := kin_scope(source, id)
+	if rows.is_empty():
+		return
+	_visible_ids.clear()
+	_row_hint.clear()
+	for person_id in rows:
+		_visible_ids[person_id] = true
+		_row_hint[person_id] = rows[person_id]
+
+	_focus_active = true
+	_kin_focus = true
+	selected_id = id
+	rebuild()
+	# Opened far enough out to see several generations of the line at once, and
+	# with the subject below the middle, because the half worth reading first is
+	# the one above them.
+	view_zoom = clampf(KIN_ZOOM, min_zoom, max_zoom)
+	center_on_node(id, KIN_VERTICAL_ANCHOR)
+
+
 func clear_focus() -> void:
 	_focus_active = false
+	_kin_focus = false
+	_row_hint.clear()
 	_visible_ids.clear()
 	rebuild()
 	frame_all()
@@ -585,19 +713,23 @@ func is_focused() -> bool:
 	return _focus_active
 
 
+func is_kin_focus() -> bool:
+	return _focus_active and _kin_focus
+
+
 ## Puts a node in the upper part of the view rather than the exact middle: the
 ## detail sheet covers the bottom, and a focused person's children are drawn
 ## below them, so dead-centring hides the half worth looking at.
 const FOCUS_VERTICAL_ANCHOR := 0.30
 
 
-func center_on_node(id: StringName) -> void:
+func center_on_node(id: StringName, vertical_anchor: float = FOCUS_VERTICAL_ANCHOR) -> void:
 	if not _positions.has(id):
 		return
 	# Centre the household, not one of its two halves.
 	var anchor_x: float = _child_anchor.get(id, _positions[id].x + NODE_SIZE.x * 0.5)
 	var target := Vector2(anchor_x, _positions[id].y + NODE_SIZE.y * 0.5)
-	view_offset = Vector2(size.x * 0.5, size.y * FOCUS_VERTICAL_ANCHOR) - target * view_zoom
+	view_offset = Vector2(size.x * 0.5, size.y * vertical_anchor) - target * view_zoom
 	queue_redraw()
 
 
@@ -729,3 +861,12 @@ func _on_tapped(world_position: Vector2) -> void:
 	selected_id = &""
 	node_selected.emit(&"")
 	queue_redraw()
+
+
+func _on_long_pressed(world_position: Vector2) -> void:
+	for id in _positions:
+		if not Rect2(_positions[id], NODE_SIZE).has_point(world_position):
+			continue
+		selected_id = id
+		node_long_pressed.emit(id)
+		return
