@@ -277,6 +277,11 @@ static func _refound(polity: Organization, winner: Organization, basis: int,
 	heir.resources = polity.resources.duplicate()
 	heir.governs_settlement_ids = polity.governs_settlement_ids.duplicate()
 	heir.legitimacy = FRESH_LEGITIMACY
+	# The successor inherits the settlement of the upheaval that made it, not a
+	# clean slate. Without this a refounding resets the clock that was meant to
+	# stop regimes falling twice in a lifetime, and the country chain-collapses:
+	# a hard century produced a hundred and sixty states rather than a handful.
+	heir.last_fired_tick[&"regime_shift"] = tick
 
 	heir.ideology = polity.ideology.clone()
 	heir.ideology.legitimacy_basis = basis
