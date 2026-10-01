@@ -43,6 +43,21 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
+	# The title over everything, and the first card of the guide.
+	var title := TitleScreen.new()
+	shell.add_child(title)
+	for i in 40:
+		await get_tree().process_frame
+	await _capture("%s/title.png" % _out_dir)
+	title._menu.visible = false
+	title._guide_index = 0
+	title._show_guide_card()
+	for i in 20:
+		await get_tree().process_frame
+	await _capture("%s/title_guide.png" % _out_dir)
+	title.queue_free()
+	await _settle()
+
 	for tab in shell.TABS:
 		shell.show_tab(tab["id"])
 		await _settle()

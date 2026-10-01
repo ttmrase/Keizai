@@ -40,7 +40,7 @@ var _resume_speed := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_stack = VBoxContainer.new()
 	_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stack.add_theme_constant_override("separation", 6)
@@ -171,7 +171,13 @@ static func _item(e: HistoryEvent, weight: int, label: String, colour: Color,
 # --------------------------------------------------------------- headlines
 
 func _show_card(item: Dictionary) -> void:
+	# The same headline twice in a row (the same calamity called down again) is
+	# one piece of news: the old card makes way for the new one.
+	for shown in _shown.duplicate():
+		if shown.get_meta("text", "") == item["text"]:
+			_dismiss(shown)
 	var card := PanelContainer.new()
+	card.set_meta("text", item["text"])
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	var box := StyleBoxFlat.new()
 	box.bg_color = Color(0.07, 0.06, 0.05, 0.95)

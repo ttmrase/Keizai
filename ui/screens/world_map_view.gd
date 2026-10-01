@@ -155,28 +155,9 @@ func _frame_world() -> void:
 # ------------------------------------------------------------------ the land
 
 func _build_land() -> void:
-	var noise := FastNoiseLite.new()
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	noise.frequency = 0.012
-	noise.fractal_octaves = 4
-	var texture := NoiseTexture2D.new()
-	texture.width = 256
-	texture.height = 256
-	texture.seamless = true
-	texture.generate_mipmaps = true
-	texture.noise = noise
-
-	_land_material = ShaderMaterial.new()
-	_land_material.shader = load("res://ui/shaders/world_map.gdshader")
-	_land_material.set_shader_parameter("noise_tex", texture)
+	_land_material = MapMaterial.create()
 	_land_material.set_shader_parameter("map_size", MAP_SIZE)
 	_land_material.set_shader_parameter("aspect", Vector2(1.0, MAP_SIZE.y / MAP_SIZE.x))
-	_land_material.set_shader_parameter("vellum", Palette.VELLUM)
-	_land_material.set_shader_parameter("vellum_light", Palette.VELLUM_LIGHT)
-	_land_material.set_shader_parameter("ink", Palette.INK)
-	_land_material.set_shader_parameter("sea", Palette.SEA)
-	_land_material.set_shader_parameter("sea_light", Palette.SEA_LIGHT)
-	_land_material.set_shader_parameter("gold", Palette.ACCENT)
 
 	_land = ColorRect.new()
 	_land.material = _land_material
