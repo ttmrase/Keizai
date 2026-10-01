@@ -48,6 +48,43 @@ func _ready() -> void:
 		await _settle()
 		await _capture("%s/%s.png" % [_out_dir, tab["id"]])
 
+	# The news reaching the reader: two headlines over the map, then a rupture.
+	shell.show_tab("map")
+	await _settle()
+	var news: NewsFeed = shell._news
+	GodPowerAPI.trigger_disaster(&"plague", &"", 1.0)
+	for e in HistoryLog.buffer.slice(maxi(0, HistoryLog.buffer.size() - 400)):
+		if NewsFeed.classify(e)["weight"] == NewsFeed.Weight.NOTABLE \
+				and e.event_type != HistoryEvent.EventType.DISASTER_OCCURRED:
+			news._show_card(NewsFeed.classify(e))
+			break
+	news._show_card(NewsFeed.classify(HistoryLog.buffer[HistoryLog.buffer.size() - 1]))
+	for i in 12:
+		await get_tree().process_frame
+	await _capture("%s/news_cards.png" % _out_dir)
+	var rupture := HistoryEvent.new()
+	rupture.event_type = HistoryEvent.EventType.INCIDENT
+	rupture.tick = SimClock.current_tick
+	rupture.payload = {"incident_kind": "capital_seizure"}
+	rupture.description = "門前会議がウド森を制圧した。門は内から開かれ、誰も血を流さずに国の主が替わった。"
+	var item := NewsFeed.classify(rupture)
+	item["paused"] = true
+	news._show_banner(item)
+	for i in 20:
+		await get_tree().process_frame
+	var fall := HistoryEvent.new()
+	fall.event_type = HistoryEvent.EventType.POWER_TRANSFER
+	fall.tick = SimClock.current_tick
+	fall.payload = {"regime_change": true}
+	fall.description = "開かれた神権評議制は倒れ、中央集権的な軍事評議制が国を継いだ。"
+	news._follow_up(NewsFeed.classify(fall))
+	for i in 6:
+		await get_tree().process_frame
+	await _capture("%s/news_banner.png" % _out_dir)
+	news._close_banner(0.0)
+	news._clear()
+	await _settle()
+
 	# The chronicle narrowed to one family, which is how a house is followed.
 	shell.show_tab("chronicle")
 	await _settle()

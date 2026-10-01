@@ -21,6 +21,7 @@ const TABS := [
 
 var _screens: Dictionary = {}
 var _current_id: String = ""
+var _news: NewsFeed
 
 @onready var _status: Control = $Root/StatusBar
 @onready var _screen_host: Control = $Root/ScreenHost
@@ -30,6 +31,11 @@ var _current_id: String = ""
 func _ready() -> void:
 	_build_dock()
 	_status.speed_changed.connect(_on_speed_changed)
+	# The news sits over the screens and under nothing: whatever is open, a
+	# headline can reach the reader.
+	_news = NewsFeed.new()
+	_screen_host.add_child(_news)
+	_news.open_tab.connect(show_tab)
 	show_tab("map")
 
 
@@ -68,6 +74,9 @@ func show_tab(id: String) -> void:
 		active.visible = true
 		if active.has_method("on_shown"):
 			active.on_shown()
+	if _news != null:
+		_news.visible = true
+		_screen_host.move_child(_news, _screen_host.get_child_count() - 1)
 	_sync_dock()
 
 
