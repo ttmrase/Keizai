@@ -39,6 +39,7 @@ func _ready() -> void:
 	_news = NewsFeed.new()
 	_screen_host.add_child(_news)
 	_news.open_tab.connect(show_tab)
+	_news.reveal_requested.connect(reveal)
 	show_tab("map")
 
 
@@ -56,7 +57,10 @@ func _build_dock() -> void:
 
 ## The incidents tab carries a mark while any rupture stands close, so the
 ## pressure can be noticed from anywhere rather than only by going to look.
-func _on_recalculated(_tick: int) -> void:
+func _on_recalculated(tick: int) -> void:
+	# The power screen's memory of who has been rising is kept here, where it
+	# is fed whichever screen happens to be open.
+	PowerHistory.sample(tick)
 	var close := false
 	for entry in Incidents.pressures():
 		if float(entry["pressure"]) >= BADGE_PRESSURE:
@@ -80,6 +84,8 @@ func show_tab(id: String) -> void:
 			if tab["id"] == id:
 				var screen: Control = load(tab["scene"]).instantiate()
 				screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+				if screen.has_signal("reveal_requested"):
+					screen.reveal_requested.connect(reveal)
 				_screen_host.add_child(screen)
 				_screens[id] = screen
 				break
@@ -92,6 +98,17 @@ func show_tab(id: String) -> void:
 		_news.visible = true
 		_screen_host.move_child(_news, _screen_host.get_child_count() - 1)
 	_sync_dock()
+
+
+## Opens the family tree on a person or organization — wherever a screen or a
+## headline names somebody, this is how the reader follows them. The tree is
+## given a frame to take its size first, because it centres on what it opens.
+func reveal(id: StringName) -> void:
+	show_tab("lineage")
+	await get_tree().process_frame
+	var lineage: Control = _screens.get("lineage")
+	if lineage != null and lineage.has_method("reveal"):
+		lineage.reveal(id)
 
 
 func _sync_dock() -> void:

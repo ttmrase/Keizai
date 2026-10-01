@@ -73,7 +73,7 @@ func sublabel(id: StringName) -> String:
 
 func colour(id: StringName) -> Color:
 	var org := GameState.get_organization(id)
-	return Palette.for_kind(org.kind) if org != null else Palette.TEXT_MUTED
+	return Heraldry.of_org(org) if org != null else Palette.TEXT_MUTED
 
 
 func is_faded(id: StringName) -> bool:

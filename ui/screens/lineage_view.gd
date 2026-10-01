@@ -170,11 +170,7 @@ func _most_notable_living() -> StringName:
 func _sync_modes() -> void:
 	for entry in [[_org_button, Mode.INSTITUTIONS], [_house_button, Mode.HOUSES],
 			[_people_button, Mode.PEOPLE]]:
-		var button: Button = entry[0]
-		var active: bool = _mode == entry[1]
-		button.button_pressed = active
-		button.add_theme_color_override("font_color",
-			Palette.ACCENT if active else Palette.TEXT_MUTED)
+		Palette.style_pill(entry[0], _mode == entry[1])
 
 	_scope_button.visible = _mode != Mode.INSTITUTIONS
 	_clear_house_button.visible = _mode == Mode.PEOPLE and _focus_house != &""
@@ -258,6 +254,31 @@ func _on_result_chosen(id: StringName) -> void:
 	_results.visible = false
 	_search.text = ""
 	_graph.focus_on(id)
+	_update_focus_note()
+	_show_detail(id)
+
+
+## Opens whichever chart holds this person or organization, centred on them and
+## with their record open. It is how the chronicle and the news point at whoever
+## they are talking about, so the reader never has to go and search for them.
+func reveal(id: StringName) -> void:
+	_results.visible = false
+	if GameState.get_person(id) != null:
+		_focus_house = &""
+		_show_people()
+		_graph.focus_on_kin(id)
+	else:
+		var org := GameState.get_organization(id)
+		if org == null:
+			return
+		if org.kind == Organization.OrgKind.HOUSE:
+			if org.standing == Organization.Standing.RETAINER:
+				_house_source.include_retainers = true
+			_show_houses()
+		else:
+			_show_institutions()
+		_graph.focus_on(id)
+	_graph.selected_id = id
 	_update_focus_note()
 	_show_detail(id)
 

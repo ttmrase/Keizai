@@ -130,17 +130,25 @@ func sublabel(id: StringName) -> String:
 	return span
 
 
+## The colours of the house a person was born into, so a chart reads as
+## families: a spouse who married in carries their own house's colour beside
+## their partner's, and the join between two lines is visible at a glance.
 func colour(id: StringName) -> Color:
 	var p := GameState.get_person(id)
 	if p == null:
 		return Palette.TEXT_MUTED
-	var tenure := p.current_tenure()
-	if tenure != null:
-		var org := GameState.get_organization(tenure.org_id)
-		if org != null:
-			return Palette.for_kind(org.kind)
-	# Anyone who ever held office is worth picking out from the rest of the family.
-	return Palette.ACCENT if p.ever_held_office() else Palette.TEXT_MUTED
+	var house_id := p.birth_house_org_id if p.birth_house_org_id != &"" else p.house_org_id
+	if GameState.get_organization(house_id) == null:
+		return Palette.TEXT_MUTED
+	return Heraldry.of_id(house_id)
+
+
+## Office is marked rather than coloured, now that colour means family.
+func badge(id: StringName) -> StringName:
+	var p := GameState.get_person(id)
+	if p != null and p.is_alive() and p.current_tenure() != null:
+		return &"crown"
+	return &""
 
 
 func is_faded(id: StringName) -> bool:

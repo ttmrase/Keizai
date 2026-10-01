@@ -16,6 +16,8 @@ extends Control
 ## play reads as a sequence of headlines rather than a firehose.
 
 signal open_tab(id: String)
+## Asks for the family tree opened on whoever a headline is about.
+signal reveal_requested(id: StringName)
 
 enum Weight { NONE, NOTABLE, MAJOR }
 
@@ -164,8 +166,28 @@ static func classify(e: HistoryEvent) -> Dictionary:
 static func _item(e: HistoryEvent, weight: int, label: String, colour: Color,
 		glyph: StringName, tab: String) -> Dictionary:
 	return {"weight": weight, "label": label, "colour": colour, "glyph": glyph,
-		"tab": tab, "text": e.description,
+		"tab": tab, "text": e.description, "subject": subject_of(e),
 		"year": int(e.tick / SimConfig.TICKS_PER_YEAR)}
+
+
+## Who an event is about, for following it into the family tree. Births, deaths,
+## marriages and successions are about a person; a founding, a split or an end
+## is about the organization (and a split's subject is the new branch).
+static func subject_of(e: HistoryEvent) -> StringName:
+	var org_first := e.event_type in [HistoryEvent.EventType.FOUNDING,
+		HistoryEvent.EventType.SCHISM, HistoryEvent.EventType.DISSOLVED,
+		HistoryEvent.EventType.POWER_TRANSFER, HistoryEvent.EventType.IDEOLOGY_SHIFT,
+		HistoryEvent.EventType.INCIDENT]
+	var org_id := e.subject_org_id if GameState.get_organization(e.subject_org_id) != null else &""
+	var person_id := e.subject_person_id if GameState.get_person(e.subject_person_id) != null else &""
+	if person_id == &"":
+		for id in e.related_person_ids:
+			if GameState.get_person(id) != null:
+				person_id = id
+				break
+	if org_first:
+		return org_id if org_id != &"" else person_id
+	return person_id if person_id != &"" else org_id
 
 
 # --------------------------------------------------------------- headlines
@@ -228,7 +250,7 @@ func _show_card(item: Dictionary) -> void:
 	body.add_theme_color_override("font_color", Palette.TEXT)
 	text.add_child(body)
 
-	card.gui_input.connect(_on_card_input.bind(card, item["tab"]))
+	card.gui_input.connect(_on_card_input.bind(card, item))
 	_stack.add_child(card)
 	_shown.append(card)
 	while _shown.size() > MAX_SHOWN:
@@ -242,13 +264,22 @@ func _show_card(item: Dictionary) -> void:
 	tween.tween_callback(_dismiss.bind(card))
 
 
-func _on_card_input(event: InputEvent, card: Control, tab: String) -> void:
-	var tapped: bool = (event is InputEventMouseButton and not event.pressed) \
-		or (event is InputEventScreenTouch and not event.pressed)
-	if not tapped:
+func _on_card_input(event: InputEvent, card: Control, item: Dictionary) -> void:
+	# A touch also arrives as an emulated click; the click alone is listened to,
+	# so one tap is followed once.
+	if not (event is InputEventMouseButton and not event.pressed):
 		return
-	open_tab.emit(tab)
+	_follow(item)
 	_dismiss(card)
+
+
+## Goes where a headline points. One about a branch or a family opens the tree
+## on it, rather than leaving the reader to find it among everyone else.
+func _follow(item: Dictionary) -> void:
+	if item["tab"] == "lineage" and StringName(item.get("subject", &"")) != &"":
+		reveal_requested.emit(item["subject"])
+	else:
+		open_tab.emit(item["tab"])
 
 
 func _dismiss(card: Control) -> void:
@@ -346,7 +377,7 @@ func _show_banner(item: Dictionary) -> void:
 	var go := _banner_button("詳しく見る", true)
 	go.pressed.connect(func():
 		_close_banner(0.0)
-		open_tab.emit(item["tab"]))
+		_follow(item))
 	buttons.add_child(go)
 	rows.add_child(buttons)
 

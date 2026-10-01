@@ -3,7 +3,7 @@ extends Control
 const NAMES := [&"map", &"scroll", &"tree", &"web", &"flame", &"bars", &"sun",
 	&"claw", &"unrest", &"wheat", &"gem", &"pine", &"crown", &"coin", &"tower",
 	&"keep", &"mountain", &"plague", &"drought", &"sparkle", &"pause", &"play",
-	&"people", &"banner", &"altar"]
+	&"people", &"banner", &"altar", &"rings", &"candle", &"split", &"seal"]
 
 
 func _ready() -> void:

@@ -173,6 +173,28 @@ static func draw(ci: CanvasItem, glyph: StringName, centre: Vector2, size: float
 			_line(ci, centre, r, Vector2(0, -0.95), Vector2(0, 0.4), colour, w)
 			_line(ci, centre, r, Vector2(-0.45, -0.5), Vector2(0.45, -0.5), colour, w)
 			ci.draw_rect(Rect2(centre + Vector2(-0.75, 0.45) * r, Vector2(1.5, 0.4) * r), colour)
+		&"rings":
+			ci.draw_arc(centre + Vector2(-0.3, 0.1) * r, r * 0.5, 0.0, TAU, 20, colour, w)
+			ci.draw_arc(centre + Vector2(0.3, 0.1) * r, r * 0.5, 0.0, TAU, 20, colour, w)
+			_fill(ci, centre, r, [Vector2(0.3, -0.95), Vector2(0.48, -0.72),
+				Vector2(0.3, -0.52), Vector2(0.12, -0.72)], colour)
+		&"candle":
+			ci.draw_rect(Rect2(centre + Vector2(-0.28, -0.2) * r, Vector2(0.56, 1.0) * r), colour)
+			ci.draw_rect(Rect2(centre + Vector2(-0.6, 0.78) * r, Vector2(1.2, 0.18) * r), colour)
+			_fill(ci, centre, r, [Vector2(0, -0.95), Vector2(0.17, -0.55),
+				Vector2(0, -0.35), Vector2(-0.17, -0.55)], colour)
+		&"split":
+			_line(ci, centre, r, Vector2(0, 0.95), Vector2(0, 0.1), colour, w)
+			_line(ci, centre, r, Vector2(0, 0.1), Vector2(-0.6, -0.6), colour, w)
+			_line(ci, centre, r, Vector2(0, 0.1), Vector2(0.6, -0.6), colour, w)
+			ci.draw_circle(centre + Vector2(-0.6, -0.65) * r, r * 0.22, colour)
+			ci.draw_circle(centre + Vector2(0.6, -0.65) * r, r * 0.22, colour)
+		&"seal":
+			ci.draw_arc(centre, r * 0.78, 0.0, TAU, 24, colour, w)
+			_fill(ci, centre, r, [Vector2(0, -0.45), Vector2(0.13, -0.13),
+				Vector2(0.45, -0.1), Vector2(0.2, 0.12), Vector2(0.28, 0.45),
+				Vector2(0, 0.27), Vector2(-0.28, 0.45), Vector2(-0.2, 0.12),
+				Vector2(-0.45, -0.1), Vector2(-0.13, -0.13)], colour)
 		_:
 			ci.draw_circle(centre, r * 0.5, colour)
 

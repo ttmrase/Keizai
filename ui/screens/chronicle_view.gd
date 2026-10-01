@@ -2,8 +2,21 @@ extends Control
 
 ## The chronicle: what happened, newest first, with filters for the kinds of
 ## events worth following. This is where the game is actually read.
+##
+## It reads at two speeds. The births, marriages and deaths that make up most of
+## any year are a quiet line each, with a small mark for what kind of thing
+## happened; the events the news would have headlined — a house splitting, a
+## regime falling, a rupture — stand out as cards, so a reader scrolling back a
+## century sees its turning points first. Anything naming somebody can be tapped
+## to open the family tree on them.
+
+## Asks the shell to open the family tree on a person or organization.
+signal reveal_requested(id: StringName)
 
 const PAGE := 60
+## How far a finger may move between press and release and still be a tap
+## rather than the start of a scroll.
+const TAP_SLOP := 14.0
 
 const FILTERS := [
 	{"label": "すべて", "types": []},
@@ -42,9 +55,9 @@ func _ready() -> void:
 		button.text = FILTERS[i]["label"]
 		button.toggle_mode = true
 		button.focus_mode = Control.FOCUS_NONE
-		button.custom_minimum_size = Vector2(0, 46)
+		button.custom_minimum_size = Vector2(0, 42)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_size_override("font_size", 18)
+		button.add_theme_font_size_override("font_size", 17)
 		button.pressed.connect(_on_filter.bind(i))
 		_tabs.add_child(button)
 
@@ -153,10 +166,7 @@ func _on_filter(index: int) -> void:
 
 func _sync_tabs() -> void:
 	for i in _tabs.get_child_count():
-		var button: Button = _tabs.get_child(i)
-		button.button_pressed = i == _filter_index
-		button.add_theme_color_override("font_color",
-			Palette.ACCENT if button.button_pressed else Palette.TEXT_MUTED)
+		Palette.style_pill(_tabs.get_child(i), i == _filter_index)
 
 
 func _on_more() -> void:
@@ -223,49 +233,159 @@ func _rebuild() -> void:
 
 
 func _year_header(year: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
 	var label := Label.new()
 	label.text = "%d年" % year
 	label.add_theme_color_override("font_color", Palette.ACCENT)
-	label.add_theme_font_size_override("font_size", 16)
-	return label
+	label.add_theme_font_size_override("font_size", 17)
+	row.add_child(label)
+	var rule := ColorRect.new()
+	rule.color = Color(Palette.ACCENT, 0.22)
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(rule)
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 4)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.add_child(spacer)
+	box.add_child(row)
+	return box
 
 
 func _entry(e: HistoryEvent) -> Control:
+	var news := NewsFeed.classify(e)
+	var subject := NewsFeed.subject_of(e)
+	var entry: Control
+	if int(news["weight"]) == NewsFeed.Weight.NONE:
+		entry = _quiet_line(e)
+	else:
+		entry = _milestone(e, news)
+	if subject != &"":
+		entry.mouse_filter = Control.MOUSE_FILTER_PASS
+		entry.gui_input.connect(_on_entry_input.bind(subject))
+	return entry
+
+
+## One line for the ordinary business of a year.
+func _quiet_line(e: HistoryEvent) -> Control:
+	var look := _look_of(e)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
-
-	var marker := Panel.new()
-	marker.custom_minimum_size = Vector2(4, 0)
-	marker.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var style := StyleBoxFlat.new()
-	style.bg_color = _colour_for(e)
-	marker.add_theme_stylebox_override("panel", style)
-	row.add_child(marker)
+	var icon := GlyphIcon.make(look["glyph"], look["colour"], 20)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	icon.custom_minimum_size = Vector2(22, 28)
+	row.add_child(icon)
 
 	var text := Label.new()
 	text.text = e.description
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_color_override("font_color", Palette.TEXT)
-	text.add_theme_font_size_override("font_size", 19)
+	text.add_theme_color_override("font_color", look["ink"])
+	text.add_theme_font_size_override("font_size", 18)
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(text)
 	return row
 
 
-func _colour_for(e: HistoryEvent) -> Color:
+## A card for a turning point: what kind of turn it was, in its colour, over
+## the line itself. The ruptures are larger and lit from within.
+func _milestone(e: HistoryEvent, news: Dictionary) -> Control:
+	var major: bool = int(news["weight"]) == NewsFeed.Weight.MAJOR
+	var colour: Color = news["colour"]
+	var card := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Palette.PANEL.lerp(colour, 0.12 if major else 0.04)
+	box.border_color = colour if major else Color(colour, 0.85)
+	box.border_width_left = 4
+	if major:
+		box.border_width_top = 1
+		box.border_width_right = 1
+		box.border_width_bottom = 1
+		box.border_color = Color(colour, 0.7)
+		box.border_width_left = 5
+	box.set_corner_radius_all(10)
+	box.content_margin_left = 12
+	box.content_margin_right = 12
+	box.content_margin_top = 10 if major else 8
+	box.content_margin_bottom = 10 if major else 8
+	card.add_theme_stylebox_override("panel", box)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	var icon := GlyphIcon.make(news["glyph"], colour, 38 if major else 28)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(icon)
+
+	var rows := VBoxContainer.new()
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rows.add_theme_constant_override("separation", 2)
+	rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(rows)
+	var label := Label.new()
+	label.text = news["label"]
+	label.add_theme_font_size_override("font_size", 19 if major else 15)
+	label.add_theme_color_override("font_color", colour)
+	rows.add_child(label)
+	var text := Label.new()
+	text.text = e.description
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_theme_color_override("font_color", Palette.TEXT)
+	text.add_theme_font_size_override("font_size", 19 if major else 18)
+	rows.add_child(text)
+	return card
+
+
+## A tap, not the end of a scroll, follows the entry to whoever it names.
+var _press_at := Vector2.ZERO
+
+func _on_entry_input(event: InputEvent, subject: StringName) -> void:
+	# A touch also arrives as an emulated click; listening to the click alone
+	# keeps one tap from being followed twice.
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if event.pressed:
+		_press_at = event.global_position
+	elif event.global_position.distance_to(_press_at) <= TAP_SLOP:
+		reveal_requested.emit(subject)
+
+
+## The mark and the ink for an ordinary line. Births and marriages are the
+## background hum of the world and are written a little softer than deaths and
+## changes of hands.
+func _look_of(e: HistoryEvent) -> Dictionary:
 	match e.event_type:
+		HistoryEvent.EventType.BIRTH:
+			return {"glyph": &"sparkle", "colour": Palette.GOOD, "ink": Palette.TEXT_MUTED}
+		HistoryEvent.EventType.MARRIAGE:
+			return {"glyph": &"rings", "colour": Color("d0889a"), "ink": Palette.TEXT_MUTED}
+		HistoryEvent.EventType.DEATH:
+			return {"glyph": &"candle", "colour": Color(Palette.DANGER, 0.8), "ink": Palette.TEXT}
+		HistoryEvent.EventType.SUCCESSION:
+			return {"glyph": &"crown", "colour": Palette.POLITY, "ink": Palette.TEXT}
+		HistoryEvent.EventType.POWER_TRANSFER:
+			return {"glyph": &"banner", "colour": Palette.POLITY, "ink": Palette.TEXT}
 		HistoryEvent.EventType.SCHISM:
-			return Palette.ACCENT
-		HistoryEvent.EventType.DISSOLVED, HistoryEvent.EventType.DEATH:
-			return Palette.DANGER
-		HistoryEvent.EventType.SUCCESSION, HistoryEvent.EventType.POWER_TRANSFER:
-			return Palette.POLITY
-		HistoryEvent.EventType.INCIDENT:
-			return Palette.DANGER
-		HistoryEvent.EventType.DISASTER_OCCURRED:
-			return Palette.HOUSE
-		HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.MARRIAGE:
-			return Palette.GOOD
+			return {"glyph": &"split", "colour": Palette.ACCENT, "ink": Palette.TEXT}
 		HistoryEvent.EventType.FOUNDING:
-			return Palette.GUILD
-	return Palette.TEXT_DIM
+			return {"glyph": &"seal", "colour": Palette.GUILD, "ink": Palette.TEXT}
+		HistoryEvent.EventType.DISSOLVED:
+			return {"glyph": &"candle", "colour": Palette.TEXT_DIM, "ink": Palette.TEXT_MUTED}
+		HistoryEvent.EventType.INCIDENT:
+			return {"glyph": &"flame", "colour": Palette.DANGER, "ink": Palette.TEXT}
+		HistoryEvent.EventType.DISASTER_OCCURRED:
+			return {"glyph": &"drought", "colour": Palette.HOUSE, "ink": Palette.TEXT}
+		HistoryEvent.EventType.CONFLICT_DECLARED, HistoryEvent.EventType.CONFLICT_RESOLVED:
+			return {"glyph": &"unrest", "colour": Palette.DANGER, "ink": Palette.TEXT}
+		HistoryEvent.EventType.IDEOLOGY_SHIFT:
+			# A house's rank moving is written as a shift in what it stands for.
+			if e.payload.has("to_tier"):
+				var risen: bool = int(e.payload["to_tier"]) > int(e.payload.get("from_tier", 0))
+				return {"glyph": &"seal", "colour": Palette.ACCENT if risen else Palette.TEXT_DIM,
+					"ink": Palette.TEXT}
+			return {"glyph": &"scroll", "colour": Palette.RELIGION, "ink": Palette.TEXT}
+	return {"glyph": &"scroll", "colour": Palette.TEXT_DIM, "ink": Palette.TEXT_MUTED}

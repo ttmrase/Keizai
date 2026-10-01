@@ -883,18 +883,38 @@ func _draw_distant_marriage(a_id: StringName, b_id: StringName) -> void:
 		draw_line(s0, s1, colour, width)
 
 
+var _node_box := StyleBoxFlat.new()
+var _strip_box := StyleBoxFlat.new()
+
 func _draw_node(id: StringName) -> void:
 	var rect := Rect2(to_screen(_positions[id]), NODE_SIZE * view_zoom)
 	var accent: Color = source.colour(id)
 	var faded: bool = source.is_faded(id)
+	var chosen := id == selected_id
 	if faded:
 		accent = accent.darkened(0.45)
 
-	draw_rect(rect, Palette.PANEL_RAISED if not faded else Palette.PANEL, true)
-	draw_rect(rect, Palette.ACCENT if id == selected_id else accent, false,
-		maxf(1.0, (3.0 if id == selected_id else 1.5) * view_zoom))
-	# A colour bar on the leading edge survives zooming out further than text does.
-	draw_rect(Rect2(rect.position, Vector2(5.0 * view_zoom, rect.size.y)), accent, true)
+	# Rounded cards, the chosen one lifted with a gold glow; the leading edge
+	# carries the colour, because a colour bar survives zooming out further
+	# than text does.
+	var radius := int(maxf(2.0, 7.0 * view_zoom))
+	_node_box.bg_color = Palette.PANEL_RAISED if not faded else Palette.PANEL
+	_node_box.border_color = Palette.ACCENT if chosen else Color(accent, 0.75)
+	_node_box.set_border_width_all(int(maxf(1.0, (3.0 if chosen else 1.5) * view_zoom)))
+	_node_box.set_corner_radius_all(radius)
+	_node_box.shadow_color = Color(Palette.ACCENT, 0.35) if chosen else Color(0, 0, 0, 0.35)
+	_node_box.shadow_size = int((14.0 if chosen else 4.0) * view_zoom)
+	draw_style_box(_node_box, rect)
+	_strip_box.bg_color = accent
+	_strip_box.corner_radius_top_left = radius
+	_strip_box.corner_radius_bottom_left = radius
+	draw_style_box(_strip_box, Rect2(rect.position, Vector2(6.0 * view_zoom, rect.size.y)))
+
+	var mark: StringName = source.badge(id)
+	if mark != &"" and view_zoom >= 0.2:
+		var side := 18.0 * view_zoom
+		Glyph.draw(self, mark, rect.position + Vector2(rect.size.x - side * 0.9, side * 0.85),
+			side, Palette.ACCENT)
 
 	if view_zoom < 0.34:
 		return

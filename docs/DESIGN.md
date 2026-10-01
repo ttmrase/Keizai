@@ -958,3 +958,77 @@ and sixty states. The successor now inherits the settlement of the upheaval that
 made it. And ending a country is held to a harder bar than amending one, so a
 claim strong enough to rearrange the chamber does not automatically declare the
 state finished — the pressure keeps building until it clears.
+
+## Tenth iteration: a face for the record
+
+Nine iterations built a world worth watching and then asked the reader to watch
+it through lists. Everything in this pass is presentation — not one rule, weight
+or event changed, and the boundary test still holds every new screen to reading
+the world and never writing it. The aim was narrower than "prettier": every piece
+answers a question a player actually has and previously had to dig for.
+
+**The map is a map.** Settlements were dots on a dark field. The land is now a
+shader: a Voronoi partition of the continent around the settlements, warped by
+a seamless noise texture so borders wander, hatched coastlines, vellum grain, and
+each region washed in the colour of whatever the reader asked about — ruling
+house, faith, realm, unrest or industry. The view transform is passed as
+uniforms rather than by moving the rect, so panning costs nothing and never lags.
+On top of it, drawn in vector: roads to the nearest neighbours, terrain marks for
+each region's industry, keeps sized by population with the house banner, a crown
+on the capital, smoke over a starving town and fire over a rebellious one, and a
+ripple where each event lands. Calamities wash over the whole land, because in
+the core they are world-wide; the map shows that rather than pretending a god
+could aim them.
+
+**Heraldry.** Colours used to be per kind — every house the same brown. Houses,
+faiths and realms now get a tincture each, assigned greedily (the least-used
+colour among living kin, in id order) so neighbours on the map and siblings on
+the tree are told apart, and cached per world so a colour means the same family
+for the whole game. The same colour follows a family to the map, the relations
+web, the power rows and the family tree, where a person's card carries the
+colour of the house they were born into: a chart reads as families, and a
+marriage is visibly the join between two colours.
+
+**News comes to the reader.** At four times speed a kingdom can fall between two
+glances at the family tree. Events are sorted by how much a history will
+remember them: most are nothing, some are headlines (a cadet house, a new faith,
+a contested succession, a calamity) that slide in over whatever screen is open,
+rate-limited so a burst reads as a sequence; and the ruptures — incidents, a
+regime falling, a state refounded — take the whole screen and stop the clock
+until read, with a same-season aftermath folded into the same banner. The pause
+is a setting, on by default. The chronicle uses the same sorting, so its turning
+points stand out as cards against a quiet line per birth, marriage and death,
+each with a mark for what kind of thing it was.
+
+**Following a name.** Anything that names somebody can be tapped — a chronicle
+entry, a headline — and opens the family tree on them: a person in their own
+chart, a new branch in the house tree, an institution in its lineage. Before
+this, a reader who saw "X家が分かれた" had to remember the name, switch screens
+and search.
+
+**Who is coming, not only who is strongest.** The simulation keeps one power
+score per organization, deliberately — a float that changes every epoch is not
+history. But "who is rising" is the question a player brings to the power
+screen. So the UI keeps its own memory: the shell samples scores each epoch into
+a small ring buffer, the power rows draw it as a sparkline, and a real move over
+the last ten years is marked ▲/▼. Nothing in the simulation reads it, it is not
+saved, and it starts again on a new world or a load.
+
+**The god's panel says what a dial does.** Each dial shows its reading in words
+against bands around normal, and which living organizations gain if it is raised
+or lowered — read from their power profiles, so it is true by construction and
+changes as the world's cast changes. Calamities take two taps, show what they
+will do, and show how long a running one has left.
+
+**A title, and three cards.** The game opens on the world drifting under its
+name, with a way back into the running history (its year, form of rule and
+number of houses beneath) and a way to start another. The first time only, three
+cards say the one surprising thing about the game — the god can change the
+world and nothing else — and where to look. The shell is hidden beneath the
+title so a phone is never painting two maps.
+
+Two lessons. `set_anchors_preset` keeps a control's current rect by adjusting its
+offsets, so a control that sets its own anchors in `_ready` after layout ends up
+the size it already was — zero; `set_anchors_and_offsets_preset` is the call.
+And a chart that is coloured by family needs another channel for office, so
+office became a small crown in the card's corner rather than the colour.

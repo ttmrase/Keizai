@@ -23,6 +23,9 @@ func _ready() -> void:
 	ContentRegistry.ensure_loaded()
 	WorldGenerator.generate(_seed)
 	SimClock.start(0)
+	# The power screen remembers what it was shown; here nothing is shown while
+	# the world runs ahead, so it is fed directly.
+	EventBus.power_recalculated.connect(func(tick: int): PowerHistory.sample(tick))
 
 	# A world with something to show: monsters, then hardship, then plenty.
 	GodPowerAPI.set_monster_spawn_rate(2.2)
@@ -62,6 +65,21 @@ func _ready() -> void:
 		shell.show_tab(tab["id"])
 		await _settle()
 		await _capture("%s/%s.png" % [_out_dir, tab["id"]])
+
+	# Following the chronicle to whoever it names: the latest house split,
+	# opened in the tree on the new branch, and the latest death, on the person.
+	for kind in [HistoryEvent.EventType.SCHISM, HistoryEvent.EventType.DEATH]:
+		for i in range(HistoryLog.buffer.size() - 1, -1, -1):
+			var e: HistoryEvent = HistoryLog.buffer[i]
+			if e.event_type == kind and NewsFeed.subject_of(e) != &"" \
+					and not Retainers.is_service_household_event(e):
+				shell.reveal(NewsFeed.subject_of(e))
+				break
+		for f in 6:
+			await get_tree().process_frame
+		await _settle()
+		await _capture("%s/reveal_%s.png" % [_out_dir,
+			"branch" if kind == HistoryEvent.EventType.SCHISM else "person"])
 
 	# The news reaching the reader: two headlines over the map, then a rupture.
 	shell.show_tab("map")

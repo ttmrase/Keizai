@@ -295,28 +295,7 @@ func _build_chips() -> void:
 
 func _style_chips() -> void:
 	for i in _chips.get_child_count():
-		var chip: Button = _chips.get_child(i)
-		var active: bool = int(OVERLAYS[i]["id"]) == _overlay
-		chip.button_pressed = active
-		chip.add_theme_stylebox_override("normal", _pill(active))
-		chip.add_theme_stylebox_override("hover", _pill(active))
-		chip.add_theme_stylebox_override("pressed", _pill(true))
-		chip.add_theme_stylebox_override("hover_pressed", _pill(true))
-		chip.add_theme_color_override("font_color", Palette.INK if active else Palette.TEXT)
-		chip.add_theme_color_override("font_pressed_color", Palette.INK)
-		chip.add_theme_color_override("font_hover_color", Palette.INK if active else Palette.TEXT)
-		chip.add_theme_color_override("font_hover_pressed_color", Palette.INK)
-
-
-static func _pill(active: bool) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = Palette.ACCENT if active else Color(0.08, 0.07, 0.05, 0.78)
-	box.border_color = Palette.ACCENT if active else Color(1, 1, 1, 0.12)
-	box.set_border_width_all(1)
-	box.set_corner_radius_all(19)
-	box.content_margin_left = 8
-	box.content_margin_right = 8
-	return box
+		Palette.style_pill(_chips.get_child(i), int(OVERLAYS[i]["id"]) == _overlay)
 
 
 func _on_overlay(id: int) -> void:

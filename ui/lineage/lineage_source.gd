@@ -39,6 +39,12 @@ func is_faded(_id: StringName) -> bool:
 	return false
 
 
+## A small mark drawn in a node's corner — for a person, that they hold an office
+## now. Empty for none.
+func badge(_id: StringName) -> StringName:
+	return &""
+
+
 ## BBCode shown when a node is tapped.
 func detail(_id: StringName) -> String:
 	return ""

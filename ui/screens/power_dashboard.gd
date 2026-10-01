@@ -3,6 +3,21 @@ extends Control
 ## Who holds influence, and why. Tapping a bar opens the breakdown, which is the
 ## point: it names the world conditions the player created that put this
 ## organization where it is.
+##
+## Each row also says which way it is going — a line of the last decades and the
+## change over the last ten years — because the question a reader brings to this
+## screen is less "who is strongest" than "who is coming".
+
+const KIND_GLYPHS := {
+	Organization.OrgKind.POLITICAL_SYSTEM: &"crown",
+	Organization.OrgKind.GUILD: &"coin",
+	Organization.OrgKind.FACTION: &"banner",
+	Organization.OrgKind.HOUSE: &"keep",
+	Organization.OrgKind.RELIGION: &"altar",
+}
+## A change smaller than this over ten years reads as holding steady, and is
+## left unmarked.
+const STEADY := 3.0
 
 const KIND_FILTERS := [
 	{"label": "すべて", "kind": -1},
@@ -26,7 +41,7 @@ func _ready() -> void:
 		button.text = KIND_FILTERS[i]["label"]
 		button.toggle_mode = true
 		button.focus_mode = Control.FOCUS_NONE
-		button.custom_minimum_size = Vector2(0, 44)
+		button.custom_minimum_size = Vector2(0, 42)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.add_theme_font_size_override("font_size", 17)
 		button.pressed.connect(_on_filter.bind(i))
@@ -56,11 +71,7 @@ func _on_filter(index: int) -> void:
 
 func _sync_tabs() -> void:
 	for i in _tabs.get_child_count():
-		var button: Button = _tabs.get_child(i)
-		var active: bool = KIND_FILTERS[i]["kind"] == _filter
-		button.button_pressed = active
-		button.add_theme_color_override("font_color",
-			Palette.ACCENT if active else Palette.TEXT_MUTED)
+		Palette.style_pill(_tabs.get_child(i), KIND_FILTERS[i]["kind"] == _filter)
 
 
 func _rebuild() -> void:
@@ -82,8 +93,9 @@ func _rebuild() -> void:
 			_list.add_child(_government_banner(polity))
 
 	var strongest: float = maxf(1.0, ranked[0].power_score)
-	for org in ranked:
-		_list.add_child(_row(org, strongest))
+	for i in ranked.size():
+		var org: Organization = ranked[i]
+		_list.add_child(_row(org, strongest, i + 1))
 		if org.org_id == _expanded:
 			_list.add_child(_breakdown(org))
 
@@ -171,56 +183,122 @@ func _government_banner(polity: Organization) -> Control:
 	return panel
 
 
-func _row(org: Organization, strongest: float) -> Control:
+func _row(org: Organization, strongest: float, rank: int) -> Control:
+	var tint := Heraldry.of_org(org)
+	var open := org.org_id == _expanded
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(0, 62)
+	button.custom_minimum_size = Vector2(0, 66)
 	button.focus_mode = Control.FOCUS_NONE
 	button.flat = true
 	button.pressed.connect(_on_row_pressed.bind(org.org_id))
+	var back := StyleBoxFlat.new()
+	back.bg_color = Palette.PANEL if open else Color(0, 0, 0, 0)
+	back.corner_radius_top_left = 8
+	back.corner_radius_top_right = 8
+	if not open:
+		back.corner_radius_bottom_left = 8
+		back.corner_radius_bottom_right = 8
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		button.add_theme_stylebox_override(state, back)
 
-	var bar := ColorRect.new()
-	bar.color = Palette.for_kind(org.kind)
-	bar.color.a = 0.22
+	var bar := Panel.new()
+	var bar_box := StyleBoxFlat.new()
+	bar_box.bg_color = Color(tint, 0.2)
+	bar_box.set_corner_radius_all(8)
+	bar.add_theme_stylebox_override("panel", bar_box)
 	bar.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	bar.anchor_right = clampf(org.power_score / strongest, 0.02, 1.0)
+	bar.anchor_right = clampf(org.power_score / strongest, 0.04, 1.0)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(bar)
 
 	var accent := ColorRect.new()
-	accent.color = Palette.for_kind(org.kind)
+	accent.color = tint
 	accent.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	accent.offset_top = 6.0
+	accent.offset_bottom = -6.0
 	accent.offset_right = 4.0
 	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(accent)
 
+	var row := HBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 10
+	row.offset_right = -10
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+
+	var place := Label.new()
+	place.text = "%d" % rank
+	place.custom_minimum_size = Vector2(28, 0)
+	place.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	place.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	place.add_theme_font_size_override("font_size", 20 if rank <= 3 else 16)
+	place.add_theme_color_override("font_color", Palette.ACCENT if rank <= 3 else Palette.TEXT_DIM)
+	place.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(place)
+
+	var icon := GlyphIcon.make(KIND_GLYPHS.get(org.kind, &"seal"), tint, 26)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.add_theme_constant_override("separation", 0)
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(words)
 	var name_label := Label.new()
 	name_label.text = org.display_name
-	name_label.position = Vector2(14, 8)
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_label.add_theme_font_size_override("font_size", 20)
 	name_label.add_theme_color_override("font_color", Palette.TEXT)
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	button.add_child(name_label)
-
+	words.add_child(name_label)
 	var leader := GameState.get_current_leader(org.org_id)
 	var sub := Label.new()
 	sub.text = "%s・%d名　%s%s" % [_kind_note(org), org.member_count,
 		leader.full_name if leader != null else "指導者不在", _house_note(org)]
-	sub.position = Vector2(14, 34)
-	sub.add_theme_font_size_override("font_size", 15)
+	sub.clip_text = true
+	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	sub.add_theme_font_size_override("font_size", 14)
 	sub.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	button.add_child(sub)
+	words.add_child(sub)
 
+	var line := Sparkline.new()
+	line.values = PowerHistory.series(org.org_id)
+	line.colour = tint
+	line.custom_minimum_size = Vector2(70, 30)
+	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(line)
+
+	var numbers := VBoxContainer.new()
+	numbers.custom_minimum_size = Vector2(56, 0)
+	numbers.alignment = BoxContainer.ALIGNMENT_CENTER
+	numbers.add_theme_constant_override("separation", -4)
+	numbers.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(numbers)
 	var score := Label.new()
 	score.text = "%d" % int(org.power_score)
-	score.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	score.position = Vector2(-64, 14)
-	score.custom_minimum_size = Vector2(54, 0)
 	score.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	score.add_theme_font_size_override("font_size", 26)
 	score.add_theme_color_override("font_color", Palette.ACCENT)
 	score.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	button.add_child(score)
+	numbers.add_child(score)
+	# Only a real move is marked; a column of arrows saying "about the same"
+	# would hide the two rows that are actually going somewhere.
+	var change := PowerHistory.change(org.org_id)
+	if not is_nan(change) and absf(change) >= STEADY:
+		var trend := Label.new()
+		trend.text = "%s%d" % ["▲" if change > 0.0 else "▼", int(round(absf(change)))]
+		trend.add_theme_color_override("font_color",
+			Palette.GOOD if change > 0.0 else Palette.DANGER)
+		trend.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		trend.add_theme_font_size_override("font_size", 13)
+		trend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		numbers.add_child(trend)
 	return button
 
 
@@ -256,6 +334,8 @@ func _breakdown(org: Organization) -> Control:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Palette.PANEL
+	style.border_color = Color(Heraldry.of_org(org), 0.6)
+	style.border_width_left = 4
 	style.corner_radius_bottom_left = 8
 	style.corner_radius_bottom_right = 8
 	style.content_margin_left = 18
