@@ -136,6 +136,26 @@ func _ready() -> void:
 	await _settle()
 	await _capture("%s/relations.png" % _out_dir)
 
+	# The other questions the map can answer, and a calamity across it.
+	shell.show_tab("map")
+	await _settle()
+	var atlas: Control = shell._screens["map"]
+	atlas._on_overlay(1)
+	await _settle()
+	await _capture("%s/map_faith.png" % _out_dir)
+	atlas._on_overlay(3)
+	for id in GameState.world.settlements:
+		GameState.world.settlements[id].unrest = randf_range(0.2, 0.95)
+	atlas._refresh()
+	await _settle()
+	await _capture("%s/map_unrest.png" % _out_dir)
+	atlas._on_overlay(0)
+	GodPowerAPI.trigger_disaster(&"drought", &"", 1.3)
+	atlas._refresh()
+	for i in 20:
+		await get_tree().process_frame
+	await _capture("%s/map_drought.png" % _out_dir)
+
 	# A settlement selected on the map, so the detail sheet is visible.
 	shell.show_tab("map")
 	await _settle()

@@ -14,6 +14,7 @@ const TEXT_MUTED := Color("9a9080")
 const TEXT_DIM := Color("6a6357")
 
 const ACCENT := Color("d4a748")
+const ACCENT_SOFT := Color("8a6d32")
 const DANGER := Color("c85a4a")
 const GOOD := Color("7ab87a")
 
@@ -24,6 +25,13 @@ const HOUSE := Color("c8926f")
 const FACTION := Color("8fbf7a")
 const POLITY := Color("b48fd0")
 const RELIGION := Color("d0b48f")
+
+## The map: ink on old vellum, and a dark sea around it.
+const SEA := Color("101a22")
+const SEA_LIGHT := Color("1c2c38")
+const VELLUM := Color("3a3326")
+const VELLUM_LIGHT := Color("54493a")
+const INK := Color("1a1610")
 
 
 static func for_kind(kind: int) -> Color:
