@@ -23,7 +23,7 @@ grow_vertical = 2
 theme_override_constants/separation = 0
 
 [node name="StatusBar" type="Control" parent="Root"]
-custom_minimum_size = Vector2(0, 96)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
 script = ExtResource("2_status")
 
@@ -58,7 +58,7 @@ theme_override_constants/separation = 2
 [node name="Gauges" type="HBoxContainer" parent="Root/StatusBar/Rows"]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 14
 
 [node name="G0" type="Control" parent="Root/StatusBar/Rows/Gauges"]
 layout_mode = 2
@@ -90,6 +90,6 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="Dock" type="HBoxContainer" parent="Root"]
-custom_minimum_size = Vector2(0, 64)
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
 theme_override_constants/separation = 0

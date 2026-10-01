@@ -10,14 +10,17 @@ extends Control
 signal new_world_requested
 
 const TABS := [
-	{"id": "map", "label": "世界", "scene": "res://ui/screens/WorldMapView.tscn"},
-	{"id": "chronicle", "label": "年代記", "scene": "res://ui/screens/ChronicleView.tscn"},
-	{"id": "lineage", "label": "系譜", "scene": "res://ui/screens/LineageView.tscn"},
-	{"id": "relations", "label": "関係", "scene": "res://ui/screens/RelationsView.tscn"},
-	{"id": "incidents", "label": "事件", "scene": "res://ui/screens/IncidentsView.tscn"},
-	{"id": "power", "label": "勢力", "scene": "res://ui/screens/PowerDashboard.tscn"},
-	{"id": "god", "label": "神の力", "scene": "res://ui/screens/GodPowerPanel.tscn"},
+	{"id": "map", "label": "世界", "glyph": &"map", "scene": "res://ui/screens/WorldMapView.tscn"},
+	{"id": "chronicle", "label": "年代記", "glyph": &"scroll", "scene": "res://ui/screens/ChronicleView.tscn"},
+	{"id": "lineage", "label": "系譜", "glyph": &"tree", "scene": "res://ui/screens/LineageView.tscn"},
+	{"id": "relations", "label": "関係", "glyph": &"web", "scene": "res://ui/screens/RelationsView.tscn"},
+	{"id": "incidents", "label": "事件", "glyph": &"flame", "scene": "res://ui/screens/IncidentsView.tscn"},
+	{"id": "power", "label": "勢力", "glyph": &"bars", "scene": "res://ui/screens/PowerDashboard.tscn"},
+	{"id": "god", "label": "神の力", "glyph": &"sun", "scene": "res://ui/screens/GodPowerPanel.tscn"},
 ]
+
+## A rupture this close is worth a mark on its tab.
+const BADGE_PRESSURE := 0.75
 
 var _screens: Dictionary = {}
 var _current_id: String = ""
@@ -41,15 +44,26 @@ func _ready() -> void:
 
 func _build_dock() -> void:
 	for tab in TABS:
-		var button := Button.new()
-		button.text = tab["label"]
-		button.toggle_mode = true
-		button.focus_mode = Control.FOCUS_NONE
+		var button := DockButton.new()
+		button.glyph = tab["glyph"]
+		button.caption = tab["label"]
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size = Vector2(0, 60)
-		button.add_theme_font_size_override("font_size", 20)
+		button.custom_minimum_size = Vector2(0, 66)
 		button.pressed.connect(show_tab.bind(tab["id"]))
 		_dock.add_child(button)
+	EventBus.power_recalculated.connect(_on_recalculated)
+
+
+## The incidents tab carries a mark while any rupture stands close, so the
+## pressure can be noticed from anywhere rather than only by going to look.
+func _on_recalculated(_tick: int) -> void:
+	var close := false
+	for entry in Incidents.pressures():
+		if float(entry["pressure"]) >= BADGE_PRESSURE:
+			close = true
+	for i in TABS.size():
+		if TABS[i]["id"] == "incidents":
+			(_dock.get_child(i) as DockButton).badge = close
 
 
 func show_tab(id: String) -> void:
@@ -82,10 +96,9 @@ func show_tab(id: String) -> void:
 
 func _sync_dock() -> void:
 	for i in _dock.get_child_count():
-		var button: Button = _dock.get_child(i)
+		var button: DockButton = _dock.get_child(i)
 		button.button_pressed = TABS[i]["id"] == _current_id
-		button.add_theme_color_override("font_color",
-			Palette.ACCENT if button.button_pressed else Palette.TEXT_MUTED)
+		button.active = button.button_pressed
 
 
 func _on_speed_changed(scale: float) -> void:
@@ -100,3 +113,7 @@ func request_new_world() -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Palette.BG)
+	# The dock sits on its own panel, ruled off from the screen above it.
+	var dock_top := _dock.position.y
+	draw_rect(Rect2(Vector2(0, dock_top), Vector2(size.x, size.y - dock_top)), Palette.PANEL)
+	draw_line(Vector2(0, dock_top), Vector2(size.x, dock_top), Palette.LINE, 1.0)
