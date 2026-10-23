@@ -1,9 +1,14 @@
 class_name PannableCanvas
 extends Control
 
-## Pan and zoom for the two views that need it: the world map and the lineage
-## trees. Handles touch drag, pinch, and mouse wheel, and reports taps that were
-## not part of a drag so a subclass can treat them as selection.
+## Pan and zoom for the views that need it: the world map, the relations web
+## and the lineage trees. Handles touch drag, pinch, and mouse wheel, and reports
+## taps that were not part of a drag so a subclass can treat them as selection.
+##
+## On a phone, drags and taps are read from the touches alone. Godot also makes
+## up a mouse event from every touch, and reading both moved the view twice as
+## far as the finger and kept panning under a pinch. A drag let go of while
+## still moving glides on and slows, as a scrolling list does.
 ##
 ## Subclasses draw in world coordinates and convert with to_screen().
 
@@ -35,6 +40,16 @@ const TAP_SLOP := 12.0
 ## Long enough not to fire while someone is deciding where to drag, short enough
 ## that holding still feels deliberate rather than broken.
 const LONG_PRESS_MS := 480
+## A release slower than this (screen pixels a second) just stops.
+const FLING_MIN_SPEED := 260.0
+## How quickly a glide dies away, per second; the glide is gone in about a second.
+const FLING_FRICTION := 4.5
+## A finger that held still this long before letting go meant to stop there.
+const FLING_STALE_MS := 90
+
+var _velocity := Vector2.ZERO
+var _last_drag_ms := 0
+var _fling := Vector2.ZERO
 
 
 func to_screen(world_position: Vector2) -> Vector2:
@@ -60,9 +75,15 @@ func set_zoom_about(new_zoom: float, screen_anchor: Vector2) -> void:
 	queue_redraw()
 
 
-## Watches a held press. Cheap enough to leave running: it is one comparison per
-## frame while nothing is pressed.
-func _process(_delta: float) -> void:
+## Watches a held press and carries a glide on. Cheap enough to leave running: a
+## couple of comparisons a frame while nothing is happening.
+func _process(delta: float) -> void:
+	if _fling != Vector2.ZERO:
+		view_offset += _fling * delta
+		_fling *= exp(-FLING_FRICTION * delta)
+		if _fling.length() < 20.0:
+			_fling = Vector2.ZERO
+		queue_redraw()
 	if _press_started_ms < 0 or _long_press_fired:
 		return
 	if _drag_moved >= TAP_SLOP or _touch_points.size() > 1:
@@ -81,6 +102,8 @@ func _begin_press(at: Vector2) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if Touch.is_emulated(event):
+		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event)
 	elif event is InputEventScreenDrag:
@@ -95,6 +118,8 @@ func _gui_input(event: InputEvent) -> void:
 
 func _handle_touch(event: InputEventScreenTouch) -> void:
 	if event.pressed:
+		_fling = Vector2.ZERO
+		_velocity = Vector2.ZERO
 		_touch_points[event.index] = event.position
 		if _touch_points.size() == 1:
 			_dragging = true
@@ -109,6 +134,10 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		_touch_points.erase(event.index)
 		if _dragging and _drag_moved < TAP_SLOP and not _long_press_fired:
 			canvas_tapped.emit(to_world(event.position))
+		elif _dragging and _touch_points.is_empty() \
+				and Time.get_ticks_msec() - _last_drag_ms < FLING_STALE_MS \
+				and _velocity.length() > FLING_MIN_SPEED:
+			_fling = _velocity
 		_press_started_ms = -1
 		if _touch_points.is_empty():
 			_dragging = false
@@ -122,7 +151,9 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 			set_zoom_about(view_zoom * (spread / _pinch_reference), _touch_centroid())
 		_pinch_reference = spread
 		return
-	_drag_moved += event.relative.length()
+	# Smoothed, because a single drag event's velocity jumps about.
+	_velocity = _velocity.lerp(event.velocity, 0.45)
+	_last_drag_ms = Time.get_ticks_msec()
 	_pan_by(event.relative)
 
 
@@ -136,6 +167,7 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 				set_zoom_about(view_zoom / 1.12, event.position)
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				_fling = Vector2.ZERO
 				_dragging = true
 				_drag_moved = 0.0
 				_begin_press(event.position)

@@ -1032,3 +1032,27 @@ offsets, so a control that sets its own anchors in `_ready` after layout ends up
 the size it already was — zero; `set_anchors_and_offsets_preset` is the call.
 And a chart that is coloured by family needs another channel for office, so
 office became a small crown in the card's corner rather than the colour.
+
+**Touch, read once.** The first build on a real phone showed what a desktop
+cannot. Android delivers every touch twice — the touch, and a mouse event Godot
+makes up from it so buttons work — and the views that listened to both acted
+twice: one tap on a calamity card armed it and called it down together, the map
+and the trees panned at double the finger's speed and kept panning under a
+pinch. Separately, a swipe meant for a list was taken by whatever it started on:
+buttons keep their touches by default, so the list never heard the swipe and the
+button fired; a slider took the first touch on its track as a new value.
+
+The rules now live in `Touch`: taps are read from the click alone and only if the
+finger came up near where it went down; drags and pinches from the touches alone;
+and every control inside a scrolling list lets swipes through, so Godot's own
+behaviour — a list that starts scrolling cancels the press under the finger —
+can work. The scroll dead zone is 20 units, above the tap slop, so a tap that
+wobbles neither scrolls nor fails. Dials sit under a grip that turns them only
+for a plainly sideways drag and follows the finger from where the dial was. The
+map and the trees glide to a stop when let go of while moving, as lists do.
+`test_touch` delivers gestures the way the phone does, made-up click first and
+then the touch, and fails on the old behaviour.
+
+The game also stopped covering the whole screen: immersive mode is off and so is
+edge-to-edge, so Android keeps its status and navigation bars and Godot pads the
+game between them, with the bars in the game's own background colour.

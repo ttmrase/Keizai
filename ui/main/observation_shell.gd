@@ -32,6 +32,11 @@ var _news: NewsFeed
 
 
 func _ready() -> void:
+	# Every list on every screen lets a swipe reach its scroll, whichever control
+	# the finger happened to land on. Screens are built later, as they are first
+	# opened, so this watches for them rather than walking them now.
+	if not get_tree().node_added.is_connected(Touch.let_swipes_through):
+		get_tree().node_added.connect(Touch.let_swipes_through)
 	_build_dock()
 	_status.speed_changed.connect(_on_speed_changed)
 	# The news sits over the screens and under nothing: whatever is open, a

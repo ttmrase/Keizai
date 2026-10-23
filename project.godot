@@ -27,6 +27,7 @@ SimClock="*res://autoload/sim_clock.gd"
 [gui]
 
 theme/custom_font="res://assets/fonts/NotoSansJP-Regular.ttf"
+common/default_scroll_deadzone=20
 
 [display]
 

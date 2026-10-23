@@ -265,9 +265,7 @@ func _show_card(item: Dictionary) -> void:
 
 
 func _on_card_input(event: InputEvent, card: Control, item: Dictionary) -> void:
-	# A touch also arrives as an emulated click; the click alone is listened to,
-	# so one tap is followed once.
-	if not (event is InputEventMouseButton and not event.pressed):
+	if not Touch.tapped(card, event):
 		return
 	_follow(item)
 	_dismiss(card)

@@ -172,7 +172,8 @@ Godot **4.7** 以上（`Dictionary[K,V]` の型付き構文を使うため 4.4 �
 # エディタで開く
 godot --path .
 
-# ヘッドレスのテスト（約15分、12万件超の検証。--spec=名前 で個別に実行可）
+# ヘッドレスのテスト（約15分、12万件超の検証。--spec=名前 で個別に実行可。
+# test_touch はスマホと同じ順でタッチを送り、スワイプ・タップ・ダイヤルを確かめる）
 godot --headless --path . res://tests/TestRunner.tscn
 
 # 数百年ぶんを一気に回して結果を眺める開発用ツール
@@ -212,6 +213,7 @@ godot --headless --path . --export-release "Android" build/keizai-release.apk
 - 最小 SDK 24（Android 7.0）／ターゲット SDK 36（Android 16）
 - arm64-v8a のみ（32bit を含めると 59MB になるため既定では外しています。必要なら `export_presets.cfg` の `architectures/armeabi-v7a` を `true` に）
 - 権限要求は**ゼロ**（通信・位置情報・カメラのいずれも使いません）
+- 全画面にはせず、ステータスバーとナビゲーションバーを残してその間に表示します（`screen/immersive_mode` と `screen/edge_to_edge` はどちらも off）
 - デバッグ 32MB／リリース 30MB
 
 **ターゲット SDK は提出時に Google Play の当時の要件を確認してください。** この要件は毎年上がります。

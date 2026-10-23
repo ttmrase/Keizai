@@ -61,7 +61,7 @@ func _ready() -> void:
 		child.queue_free()
 	_rows.add_theme_constant_override("separation", 12)
 	_build_header()
-	_rows.add_child(_section("世界の理", "上げ下げすると、誰かが力を得る"))
+	_rows.add_child(_section("世界の理", "つまみを左右になぞって動かす。上げ下げすると、誰かが力を得る"))
 	for i in DIALS.size():
 		_rows.add_child(_dial_card(i))
 	_rows.add_child(_section("災厄と恵み", "二度押すと下る。世界全体に及ぶ"))
@@ -203,6 +203,7 @@ func _dial_card(index: int) -> Control:
 	slider.custom_minimum_size = Vector2(0, 40)
 	_style_slider(slider, colour)
 	slider.value_changed.connect(_on_dial_changed.bind(index))
+	DialGrip.attach(slider)
 	rows.add_child(slider)
 	_sliders.append(slider)
 
@@ -346,7 +347,7 @@ func _calamity_card(definition: DisasterDefinition) -> Control:
 	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rows.add_child(status)
 
-	card.gui_input.connect(_on_card_input.bind(definition))
+	card.gui_input.connect(_on_card_input.bind(card, definition))
 	_cards[definition.definition_id] = {"card": card, "effect": effect, "status": status,
 		"definition": definition, "tint": tint}
 	_sync_card(definition.definition_id)
@@ -374,10 +375,10 @@ func _remaining(id: StringName) -> int:
 	return left
 
 
-func _on_card_input(event: InputEvent, definition: DisasterDefinition) -> void:
-	var tapped: bool = (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT
-		and not event.pressed) or (event is InputEventScreenTouch and not event.pressed)
-	if not tapped:
+## A tap, read once: a swipe across the cards on the way down the panel is not
+## a request for a calamity.
+func _on_card_input(event: InputEvent, card: Control, definition: DisasterDefinition) -> void:
+	if not Touch.tapped(card, event):
 		return
 	var id := definition.definition_id
 	if _armed != id:

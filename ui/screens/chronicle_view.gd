@@ -14,9 +14,6 @@ extends Control
 signal reveal_requested(id: StringName)
 
 const PAGE := 60
-## How far a finger may move between press and release and still be a tap
-## rather than the start of a scroll.
-const TAP_SLOP := 14.0
 
 const FILTERS := [
 	{"label": "すべて", "types": []},
@@ -265,7 +262,7 @@ func _entry(e: HistoryEvent) -> Control:
 		entry = _milestone(e, news)
 	if subject != &"":
 		entry.mouse_filter = Control.MOUSE_FILTER_PASS
-		entry.gui_input.connect(_on_entry_input.bind(subject))
+		entry.gui_input.connect(_on_entry_input.bind(entry, subject))
 	return entry
 
 
@@ -341,16 +338,8 @@ func _milestone(e: HistoryEvent, news: Dictionary) -> Control:
 
 
 ## A tap, not the end of a scroll, follows the entry to whoever it names.
-var _press_at := Vector2.ZERO
-
-func _on_entry_input(event: InputEvent, subject: StringName) -> void:
-	# A touch also arrives as an emulated click; listening to the click alone
-	# keeps one tap from being followed twice.
-	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
-		return
-	if event.pressed:
-		_press_at = event.global_position
-	elif event.global_position.distance_to(_press_at) <= TAP_SLOP:
+func _on_entry_input(event: InputEvent, entry: Control, subject: StringName) -> void:
+	if Touch.tapped(entry, event):
 		reveal_requested.emit(subject)
 
 

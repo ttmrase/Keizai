@@ -43,6 +43,7 @@ func _ready() -> void:
 			continue
 		var spec: Spec = script.new()
 		spec.run()
+		await spec.run_in_tree(self)
 		total_checks += spec.checks
 		if not spec.completed:
 			spec.failures.append("spec did not reach finish() — it aborted partway through")

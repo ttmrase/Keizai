@@ -18,6 +18,13 @@ func run() -> void:
 	pass    # overridden
 
 
+## For the few specs that need the scene tree — screens laid out, input
+## delivered, frames passing. Runs after run(); a spec that uses it calls
+## finish() here instead.
+func run_in_tree(host: Node) -> void:
+	await host.get_tree().process_frame
+
+
 func finish() -> void:
 	completed = true
 
