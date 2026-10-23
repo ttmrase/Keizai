@@ -10,6 +10,13 @@ extends Control
 ## world it currently feeds, read off the same profiles the simulation scores
 ## power with. A god who can only change the weather should at least be able to
 ## see whose harvest it is.
+##
+## And above them, the reason to touch any of it: 神託. The god foretells what
+## the world will do, then steers toward it with the same dials and calamities;
+## a prophecy that comes true pays out in might, and calamities cost might.
+
+## Asks the shell to open the family tree on whoever a prophecy names.
+signal reveal_requested(id: StringName)
 
 const DIALS := [
 	{"label": "鉱石", "glyph": &"gem", "colour": Color("8c95a6"),
@@ -54,6 +61,12 @@ var _gainers: Array[Label] = []
 var _cards: Dictionary = {}
 var _armed: StringName = &""
 var _armed_left := 0.0
+var _might_value: Label
+var _might_bar: ProgressBar
+var _might_note: Label
+var _oracle_box: VBoxContainer
+var _feats_label: Label
+var _sheet: Sheet
 
 
 func _ready() -> void:
@@ -61,10 +74,15 @@ func _ready() -> void:
 		child.queue_free()
 	_rows.add_theme_constant_override("separation", 12)
 	_build_header()
+	_rows.add_child(_might_card())
+	_rows.add_child(_section("神託", "未来を告げ、理と災厄で世をそちらへ導く。成就すれば神威が満ちる"))
+	_oracle_box = VBoxContainer.new()
+	_oracle_box.add_theme_constant_override("separation", 10)
+	_rows.add_child(_oracle_box)
 	_rows.add_child(_section("世界の理", "つまみを左右になぞって動かす。上げ下げすると、誰かが力を得る"))
 	for i in DIALS.size():
 		_rows.add_child(_dial_card(i))
-	_rows.add_child(_section("災厄と恵み", "二度押すと下る。世界全体に及ぶ"))
+	_rows.add_child(_section("災厄と恵み", "二度押すと下る。世界全体に及び、神威を費やす"))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10)
@@ -72,6 +90,8 @@ func _ready() -> void:
 	for definition in GodPowerAPI.available_disasters():
 		grid.add_child(_calamity_card(definition))
 	_rows.add_child(grid)
+	_rows.add_child(_section("史録", ""))
+	_rows.add_child(_feats_card())
 	_rows.add_child(_section("観察", ""))
 	_rows.add_child(_settings_card())
 	var note := Label.new()
@@ -85,6 +105,9 @@ func _ready() -> void:
 	EventBus.game_loaded.connect(_sync)
 	EventBus.world_reset.connect(_sync)
 	EventBus.power_recalculated.connect(func(_t): if is_visible_in_tree(): _sync())
+	Oracle.might_changed.connect(func(_v): _sync_might())
+	Oracle.prophecies_changed.connect(func(): if is_visible_in_tree(): _sync_oracle())
+	Oracle.feat_unlocked.connect(func(_f): _sync_feats())
 	_sync()
 
 
@@ -114,7 +137,7 @@ func _build_header() -> void:
 	title.add_theme_color_override("font_color", Palette.ACCENT)
 	words.add_child(title)
 	var sub := Label.new()
-	sub.text = "四つの理と七つの災厄。それが神の持つすべて。"
+	sub.text = "四つの理と七つの災厄、そして神託。それが神の持つすべて。"
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub.add_theme_font_size_override("font_size", 14)
@@ -159,6 +182,185 @@ static func _card_style(accent: Color, lit := false) -> StyleBoxFlat:
 	box.content_margin_top = 12
 	box.content_margin_bottom = 12
 	return box
+
+
+# ------------------------------------------------------------------- might
+
+func _might_card() -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _card_style(Palette.ACCENT))
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	card.add_child(rows)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	head.add_child(GlyphIcon.make(&"sparkle", Palette.ACCENT, 28))
+	var label := Label.new()
+	label.text = "神威"
+	label.add_theme_font_size_override("font_size", 19)
+	label.add_theme_color_override("font_color", Palette.TEXT)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(label)
+	_might_value = Label.new()
+	_might_value.add_theme_font_size_override("font_size", 26)
+	_might_value.add_theme_color_override("font_color", Palette.ACCENT)
+	head.add_child(_might_value)
+	rows.add_child(head)
+	_might_bar = ProgressBar.new()
+	_might_bar.show_percentage = false
+	_might_bar.custom_minimum_size = Vector2(0, 8)
+	_might_bar.max_value = Oracle.MAX_MIGHT
+	var back := StyleBoxFlat.new()
+	back.bg_color = Palette.BG
+	back.set_corner_radius_all(4)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Palette.ACCENT
+	fill.set_corner_radius_all(4)
+	_might_bar.add_theme_stylebox_override("background", back)
+	_might_bar.add_theme_stylebox_override("fill", fill)
+	rows.add_child(_might_bar)
+	_might_note = Label.new()
+	_might_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_might_note.add_theme_font_size_override("font_size", 13)
+	_might_note.add_theme_color_override("font_color", Palette.TEXT_DIM)
+	rows.add_child(_might_note)
+	return card
+
+
+func _sync_might() -> void:
+	if _might_value == null:
+		return
+	if Oracle.free_mode():
+		_might_value.text = "∞"
+		_might_bar.value = Oracle.MAX_MIGHT
+		_might_note.text = "制約なし：災厄はいくらでも下せる（設定で戻せる）"
+	else:
+		_might_value.text = "%d / %d" % [int(Oracle.might), int(Oracle.MAX_MIGHT)]
+		_might_bar.value = Oracle.might
+		_might_note.text = "年に%dずつ満ちる。神託が成就すれば大きく満ちる。災厄を下すと費える。" \
+			% int(Oracle.MIGHT_PER_YEAR)
+	for id in _cards:
+		_sync_card(id)
+
+
+# ---------------------------------------------------------------- prophecy
+
+func _sync_oracle() -> void:
+	if _oracle_box == null:
+		return
+	for child in _oracle_box.get_children():
+		child.queue_free()
+	var tick := SimClock.current_tick
+	for p in Oracle.prophecies:
+		_oracle_box.add_child(ProphecyCard.build(p, tick, "active", Callable(), _follow))
+	if Oracle.prophecies.size() < Oracle.MAX_ACTIVE:
+		var speak := Button.new()
+		speak.text = "神託を下す　（%d / %d）" % [Oracle.prophecies.size(), Oracle.MAX_ACTIVE]
+		speak.focus_mode = Control.FOCUS_NONE
+		speak.custom_minimum_size = Vector2(0, 58)
+		speak.add_theme_font_size_override("font_size", 19)
+		var box := StyleBoxFlat.new()
+		box.bg_color = Color(Palette.ACCENT, 0.14)
+		box.border_color = Palette.ACCENT
+		box.set_border_width_all(1)
+		box.set_corner_radius_all(12)
+		for state in ["normal", "hover", "pressed", "focus"]:
+			speak.add_theme_stylebox_override(state, box)
+		for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			speak.add_theme_color_override(state, Palette.ACCENT)
+		speak.pressed.connect(_open_offers)
+		_oracle_box.add_child(speak)
+	# The last few settled, so the outcome of a prophecy can still be read after
+	# the news of it has gone.
+	var settled := Oracle.record.slice(maxi(0, Oracle.record.size() - 2))
+	settled.reverse()
+	for p in settled:
+		_oracle_box.add_child(ProphecyCard.build(p, tick, "past"))
+
+
+func _open_offers() -> void:
+	if _sheet != null and is_instance_valid(_sheet):
+		_sheet.close()
+	_sheet = Sheet.open(self, "神託を下す",
+		"どれか一つを告げる。告げた未来へ、理と災厄で世を導く。外れても失うものはない。")
+	_fill_offers()
+
+
+func _fill_offers() -> void:
+	if _sheet == null or not is_instance_valid(_sheet):
+		return
+	_sheet.clear()
+	var tick := SimClock.current_tick
+	var offers := Oracle.current_offers()
+	for i in offers.size():
+		_sheet.body.add_child(ProphecyCard.build(offers[i], tick, "offer",
+			_declare.bind(i), _follow))
+	if offers.is_empty():
+		var none := Label.new()
+		none.text = "いまの世に告げられる未来は見当たらない。時を進めてまた来よう。"
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		none.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		_sheet.body.add_child(none)
+	var reroll := Button.new()
+	var price := 0 if Oracle.free_mode() else int(Oracle.REROLL_COST)
+	reroll.text = "別の未来を見る　（神威 %d）" % price
+	reroll.focus_mode = Control.FOCUS_NONE
+	reroll.custom_minimum_size = Vector2(0, 50)
+	reroll.add_theme_font_size_override("font_size", 16)
+	reroll.disabled = Oracle.might < float(price)
+	reroll.pressed.connect(func():
+		if Oracle.reroll():
+			_fill_offers())
+	_sheet.body.add_child(reroll)
+
+
+func _declare(index: int) -> void:
+	if Oracle.declare(index) and _sheet != null and is_instance_valid(_sheet):
+		_sheet.close()
+	_sync_oracle()
+
+
+func _follow(id: StringName) -> void:
+	if _sheet != null and is_instance_valid(_sheet):
+		_sheet.close()
+	reveal_requested.emit(id)
+
+
+# ------------------------------------------------------------------- feats
+
+func _feats_card() -> Control:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0, 64)
+	button.add_theme_stylebox_override("normal", _card_style(Palette.ACCENT_SOFT))
+	button.add_theme_stylebox_override("hover", _card_style(Palette.ACCENT_SOFT))
+	button.add_theme_stylebox_override("pressed", _card_style(Palette.ACCENT, true))
+	button.add_theme_stylebox_override("focus", _card_style(Palette.ACCENT_SOFT))
+	var row := HBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 16
+	row.offset_right = -16
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+	var icon := GlyphIcon.make(&"scroll", Palette.ACCENT, 30)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	_feats_label = Label.new()
+	_feats_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_feats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_feats_label.size_flags_vertical = Control.SIZE_FILL
+	_feats_label.add_theme_font_size_override("font_size", 17)
+	_feats_label.add_theme_color_override("font_color", Palette.TEXT)
+	_feats_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_feats_label)
+	button.pressed.connect(func(): _sheet = FeatsSheet.open(self))
+	return button
+
+
+func _sync_feats() -> void:
+	if _feats_label != null:
+		_feats_label.text = "これまでに見届けたもの　%d / %d" % [Oracle.unlocked_count(), Feats.ALL.size()]
 
 
 # ------------------------------------------------------------------- dials
@@ -291,6 +493,9 @@ func _who_gains(world_var: StringName) -> Dictionary:
 
 
 func _sync() -> void:
+	_sync_might()
+	_sync_oracle()
+	_sync_feats()
 	for i in _sliders.size():
 		var current: float = GodPowerAPI.get_dial(DIALS[i]["get"])
 		_sliders[i].set_value_no_signal(current)
@@ -347,9 +552,14 @@ func _calamity_card(definition: DisasterDefinition) -> Control:
 	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rows.add_child(status)
 
+	var cost := Label.new()
+	cost.add_theme_font_size_override("font_size", 13)
+	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rows.add_child(cost)
+
 	card.gui_input.connect(_on_card_input.bind(card, definition))
 	_cards[definition.definition_id] = {"card": card, "effect": effect, "status": status,
-		"definition": definition, "tint": tint}
+		"cost": cost, "definition": definition, "tint": tint}
 	_sync_card(definition.definition_id)
 	return card
 
@@ -365,6 +575,14 @@ func _sync_card(id: StringName) -> void:
 	var remaining := _remaining(id)
 	(entry["status"] as Label).text = "進行中　あと%d季" % remaining if remaining > 0 \
 		else "%d季にわたる" % definition.duration_ticks
+	var price := Oracle.cost_of(id)
+	var affordable := Oracle.can_afford(id)
+	var cost: Label = entry["cost"]
+	cost.text = "神威 %d" % price if price > 0 else "神威 —"
+	if not affordable:
+		cost.text += "　足りない"
+	cost.add_theme_color_override("font_color", Palette.ACCENT if affordable else Palette.TEXT_DIM)
+	(entry["card"] as Control).modulate = Color.WHITE if affordable or armed else Color(1, 1, 1, 0.55)
 
 
 func _remaining(id: StringName) -> int:
@@ -381,6 +599,9 @@ func _on_card_input(event: InputEvent, card: Control, definition: DisasterDefini
 	if not Touch.tapped(card, event):
 		return
 	var id := definition.definition_id
+	if not Oracle.can_afford(id):
+		_refuse(card)
+		return
 	if _armed != id:
 		var previous := _armed
 		_armed = id
@@ -390,9 +611,19 @@ func _on_card_input(event: InputEvent, card: Control, definition: DisasterDefini
 		_sync_card(id)
 		return
 	_disarm()
-	GodPowerAPI.trigger_disaster(id, &"", 1.0)
+	if not Oracle.call_down(id):
+		_refuse(card)
+		return
 	_flash(_cards[id]["card"])
 	_sync_card(id)
+
+
+## Too little might: the card shakes its head.
+func _refuse(card: Control) -> void:
+	var start := card.position.x
+	var tween := card.create_tween()
+	for offset in [-8.0, 8.0, -5.0, 5.0, 0.0]:
+		tween.tween_property(card, "position:x", start + offset, 0.05)
 
 
 func _disarm() -> void:
@@ -429,6 +660,22 @@ func _settings_card() -> Control:
 	pause_note.add_theme_font_size_override("font_size", 13)
 	pause_note.add_theme_color_override("font_color", Palette.TEXT_DIM)
 	rows.add_child(pause_note)
+
+	var free := CheckButton.new()
+	free.text = "神威の制約をなくす"
+	free.button_pressed = Oracle.free_mode()
+	free.focus_mode = Control.FOCUS_NONE
+	free.add_theme_font_size_override("font_size", 17)
+	free.toggled.connect(func(on: bool):
+		Oracle.set_free_mode(on)
+		_sync())
+	rows.add_child(free)
+	var free_note := Label.new()
+	free_note.text = "災厄を神威なしでいくらでも下せるようにする。神託はそのまま。"
+	free_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	free_note.add_theme_font_size_override("font_size", 13)
+	free_note.add_theme_color_override("font_color", Palette.TEXT_DIM)
+	rows.add_child(free_note)
 
 	var new_world := Button.new()
 	new_world.text = "新しい世界を興す"

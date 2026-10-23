@@ -39,6 +39,7 @@ const FORBIDDEN_API_TERMS := [
 
 func run() -> void:
 	_check_ui_never_writes_simulation_state()
+	_check_oracle_never_writes_simulation_state()
 	_check_god_powers_take_no_political_target()
 	finish()
 
@@ -51,6 +52,22 @@ func _check_ui_never_writes_simulation_state() -> void:
 		for needle in FORBIDDEN:
 			check(not text.contains(needle),
 				"%s contains '%s' — screens must not write simulation state" % [path, needle])
+
+
+## The oracle and what it reads from — prophecies, feats, the history book —
+## sit between the world and the screens. They name families and guilds, which
+## is what a prophecy is about, but they are held to the same rule as a screen:
+## the world is read, never written. The god still acts only through GodPowerAPI.
+func _check_oracle_never_writes_simulation_state() -> void:
+	var scripts := _gd_files("res://game")
+	scripts.append("res://autoload/oracle.gd")
+	check_gt(float(scripts.size()), 3.0, "there should be oracle scripts to scan")
+	for path in scripts:
+		var text := FileAccess.get_file_as_string(path)
+		check(not text.is_empty(), "%s should be readable" % path)
+		for needle in FORBIDDEN:
+			check(not text.contains(needle),
+				"%s contains '%s' — the oracle must not write simulation state" % [path, needle])
 
 
 func _check_god_powers_take_no_political_target() -> void:

@@ -1056,3 +1056,61 @@ then the touch, and fails on the old behaviour.
 The game also stopped covering the whole screen: immersive mode is off and so is
 edge-to-edge, so Android keeps its status and navigation bars and Godot pads the
 game between them, with the bars in the game's own background colour.
+
+## Eleventh iteration: a reason to act
+
+The game was good to watch and gave the watcher nothing to want. The dials could
+change everything, and nothing asked the player to change anything in
+particular; the calamities were free, so none of them was a decision. This pass
+adds a layer above the simulation — the oracle — without touching what the god
+may do. The god still changes the world and nothing else. What changed is that
+the god now has something to aim at, something to spend, and something to
+collect.
+
+**Prophecies (神託).** The god picks one of three futures the world could
+plausibly bear out and speaks it, with a deadline: a guild above all others, a
+family on the throne, a house dying out, a rupture, a new faith, a regime or a
+state falling, the population rising or falling, a ruler living to a given age,
+a house raised in rank. Offers are built from the world as it is — real
+families, real pressures, incidents only where their cooldowns allow one inside
+the deadline — and each carries the current standing and the dials that reach
+it, read from the same power profiles the simulation scores with. Event-shaped
+prophecies are noticed as the event is recorded; state-shaped ones are judged
+each epoch. A fulfilled prophecy is announced like a rupture. A failed one costs
+nothing; being wrong is part of learning how a world that decides for itself
+actually behaves, which is the game.
+
+**Might (神威).** A point a year, a lump for each fulfilled prophecy, a ceiling
+of 150; calamities cost 15 to 45, plague dearest. This turns the seven calamity
+cards from buttons into decisions, and ties them to the prophecies: the reward
+for reading the world well is the power to push it harder. A setting removes the
+cost for those who prefer the sandbox.
+
+**Feats (史録).** Twenty-seven things a history can be remembered for, kept in
+`user://annals.cfg` across every world: the first dynasty to fall, each of the
+four ruptures, a family that lasts five centuries, a hundred quiet years, a god
+who calls nothing down for two hundred. Most cannot be made to happen, only
+invited, which is the point — they are reasons to start another world and turn
+it differently.
+
+**Eras (時代).** The chronicle reads as a book of fifty-year chapters, each
+named from what it was most about — ruptures outweigh splits, splits outweigh
+weather, and an age with none of it is a quiet one — with a few lines on who
+reigned, who fell, what split off and what struck. The names step through their
+variants chapter by chapter so two quiet ages in a row read differently. A
+closing chapter is announced in the news.
+
+The oracle is an autoload that listens and reads; it never writes simulation
+state, and the boundary spec now scans it and the `game/` layer for the same
+forbidden writes as the screens. It draws offers from its own generator, never
+the world's named streams, and `test_oracle` checks that asking for prophecies
+leaves both the world and its randomness byte-identical. Its state goes into the
+save's snapshot; a save from before it existed loads into a fresh oracle. It
+costs about four percent of a tick.
+
+Three choices left out on purpose. The top speed stays at 4×: a tick costs
+around 18 ms by year 600 on a desktop, and a phone would stutter at twice that.
+Prophecies are not written into the chronicle, which records what the world did,
+not what the god said. And fulfilment never feeds back into the simulation — no
+faith grows because a prophecy came true — because that would be the god
+reaching into society by another door.

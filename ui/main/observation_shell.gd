@@ -39,6 +39,7 @@ func _ready() -> void:
 		get_tree().node_added.connect(Touch.let_swipes_through)
 	_build_dock()
 	_status.speed_changed.connect(_on_speed_changed)
+	_status.oracle_requested.connect(show_tab.bind("god"))
 	# The news sits over the screens and under nothing: whatever is open, a
 	# headline can reach the reader.
 	_news = NewsFeed.new()

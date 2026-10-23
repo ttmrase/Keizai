@@ -23,6 +23,7 @@ GodPowerAPI="*res://autoload/god_power_api.gd"
 NamingService="*res://autoload/naming_service.gd"
 SaveManager="*res://autoload/save_manager.gd"
 SimClock="*res://autoload/sim_clock.gd"
+Oracle="*res://autoload/oracle.gd"
 
 [gui]
 

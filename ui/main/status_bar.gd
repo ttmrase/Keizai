@@ -9,6 +9,8 @@ extends Control
 ## merchant republic" is half a history.
 
 signal speed_changed(scale: float)
+## The might chip was tapped: the reader wants the god's panel.
+signal oracle_requested
 
 const SPEEDS := [0.0, 1.0, 2.0, 4.0]
 
@@ -36,6 +38,11 @@ func _ready() -> void:
 	_realm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_realm.clip_text = true
 	when.add_child(_realm)
+
+	var might := MightChip.new()
+	might.pressed.connect(func(): oracle_requested.emit())
+	top.add_child(might)
+	top.move_child(might, 1)
 
 	_speed_row.add_theme_constant_override("separation", 0)
 	for i in SPEEDS.size():

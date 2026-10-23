@@ -49,6 +49,7 @@ func save_game(slot: int) -> bool:
 			"tick": SimClock.current_tick,
 			"game_state": GameState.to_dict(),
 			"rng": RngService.to_dict(),
+			"oracle": Oracle.to_dict(),
 		}):
 		return false
 
@@ -101,6 +102,8 @@ func load_game(slot: int) -> bool:
 	HistoryLog.total_recorded = int(manifest.get("total_events_recorded", HistoryLog.buffer.size()))
 
 	SimClock.start(int(snapshot.get("tick", 0)))
+	# The god's prophecies and might travel with the world they were spoken in.
+	Oracle.from_dict(snapshot.get("oracle", {}))
 	EventBus.game_loaded.emit()
 	return true
 

@@ -54,6 +54,9 @@ func _ready() -> void:
 	EventBus.event_recorded.connect(_on_event)
 	EventBus.world_reset.connect(_clear)
 	EventBus.game_loaded.connect(_clear)
+	EventBus.tick_advanced.connect(_on_tick)
+	Oracle.prophecy_resolved.connect(_on_prophecy)
+	Oracle.feat_unlocked.connect(_on_feat)
 
 
 func _clear() -> void:
@@ -84,7 +87,46 @@ func _process(delta: float) -> void:
 # ---------------------------------------------------------------- sorting
 
 func _on_event(e: HistoryEvent) -> void:
-	var item := classify(e)
+	_queue(classify(e))
+
+
+## The god's own news: a prophecy fulfilled is as large a moment as any rupture,
+## and is announced like one.
+func _on_prophecy(p: Dictionary) -> void:
+	var fulfilled: bool = p["state"] == "fulfilled"
+	var year := int(int(p["resolved"]) / SimConfig.TICKS_PER_YEAR)
+	if fulfilled:
+		_queue({"weight": Weight.MAJOR, "label": "神託成就", "colour": Palette.ACCENT,
+			"glyph": &"sun", "tab": "god", "subject": &"", "year": year,
+			"kicker": "%d年　告げた未来が来た" % year,
+			"text": "「%s」\n神威 +%d" % [p["text"], int(p["reward"])]})
+	else:
+		_queue({"weight": Weight.NOTABLE, "label": "神託外れ", "colour": Palette.TEXT_MUTED,
+			"glyph": &"scroll", "tab": "god", "subject": &"", "year": year,
+			"text": "「%s」は果たされなかった" % p["text"]})
+
+
+func _on_feat(feat: Dictionary) -> void:
+	_queue({"weight": Weight.NOTABLE, "label": "史録　%s" % feat["title"],
+		"colour": Palette.ACCENT, "glyph": feat["glyph"], "tab": "god", "subject": &"",
+		"year": int(feat.get("year", SimClock.year())), "text": feat["text"]})
+
+
+## Every fifty years the chronicle closes a chapter and names it.
+func _on_tick(tick: int) -> void:
+	if tick <= 0 or tick % EraBook.CHAPTER_TICKS != 0:
+		return
+	var chapter := EraBook.chapter(int(tick / EraBook.CHAPTER_TICKS) - 1)
+	if chapter.is_empty():
+		return
+	var lines: Array = chapter["lines"]
+	_queue({"weight": Weight.NOTABLE, "label": "第%d章　閉幕" % chapter["number"],
+		"colour": Palette.ACCENT_SOFT.lightened(0.3), "glyph": &"scroll", "tab": "chronicle",
+		"subject": &"", "year": int(chapter["end_year"]),
+		"text": "「%s」%s" % [chapter["title"], "　" + lines[0] if not lines.is_empty() else ""]})
+
+
+func _queue(item: Dictionary) -> void:
 	if item["weight"] == Weight.NONE:
 		return
 	if item["weight"] == Weight.MAJOR:
@@ -336,7 +378,7 @@ func _show_banner(item: Dictionary) -> void:
 	var titles := VBoxContainer.new()
 	titles.add_theme_constant_override("separation", 0)
 	var kicker := Label.new()
-	kicker.text = "%d年　歴史が動いた" % item["year"]
+	kicker.text = item.get("kicker", "%d年　歴史が動いた" % item["year"])
 	kicker.add_theme_font_size_override("font_size", 15)
 	kicker.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 	titles.add_child(kicker)

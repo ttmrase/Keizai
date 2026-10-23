@@ -267,6 +267,12 @@ func _row(org: Organization, strongest: float, rank: int) -> Control:
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(sub)
 
+	# Marked when a spoken prophecy is about it: the god is watching this one.
+	if Oracle.is_foretold(org.org_id):
+		var mark := GlyphIcon.make(&"sparkle", Palette.ACCENT, 18)
+		mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(mark)
+
 	var line := Sparkline.new()
 	line.values = PowerHistory.series(org.org_id)
 	line.colour = tint

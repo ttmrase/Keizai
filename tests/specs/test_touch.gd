@@ -59,18 +59,17 @@ func _god_panel(shell: Control) -> void:
 
 	# A swipe up the panel that starts on a calamity card scrolls the panel and
 	# does nothing else.
-	scroll.scroll_vertical = 0
-	await _frames(2)
+	await _bring_into_view(scroll, card)
+	var top := scroll.scroll_vertical
 	var at := _centre(card)
 	await _swipe(at, at + Vector2(0, -320))
-	check(scroll.scroll_vertical > 0, "a swipe on the god's panel should scroll it")
+	check(scroll.scroll_vertical > top, "a swipe on the god's panel should scroll it")
 	check_eq(panel._armed, &"", "a swipe across a calamity card should not arm it")
 	check_eq(GameState.world.active_disasters.size(), running,
 		"a swipe across a calamity card should not call it down")
 
 	# One tap arms; it does not also fire.
-	scroll.scroll_vertical = 0
-	await _frames(2)
+	await _bring_into_view(scroll, card)
 	at = _centre(card)
 	await _tap(at)
 	check_eq(panel._armed, id, "one tap should arm the calamity")
@@ -83,27 +82,37 @@ func _god_panel(shell: Control) -> void:
 
 	# A swipe that starts on a dial scrolls the panel and leaves the dial alone.
 	var slider: HSlider = panel._sliders[0]
-	scroll.scroll_vertical = 0
-	await _frames(2)
+	await _bring_into_view(scroll, slider)
+	top = scroll.scroll_vertical
 	var before := slider.value
 	at = _centre(slider)
 	await _swipe(at, at + Vector2(0, -300))
 	check_near(slider.value, before, 0.0001, "a vertical swipe from a dial should not turn it")
-	check(scroll.scroll_vertical > 0, "a vertical swipe from a dial should scroll the panel")
+	check(scroll.scroll_vertical > top, "a vertical swipe from a dial should scroll the panel")
 
 	# A tap on the track changes nothing either.
-	scroll.scroll_vertical = 0
-	await _frames(2)
+	await _bring_into_view(scroll, slider)
 	at = _centre(slider)
 	await _tap(at + Vector2(slider.size.x * 0.4, 0))
 	check_near(slider.value, before, 0.0001, "a tap on a dial's track should not turn it")
 
 	# A sideways drag turns it, and the panel stays where it is.
+	top = scroll.scroll_vertical
 	at = _centre(slider)
 	await _swipe(at, at + Vector2(140, 0))
 	check_gt(slider.value, before + 0.05, "a sideways drag on a dial should turn it up")
-	check_eq(scroll.scroll_vertical, 0, "turning a dial should not scroll the panel")
+	check_eq(scroll.scroll_vertical, top, "turning a dial should not scroll the panel")
 	slider.value = before
+
+
+## Scrolls a list so a control sits in its upper half, with room to swipe both
+## ways, as a reader would before reaching for it.
+func _bring_into_view(scroll: ScrollContainer, control: Control) -> void:
+	scroll.scroll_vertical = 0
+	await _frames(2)
+	var offset := control.get_global_rect().position.y - scroll.get_global_rect().position.y
+	scroll.scroll_vertical = int(maxf(0.0, offset - scroll.size.y * 0.3))
+	await _frames(3)
 
 
 # ----------------------------------------------------------------- power rows

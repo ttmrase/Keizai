@@ -60,6 +60,7 @@ func _ready() -> void:
 
 	_canvas.draw.connect(_draw_map)
 	_canvas.canvas_tapped.connect(_on_tapped)
+	Oracle.prophecies_changed.connect(_canvas.queue_redraw)
 	_canvas.resized.connect(_sync_land)
 	EventBus.tick_advanced.connect(_on_tick)
 	EventBus.game_loaded.connect(_on_world_changed)
@@ -130,9 +131,9 @@ func _process(delta: float) -> void:
 			ping["age"] = float(ping["age"]) + delta
 		_pings = _pings.filter(func(p): return float(p["age"]) < PING_LIFE)
 		_canvas.queue_redraw()
-	elif _has_restless_town():
-		# The small flames over angry towns flicker, which needs a redraw now
-		# and again — not every frame.
+	elif _has_restless_town() or not Oracle.prophecies.is_empty():
+		# The small flames over angry towns flicker, and the mark on a foretold
+		# family glows, which needs a redraw now and again — not every frame.
 		if int(_clock * 8.0) != int((_clock - delta) * 8.0):
 			_canvas.queue_redraw()
 
@@ -502,6 +503,13 @@ func _draw_town(s: SettlementState, font: Font, zoom: float, is_capital: bool) -
 			Palette.ACCENT)
 	if s.id == _selected_id:
 		_canvas.draw_arc(centre, scale * 0.85, 0, TAU, 40, Palette.ACCENT, maxf(2.0, 3.0 * zoom))
+	# A family the god has foretold something of is marked where it holds land.
+	if house != null and Oracle.is_foretold(house.org_id):
+		var glow := 0.55 + 0.45 * sin(_clock * 3.0)
+		_canvas.draw_arc(centre, scale * 1.0, 0, TAU, 40, Color(Palette.ACCENT, 0.35 * glow),
+			maxf(1.5, 2.0 * zoom))
+		Glyph.draw(_canvas, &"sparkle", centre + Vector2(-scale * 0.7, -scale * 0.75),
+			scale * 0.36, Color(Palette.ACCENT, 0.6 + 0.4 * glow))
 
 	# Trouble shows over the town itself, not only in the ground around it.
 	if s.unrest >= 0.45:

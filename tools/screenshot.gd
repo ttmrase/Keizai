@@ -21,6 +21,8 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 
 	ContentRegistry.ensure_loaded()
+	Oracle.use_annals("%s/annals.cfg" % _out_dir)
+	DirAccess.remove_absolute("%s/annals.cfg" % _out_dir)
 	WorldGenerator.generate(_seed)
 	SimClock.start(0)
 	# The power screen remembers what it was shown; here nothing is shown while
@@ -54,6 +56,7 @@ func _ready() -> void:
 	await _capture("%s/title.png" % _out_dir)
 	title._menu.visible = false
 	title._guide_index = 0
+	title._guide_cards = [TitleScreen.GUIDE[2]]
 	title._show_guide_card()
 	for i in 20:
 		await get_tree().process_frame
@@ -61,10 +64,44 @@ func _ready() -> void:
 	title.queue_free()
 	await _settle()
 
+	# Two prophecies spoken, so the god's panel shows what one looks like.
+	Oracle.current_offers()
+	Oracle.declare(0)
+	Oracle.declare(0)
+
 	for tab in shell.TABS:
 		shell.show_tab(tab["id"])
 		await _settle()
 		await _capture("%s/%s.png" % [_out_dir, tab["id"]])
+
+	# The oracle: the offers, the record of feats, and the chronicle as a book.
+	shell.show_tab("god")
+	await _settle()
+	var god: Control = shell._screens["god"]
+	god._open_offers()
+	for i in 20:
+		await get_tree().process_frame
+	await _capture("%s/oracle_offers.png" % _out_dir)
+	god._sheet.close()
+	await _settle()
+	var god_scroll: ScrollContainer = god.get_node("Scroll")
+	god_scroll.scroll_vertical = 1240
+	await _settle()
+	await _capture("%s/god_calamities.png" % _out_dir)
+	god_scroll.scroll_vertical = 0
+	var feats := FeatsSheet.open(god)
+	for i in 20:
+		await get_tree().process_frame
+	await _capture("%s/feats.png" % _out_dir)
+	feats.close()
+	await _settle()
+	shell.show_tab("chronicle")
+	var book: Control = shell._screens["chronicle"]
+	book._on_filter(book.FILTERS.size() - 1)
+	await _settle()
+	await _capture("%s/chronicle_eras.png" % _out_dir)
+	book._on_filter(0)
+	await _settle()
 
 	# Following the chronicle to whoever it names: the latest house split,
 	# opened in the tree on the new branch, and the latest death, on the person.
@@ -114,6 +151,17 @@ func _ready() -> void:
 	for i in 6:
 		await get_tree().process_frame
 	await _capture("%s/news_banner.png" % _out_dir)
+	news._close_banner(0.0)
+	news._clear()
+	await _settle()
+	var spoken: Dictionary = Oracle.prophecies[0].duplicate() if not Oracle.prophecies.is_empty() \
+		else {"text": "30年のうちに、真商人会が世で最も力ある組織となる", "reward": 64}
+	spoken["state"] = "fulfilled"
+	spoken["resolved"] = SimClock.current_tick
+	news._on_prophecy(spoken)
+	for i in 40:
+		await get_tree().process_frame
+	await _capture("%s/news_prophecy.png" % _out_dir)
 	news._close_banner(0.0)
 	news._clear()
 	await _settle()

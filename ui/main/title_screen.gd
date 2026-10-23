@@ -19,13 +19,18 @@ signal dismissed
 
 const MAP_SIZE := Vector2(1000, 1450)
 
+## Each card says which version of the guide added it. A reader who has seen an
+## older guide is shown only what is new since, once.
+const GUIDE_VERSION := 2
 const GUIDE := [
-	{"glyph": &"sun", "title": "神にできるのは、世界を変えることだけ",
+	{"since": 1, "glyph": &"sun", "title": "神にできるのは、世界を変えることだけ",
 		"body": "鉱石・木材・収穫・魔物の四つの理と、七つの災厄と恵み。誰を王にするかも、どの組織を潰すかも、神には選べない。"},
-	{"glyph": &"tree", "title": "人は勝手に興り、争い、分かれる",
+	{"since": 1, "glyph": &"tree", "title": "人は勝手に興り、争い、分かれる",
 		"body": "家が婚姻で結ばれ、ギルドや信仰が生まれ、国が倒れては建つ。どれほど枝分かれしても、すべては最初のひとつまで辿れる。"},
-	{"glyph": &"map", "title": "地図と事件を見ていよう",
-		"body": "地図は誰が何を治めているかを示し、事件の画面は次の破局がどこまで近づいているかを示す。大事件が起きたら、時は止まって知らせてくれる。"},
+	{"since": 2, "glyph": &"sparkle", "title": "神託を下し、世をそちらへ導く",
+		"body": "「三十年のうちにこのギルドが天下を取る」——神の力の画面で未来を告げ、四つの理と災厄で人の世をそちらへ傾ける。当たれば神威が満ち、災厄を下す力になる。"},
+	{"since": 1, "glyph": &"map", "title": "地図と事件を見ていよう",
+		"body": "地図は誰が何を治めているかを示し、事件の画面は次の破局がどこまで近づいているかを示す。年代記の「時代」には、半世紀ごとの歴史が章になって残る。"},
 ]
 
 var _land: ColorRect
@@ -33,6 +38,7 @@ var _material: ShaderMaterial
 var _clock := 0.0
 var _menu: VBoxContainer
 var _guide_index := -1
+var _guide_cards: Array = []
 var _guide_card: PanelContainer
 var _after_guide := ""
 
@@ -158,6 +164,17 @@ func _build_menu() -> void:
 	fresh.pressed.connect(_on_new_world)
 	_menu.add_child(fresh)
 
+	var annals := Button.new()
+	annals.flat = true
+	annals.focus_mode = Control.FOCUS_NONE
+	annals.text = "史録　%d / %d" % [Oracle.unlocked_count(), Feats.ALL.size()]
+	annals.custom_minimum_size = Vector2(0, 44)
+	annals.add_theme_font_size_override("font_size", 16)
+	for state in ["font_color", "font_hover_color", "font_pressed_color"]:
+		annals.add_theme_color_override(state, Palette.ACCENT_SOFT.lightened(0.35))
+	annals.pressed.connect(func(): FeatsSheet.open(self))
+	_menu.add_child(annals)
+
 
 func _button(text: String, primary: bool) -> Button:
 	var button := Button.new()
@@ -193,10 +210,13 @@ func _on_new_world() -> void:
 	_maybe_guide("new")
 
 
-## The guide is shown once, ever. Everybody after that knows what game this is.
+## The guide is shown once, ever — and when the game learns something new, that
+## part of it is shown once more.
 func _maybe_guide(after: String) -> void:
 	_after_guide = after
-	if bool(UiSettings.get_value("seen_intro", false)):
+	var seen := int(UiSettings.get_value("seen_intro", 0))
+	_guide_cards = GUIDE.filter(func(card): return int(card["since"]) > seen)
+	if _guide_cards.is_empty():
 		_leave()
 		return
 	_menu.visible = false
@@ -207,7 +227,9 @@ func _maybe_guide(after: String) -> void:
 func _show_guide_card() -> void:
 	if _guide_card != null:
 		_guide_card.queue_free()
-	var step: Dictionary = GUIDE[_guide_index]
+	if _guide_cards.is_empty():
+		_guide_cards = GUIDE.duplicate()
+	var step: Dictionary = _guide_cards[_guide_index]
 	_guide_card = PanelContainer.new()
 	var box := StyleBoxFlat.new()
 	box.bg_color = Color(0.07, 0.06, 0.05, 0.96)
@@ -236,7 +258,7 @@ func _show_guide_card() -> void:
 	head.add_theme_constant_override("separation", 14)
 	head.add_child(GlyphIcon.make(step["glyph"], Palette.ACCENT, 44))
 	var count := Label.new()
-	count.text = "%d / %d" % [_guide_index + 1, GUIDE.size()]
+	count.text = "%d / %d" % [_guide_index + 1, _guide_cards.size()]
 	count.add_theme_font_size_override("font_size", 14)
 	count.add_theme_color_override("font_color", Palette.TEXT_DIM)
 	count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -255,7 +277,7 @@ func _show_guide_card() -> void:
 	body.add_theme_font_size_override("font_size", 18)
 	body.add_theme_color_override("font_color", Palette.TEXT)
 	rows.add_child(body)
-	var last := _guide_index == GUIDE.size() - 1
+	var last := _guide_index == _guide_cards.size() - 1
 	var next := _button("始める" if last else "次へ", true)
 	next.custom_minimum_size = Vector2(0, 54)
 	next.pressed.connect(_on_guide_next)
@@ -267,8 +289,8 @@ func _show_guide_card() -> void:
 
 func _on_guide_next() -> void:
 	_guide_index += 1
-	if _guide_index >= GUIDE.size():
-		UiSettings.set_value("seen_intro", true)
+	if _guide_index >= _guide_cards.size():
+		UiSettings.set_value("seen_intro", GUIDE_VERSION)
 		_leave()
 		return
 	_show_guide_card()

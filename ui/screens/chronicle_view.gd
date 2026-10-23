@@ -28,6 +28,8 @@ const FILTERS := [
 	# in the world. Left in the main feed they bury everything else, so they get
 	# a page of their own rather than being thrown away.
 	{"label": "側近家", "types": [], "service": true},
+	# The same record read as a history book: fifty-year chapters with names.
+	{"label": "時代", "types": [], "eras": true},
 ]
 
 var _filter_index := 0
@@ -61,6 +63,7 @@ func _ready() -> void:
 	_more.pressed.connect(_on_more)
 	_house_button.pressed.connect(_on_house_button)
 	EventBus.event_recorded.connect(_on_event_recorded)
+	EventBus.tick_advanced.connect(_on_tick)
 	EventBus.game_loaded.connect(_on_world_changed)
 	EventBus.world_reset.connect(_on_world_changed)
 	_picker.visible = false
@@ -175,11 +178,18 @@ var _pending_refresh := false
 
 func _on_event_recorded(_event: HistoryEvent) -> void:
 	# Events arrive in bursts during fast-forward; rebuilding per event would
-	# rebuild the whole list dozens of times in one tick.
-	if _pending_refresh or not is_visible_in_tree():
+	# rebuild the whole list dozens of times in one tick. The history book reads
+	# the whole record, so it is only rewritten every ten years (_on_tick).
+	if _pending_refresh or not is_visible_in_tree() or FILTERS[_filter_index].get("eras", false):
 		return
 	_pending_refresh = true
 	_refresh_soon.call_deferred()
+
+
+func _on_tick(tick: int) -> void:
+	if tick % (10 * SimConfig.TICKS_PER_YEAR) == 0 and is_visible_in_tree() \
+			and FILTERS[_filter_index].get("eras", false):
+		_rebuild()
 
 
 func _refresh_soon() -> void:
@@ -190,6 +200,13 @@ func _refresh_soon() -> void:
 func _rebuild() -> void:
 	for child in _list.get_children():
 		child.queue_free()
+	var eras: bool = FILTERS[_filter_index].get("eras", false)
+	_house_button.get_parent().visible = not eras
+	if eras:
+		_more.visible = false
+		for chapter in EraBook.chapters():
+			_list.add_child(_chapter_card(chapter))
+		return
 
 	var wanted: Array = FILTERS[_filter_index]["types"]
 	var only_service: bool = FILTERS[_filter_index].get("service", false)
@@ -227,6 +244,99 @@ func _rebuild() -> void:
 		_list.add_child(empty)
 
 	_more.visible = matched > _shown
+
+
+## One chapter of the history book: its number and name, the years it covers,
+## the few lines it will be remembered by, and the moments themselves, each of
+## which can be followed to whoever it names.
+func _chapter_card(chapter: Dictionary) -> Control:
+	var writing: bool = not chapter["complete"]
+	var card := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Palette.PANEL_RAISED if writing else Palette.PANEL
+	box.border_color = Color(Palette.ACCENT, 0.7 if writing else 0.3)
+	box.border_width_top = 3
+	box.border_width_left = 1
+	box.border_width_right = 1
+	box.border_width_bottom = 1
+	box.set_corner_radius_all(12)
+	box.content_margin_left = 16
+	box.content_margin_right = 16
+	box.content_margin_top = 12
+	box.content_margin_bottom = 12
+	card.add_theme_stylebox_override("panel", box)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 4)
+	card.add_child(rows)
+
+	var head := HBoxContainer.new()
+	var number := Label.new()
+	number.text = "第%d章" % chapter["number"]
+	number.add_theme_font_size_override("font_size", 15)
+	number.add_theme_color_override("font_color", Palette.ACCENT_SOFT.lightened(0.3))
+	number.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(number)
+	var years := Label.new()
+	years.text = "%d〜%d年%s" % [chapter["start_year"], chapter["end_year"],
+		"　執筆中" if writing else ""]
+	years.add_theme_font_size_override("font_size", 14)
+	years.add_theme_color_override("font_color", Palette.ACCENT if writing else Palette.TEXT_DIM)
+	head.add_child(years)
+	rows.add_child(head)
+
+	var title := Label.new()
+	title.text = chapter["title"]
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", Palette.ACCENT)
+	rows.add_child(title)
+
+	for line in chapter["lines"]:
+		var text := Label.new()
+		text.text = "・%s" % line
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.add_theme_font_size_override("font_size", 17)
+		text.add_theme_color_override("font_color", Palette.TEXT)
+		rows.add_child(text)
+
+	var moments: Array = chapter["moments"]
+	if not moments.is_empty():
+		var rule := ColorRect.new()
+		rule.color = Color(Palette.ACCENT, 0.18)
+		rule.custom_minimum_size = Vector2(0, 1)
+		rows.add_child(rule)
+	for e in moments:
+		rows.add_child(_moment(e))
+
+	var tally := Label.new()
+	tally.text = "生まれた者 %d　世を去った者 %d" % [chapter["births"], chapter["deaths"]]
+	tally.add_theme_font_size_override("font_size", 13)
+	tally.add_theme_color_override("font_color", Palette.TEXT_DIM)
+	rows.add_child(tally)
+	return card
+
+
+func _moment(e: HistoryEvent) -> Control:
+	var news := NewsFeed.classify(e)
+	var colour: Color = news.get("colour", Palette.TEXT_MUTED)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var icon := GlyphIcon.make(news.get("glyph", &"scroll"), colour, 18)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	icon.custom_minimum_size = Vector2(20, 24)
+	row.add_child(icon)
+	var text := Label.new()
+	text.text = "%d年　%s" % [int(e.tick / SimConfig.TICKS_PER_YEAR), e.description]
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_font_size_override("font_size", 15)
+	text.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(text)
+	var subject := NewsFeed.subject_of(e)
+	if subject != &"":
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		row.gui_input.connect(_on_entry_input.bind(row, subject))
+	return row
 
 
 func _year_header(year: int) -> Control:

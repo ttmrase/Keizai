@@ -9,7 +9,14 @@ extends Node
 const SPEC_DIR := "res://tests/specs"
 
 
+const TEST_ANNALS := "user://annals_test.cfg"
+
+
 func _ready() -> void:
+	# Worlds made here unlock feats like any other; they go in a record of their
+	# own, never the player's.
+	Oracle.use_annals(TEST_ANNALS)
+	DirAccess.remove_absolute(TEST_ANNALS)
 	var start := Time.get_ticks_msec()
 	var total_checks := 0
 	var failed_specs := 0
@@ -60,6 +67,7 @@ func _ready() -> void:
 	var elapsed := Time.get_ticks_msec() - start
 	print("\n%d checks in %d specs, %d failing specs (%.1fs)"
 		% [total_checks, paths.size(), failed_specs, elapsed / 1000.0])
+	DirAccess.remove_absolute(TEST_ANNALS)
 	get_tree().quit(1 if failed_specs > 0 else 0)
 
 
