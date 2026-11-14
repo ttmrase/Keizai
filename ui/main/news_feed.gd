@@ -26,6 +26,8 @@ signal reveal_requested(id: StringName)
 signal headline(item: Dictionary)
 ## A rupture has taken the screen: `item` is what it is.
 signal rupture(item: Dictionary)
+## Fifty years have closed and been given a name.
+signal chapter_closed(chapter: Dictionary)
 
 enum Weight { NONE, NOTABLE, MAJOR }
 
@@ -129,6 +131,7 @@ func _on_tick(tick: int) -> void:
 	if chapter.is_empty():
 		return
 	var lines: Array = chapter["lines"]
+	chapter_closed.emit(chapter)
 	_queue({"weight": Weight.NOTABLE, "label": "第%d章　閉幕" % chapter["number"],
 		"colour": Palette.ACCENT_SOFT.lightened(0.3), "glyph": &"scroll", "tab": "chronicle",
 		"subject": &"", "year": int(chapter["end_year"]),

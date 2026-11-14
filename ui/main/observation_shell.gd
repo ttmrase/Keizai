@@ -73,6 +73,13 @@ func _build_fx() -> void:
 	Oracle.feat_unlocked.connect(func(_feat: Dictionary):
 		_fx.burst(Palette.ACCENT, &"scroll", _news_bar.global_position - global_position
 			+ Vector2(32, NewsBar.HEIGHT * 0.5), 0.3))
+	_news.chapter_closed.connect(func(chapter: Dictionary):
+		if is_visible_in_tree():
+			_fx.caption("第%d章　%d〜%d年　閉幕" % [chapter["number"], chapter["start_year"],
+				chapter["end_year"]], chapter["title"]))
+	EventBus.world_reset.connect(func():
+		if is_visible_in_tree():
+			_fx.caption("0年", "新しい世界が興った"))
 	_news.rupture.connect(func(item: Dictionary):
 		if item.get("label", "") != "神託成就":
 			_fx.wash(item["colour"], 0.38, 0.9)
@@ -113,6 +120,8 @@ func _build_dock() -> void:
 		button.pressed.connect(show_tab.bind(tab["id"]))
 		_dock.add_child(button)
 	EventBus.power_recalculated.connect(_on_recalculated)
+	Oracle.prophecies_changed.connect(_sync_oracle_badge)
+	_sync_oracle_badge()
 
 
 ## The incidents tab carries a mark while any rupture stands close, so the
@@ -128,6 +137,17 @@ func _on_recalculated(tick: int) -> void:
 	for i in TABS.size():
 		if TABS[i]["id"] == "incidents":
 			(_dock.get_child(i) as DockButton).badge = close
+	_sync_oracle_badge()
+
+
+## The god's tab carries a gold mark while no future has been spoken: the one
+## thing in the game that waits on the reader.
+func _sync_oracle_badge() -> void:
+	for i in TABS.size():
+		if TABS[i]["id"] == "god":
+			var button := _dock.get_child(i) as DockButton
+			button.badge_colour = Palette.ACCENT
+			button.badge = Oracle.prophecies.is_empty()
 
 
 func show_tab(id: String) -> void:

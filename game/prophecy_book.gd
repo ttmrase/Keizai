@@ -282,7 +282,7 @@ static func _offer_longevity(rng: RandomNumberGenerator, tick: int) -> Dictionar
 	return _make(LONGEVITY, String(person.person_id), person.full_name, float(goal), tick,
 		years, clampi(30 + maxi(0, goal - 60) * 3, 30, 90),
 		"%sは%d歳まで生きる" % [person.full_name, goal],
-		"疫病と飢えを遠ざけておく。いま%d歳" % age)
+		"疫病と飢えを遠ざけておく。人の寿命は神にも決められない")
 
 
 static func _offer_ascent(rng: RandomNumberGenerator, tick: int) -> Dictionary:

@@ -1114,3 +1114,65 @@ Prophecies are not written into the chronicle, which records what the world did,
 not what the god said. And fulfilment never feeds back into the simulation — no
 faith grows because a prophecy came true — because that would be the god
 reaching into society by another door.
+
+## Twelfth iteration: a pass for the reader
+
+Eleven iterations added things. This one adds almost nothing to what the game
+is and goes over how it is met: what the screen is, what can be reached on it,
+what a reader should look at, and what the moments worth waiting for feel like
+when they arrive. No rule changed.
+
+**The whole screen, and every control on it.** Two attempts at fitting a phone
+had both gone wrong. Hiding the system bars put the game under the cut-out and
+the corners. Showing them and letting the system pad the window left strips
+that were coloured like the game and dead to the finger. The arrangement that
+behaves the same everywhere is the plain modern one: draw edge to edge, let the
+bars float over the game, and keep the game's own margins (`SafeArea`). The
+backdrop runs under the bars; the status strip, screens and dock sit between
+them. Because this cannot be tried on a device from here, the settings carry
+two escape hatches — hide the bars entirely, and widen either margin by hand.
+
+The other dead region was the game's own doing. Headlines slid in over the top
+of the open screen, which is where every screen keeps its filters, and at four
+times speed there is always a headline. They now have a bar of their own above
+the dock that covers nothing. `test_reachable` asks the question that would
+have caught both: on every screen, in every state it can get to, is each
+visible button what a finger put on it would actually hit?
+
+**What is brewing.** The chronicle says what happened and the map says what is;
+neither said what was about to be, which is the part a watcher leans forward
+for. `Portents` reads it off the present — a spoken prophecy and its deadline,
+a rupture gathering, a challenger's hold on the state, an old ruler, a family
+down to its last two, a land in unrest, a divided faith — and ranks it. The map
+carries a line of it under the chips, the incidents screen lists it, and every
+item leads to where it can be watched. It predicts nothing: each line is an
+age, a headcount or a pressure the simulation already computes. A god who has
+foretold nothing finds the first line is an invitation to.
+
+**The race.** A prophecy used to be a sentence and a countdown. Where the world
+offers a number for it — a share of the leader's power, a rupture's pressure, a
+headcount — the card now shows how near the world stands beside how much time
+is gone, and the news says so once when it draws near and once when time runs
+short. Offers show their current standing and one to three stars. The god's
+tab carries a gold mark while no future is spoken.
+
+**A second of light.** A prophecy fulfilled, a calamity called down and a
+capital falling used to arrive as cards like any other. `FxLayer` gives them
+rays, a wash of colour, a jolt; a closing chapter's name crosses the screen
+like a film's chapter card. All of it is drawn, decays in a second or three,
+and can neither be touched nor hold anything up.
+
+**Arms.** Each house has a shield: the field is the colour it already had, and
+the device is that of the founding house its line descends from. A cadet
+branch keeps the chevron and changes the colour, so kinship is visible on the
+map, the power list, the relations field and the house tree without reading a
+name. It is the lineage rule the whole game is built on, made into a picture.
+
+**A legend on every screen.** The same question mark, in the same place, opens
+what the open screen's marks mean and how to work it, followed by the three
+steps the game turns on. The god's panel, which had grown long, has its four
+parts one tap from the top.
+
+Left out on purpose again: sound, which cannot be judged from here; any change
+to the dock's seven screens, which are the game's original shape; and feedback
+from fulfilment into the world, for the reason given last time.

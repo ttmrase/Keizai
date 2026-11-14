@@ -49,6 +49,13 @@ func rise(text: String, colour: Color, from: Vector2) -> void:
 	_add({"kind": "rise", "life": 1.4, "colour": colour, "text": text, "origin": from})
 
 
+## Words across the screen like a chapter card in a film: an age closing, a
+## world beginning. It passes by itself and stops nothing.
+func caption(kicker: String, title: String, colour: Color = Palette.ACCENT) -> void:
+	_effects = _effects.filter(func(e): return e["kind"] != "caption")
+	_add({"kind": "caption", "life": 3.8, "colour": colour, "kicker": kicker, "title": title})
+
+
 ## The ground moving under everything, briefly.
 func quake(seconds: float = 0.35, amplitude: float = 7.0) -> void:
 	_shake_left = seconds
@@ -97,6 +104,8 @@ func _draw() -> void:
 					Color(effect["colour"], float(effect["strength"]) * fade))
 			"omen":
 				_draw_omen(effect, u)
+			"caption":
+				_draw_caption(effect, u)
 			"rise":
 				var font := get_theme_default_font()
 				var at: Vector2 = effect["origin"] + Vector2(0, -54.0 * _ease_out(u))
@@ -145,6 +154,36 @@ func _draw_omen(effect: Dictionary, u: float) -> void:
 		300.0 * scale, Color(colour, alpha), 0.7)
 	draw_arc(centre, lerpf(120.0, 420.0, _ease_out(u)), 0.0, TAU, 64,
 		Color(colour, 0.45 * (1.0 - u)), 3.0, true)
+
+
+func _draw_caption(effect: Dictionary, u: float) -> void:
+	var colour: Color = effect["colour"]
+	var font := get_theme_default_font()
+	# In over the first tenth, out over the last quarter.
+	var alpha := minf(u / 0.1, 1.0) * (1.0 - clampf((u - 0.75) / 0.25, 0.0, 1.0))
+	var band := Rect2(0, size.y * 0.3, size.x, 132)
+	draw_rect(band, Color(0.03, 0.025, 0.02, 0.78 * alpha))
+	draw_line(band.position + Vector2(0, 1), band.position + Vector2(size.x, 1),
+		Color(colour, 0.6 * alpha), 1.5)
+	draw_line(Vector2(0, band.end.y - 1), Vector2(size.x, band.end.y - 1),
+		Color(colour, 0.6 * alpha), 1.5)
+	# The rules draw outward from the middle as the words arrive.
+	var open := _ease_out(minf(u / 0.25, 1.0))
+	var kicker: String = effect["kicker"]
+	var title: String = effect["title"]
+	var kicker_width := font.get_string_size(kicker, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+	draw_string(font, Vector2((size.x - kicker_width) * 0.5, band.position.y + 40), kicker,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(colour, alpha))
+	var title_size := 40
+	var title_width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x
+	if title_width > size.x - 48.0:
+		title_size = int(40.0 * (size.x - 48.0) / title_width)
+		title_width = font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x
+	draw_string(font, Vector2((size.x - title_width) * 0.5, band.position.y + 96), title,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, Color(Palette.TEXT, alpha))
+	var half := (title_width * 0.5 + 60.0) * open
+	draw_line(Vector2(size.x * 0.5 - half, band.position.y + 112),
+		Vector2(size.x * 0.5 + half, band.position.y + 112), Color(colour, 0.5 * alpha), 1.0)
 
 
 static func _ease_out(u: float) -> float:

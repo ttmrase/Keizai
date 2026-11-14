@@ -109,12 +109,23 @@ static func build(p: Dictionary, tick: int, mode: String,
 		if near >= 0.0:
 			rows.add_child(_meter("近さ", near, colour))
 		rows.add_child(_meter("時", used, Palette.TEXT_MUTED if used < 0.8 else Palette.DANGER))
+	if mode == "offer":
+		# Where things stand now, so the choice is made knowing the odds.
+		var standing := ProphecyBook.progress(p, tick)
+		if not standing.is_empty():
+			var now := Label.new()
+			now.text = "いま　%s" % standing if not standing.begins_with("いま") else standing
+			now.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			now.add_theme_font_size_override("font_size", 15)
+			now.add_theme_color_override("font_color", colour.lightened(0.2))
+			rows.add_child(now)
 	if not settled:
+		# How the god might bring it about: the most useful line on the card.
 		var hint := Label.new()
-		hint.text = p["hint"]
+		hint.text = "手がかり　%s" % p["hint"]
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		hint.add_theme_font_size_override("font_size", 13)
-		hint.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		hint.add_theme_font_size_override("font_size", 14)
+		hint.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 		rows.add_child(hint)
 
 	var actions := HBoxContainer.new()

@@ -21,7 +21,7 @@ const MAP_SIZE := Vector2(1000, 1450)
 
 ## Each card says which version of the guide added it. A reader who has seen an
 ## older guide is shown only what is new since, once.
-const GUIDE_VERSION := 2
+const GUIDE_VERSION := 3
 const GUIDE := [
 	{"since": 1, "glyph": &"sun", "title": "神にできるのは、世界を変えることだけ",
 		"body": "鉱石・木材・収穫・魔物の四つの理と、七つの災厄と恵み。誰を王にするかも、どの組織を潰すかも、神には選べない。"},
@@ -29,8 +29,8 @@ const GUIDE := [
 		"body": "家が婚姻で結ばれ、ギルドや信仰が生まれ、国が倒れては建つ。どれほど枝分かれしても、すべては最初のひとつまで辿れる。"},
 	{"since": 2, "glyph": &"sparkle", "title": "神託を下し、世をそちらへ導く",
 		"body": "「三十年のうちにこのギルドが天下を取る」——神の力の画面で未来を告げ、四つの理と災厄で人の世をそちらへ傾ける。当たれば神威が満ち、災厄を下す力になる。"},
-	{"since": 1, "glyph": &"map", "title": "地図と事件を見ていよう",
-		"body": "地図は誰が何を治めているかを示し、事件の画面は次の破局がどこまで近づいているかを示す。年代記の「時代」には、半世紀ごとの歴史が章になって残る。"},
+	{"since": 3, "glyph": &"unrest", "title": "兆しを見て、「？」で確かめる",
+		"body": "地図の上の一行が、いま起きそうなこと——「兆し」を教えてくれる。どの画面でも、上の「？」を押せばその画面の読み方が出る。"},
 ]
 
 var _land: ColorRect

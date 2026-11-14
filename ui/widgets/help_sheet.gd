@@ -18,6 +18,20 @@ const LOOP := [
 		"text": "時を進め、地図と年代記で成り行きを追う。当たれば神威が満ち、もっと大きく世を揺らせるようになる。"},
 ]
 
+## What is on every screen, whichever is open.
+const ALWAYS := [
+	{"glyph": &"sparkle", "title": "✦ の数字と三つの点",
+		"text": "神威（災厄を下す力）と、いま告げている神託の数。タップすると神の力へ。"},
+	{"glyph": &"play", "title": "時の速さ",
+		"text": "止める・一倍・二倍・四倍。大事件が起きると時は自動で止まる（設定で切れる）。"},
+	{"glyph": &"wheat", "title": "五つの棒",
+		"text": "魔物・不満・収穫・鉱石・木材のいまの水準。矢印は増えているか減っているか。"},
+	{"glyph": &"scroll", "title": "下の一行",
+		"text": "いちばん新しい出来事。タップするとその出来事の主役へ飛ぶ。"},
+	{"glyph": &"flame", "title": "タブの印",
+		"text": "「事件」の赤い印は破局が近いしるし。「神の力」の金の印は、まだ未来を告げていないしるし。"},
+]
+
 const PAGES := {
 	"map": {"title": "世界の読み方", "rows": [
 		{"glyph": &"map", "title": "色分け",
@@ -97,6 +111,9 @@ static func open(host: Control, tab: String, margins: Vector4 = Vector4.ZERO) ->
 	var sheet := Sheet.open(host, page["title"], "", margins)
 	for row in page["rows"]:
 		sheet.body.add_child(_row(row, Palette.ACCENT))
+	sheet.body.add_child(_heading("いつも出ているもの"))
+	for row in ALWAYS:
+		sheet.body.add_child(_row(row, Palette.TEXT_MUTED))
 	sheet.body.add_child(_heading("この遊びの流れ"))
 	for row in LOOP:
 		sheet.body.add_child(_row(row, Palette.TEXT_MUTED))

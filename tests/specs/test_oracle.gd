@@ -19,6 +19,9 @@ func run() -> void:
 	_calamities_cost_might()
 	_the_oracle_survives_a_save()
 	_the_history_reads_as_chapters()
+	_a_prophecy_races_its_deadline()
+	_portents_read_the_world()
+	_kin_bear_the_same_arms()
 	finish()
 
 
@@ -159,3 +162,97 @@ func _the_history_reads_as_chapters() -> void:
 	var again := EraBook.chapters()
 	for i in chapters.size():
 		check_eq(again[i]["title"], chapters[i]["title"], "the same history should give the same book")
+
+
+func _a_prophecy_races_its_deadline() -> void:
+	var tick := SimClock.current_tick
+	Oracle.prophecies.clear()
+	for kind in ProphecyBook.KINDS:
+		var near := ProphecyBook.closeness(ProphecyBook._make(kind, "", "", 0.0, tick, 30, 30, "", ""), tick)
+		check(near >= -1.0 and near <= 1.0, "closeness should be a share or unknown for %s" % kind)
+	var top := PowerCalculator.ranked(-1)[0]
+	check_near(ProphecyBook.closeness(ProphecyBook._make(ProphecyBook.HEGEMONY, String(top.org_id),
+		"", 0.0, tick, 30, 30, "", ""), tick), 1.0, 0.001, "the strongest stands at its own goal")
+	check_eq(ProphecyBook.headline({"text": "30年のうちに、甲が乙となる"}), "甲が乙となる",
+		"a headline should drop the deadline")
+	check_eq(ProphecyBook.stars({"reward": 40}), 1, "a modest prophecy is one star")
+	check_eq(ProphecyBook.stars({"reward": 120}), 3, "a bold prophecy is three")
+
+	# Sixty people from a hundred toward the goal: past the first mark, not the second.
+	var population := GameState.world.global_population
+	var p := ProphecyBook._make(ProphecyBook.GROWTH, "", "", population + 40.0, tick, 40, 35,
+		"40年のうちに、世の人口が増える", "test")
+	p["state"] = "active"
+	p["base"] = population - 60.0
+	p["told"] = 0
+	p["warned"] = false
+	Oracle.prophecies.append(p)
+	var nearing := [0]
+	var pressing := [0]
+	var on_near := func(_p: Dictionary, _c: float): nearing[0] += 1
+	var on_press := func(_p: Dictionary, _y: int): pressing[0] += 1
+	Oracle.prophecy_nearing.connect(on_near)
+	Oracle.prophecy_pressing.connect(on_press)
+	Oracle._watch_progress(tick)
+	Oracle._watch_progress(tick)
+	check_eq(nearing[0], 1, "drawing near should be said once, not every season")
+	check_eq(pressing[0], 0, "forty years is not yet short of time")
+	p["deadline"] = tick + 3 * SimConfig.TICKS_PER_YEAR
+	Oracle._watch_progress(tick)
+	Oracle._watch_progress(tick)
+	check_eq(pressing[0], 1, "running short of time should be said once")
+	Oracle.prophecy_nearing.disconnect(on_near)
+	Oracle.prophecy_pressing.disconnect(on_press)
+	Oracle.prophecies.clear()
+
+
+func _portents_read_the_world() -> void:
+	var tick := SimClock.current_tick
+	var world_before := JSON.stringify(GameState.to_dict())
+	var rng_before := JSON.stringify(RngService.to_dict())
+	Oracle.prophecies.clear()
+	Oracle.record.clear()
+	var portents := Portents.current(tick)
+	check(not portents.is_empty(), "there is always something to say about the world")
+	check_eq(String(portents[0]["tab"]), "god",
+		"a god who has foretold nothing is first told to foretell something")
+	for i in portents.size():
+		var item: Dictionary = portents[i]
+		check(not String(item["title"]).is_empty(), "every portent should say what it is")
+		check(not String(item["tab"]).is_empty(), "every portent should say where to look")
+		if i > 0:
+			check(float(portents[i - 1]["weight"]) >= float(item["weight"]),
+				"portents should run most pressing first")
+	check(portents.size() <= Portents.MAX_ITEMS, "the list should stay short enough to read")
+	check_eq(JSON.stringify(GameState.to_dict()), world_before, "reading portents should not change the world")
+	check_eq(JSON.stringify(RngService.to_dict()), rng_before,
+		"reading portents should not draw on the world's randomness")
+
+	Oracle.current_offers()
+	Oracle.declare(0)
+	var spoken := Portents.current(tick)
+	var found := false
+	for item in spoken:
+		found = found or (String(item["label"]) == "神託" and String(item["title"])
+			== ProphecyBook.headline(Oracle.prophecies[0]))
+	check(found, "a spoken prophecy should be among the portents")
+	Oracle.prophecies.clear()
+
+
+func _kin_bear_the_same_arms() -> void:
+	var founders := {}
+	var cadets := 0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE, false):
+		if house.is_noble() and house.founding_tick == 0:
+			founders["%d/%s" % [Crest.device_of(house), Crest.metal_of(house).to_html()]] = true
+		var parent := GameState.get_organization(house.parent_org_id)
+		if house.founding_tick > 0 and parent != null and parent.kind == Organization.OrgKind.HOUSE:
+			cadets += 1
+			check_eq(Crest.device_of(house), Crest.device_of(parent),
+				"%s should bear the device of the house it left" % house.display_name)
+			check(Crest.are_kin(house, parent), "a cadet and its parent are of one line")
+	# Families raised to the peerage since the founding bring arms of their own
+	# as well, so there may be more than there were founders — never fewer.
+	check(founders.size() >= WorldGenerator.SETTLEMENT_COUNT,
+		"each founding house should have arms of its own (%d kinds)" % founders.size())
+	check_gt(float(cadets), 0.0, "the test world should have cadet houses to check")

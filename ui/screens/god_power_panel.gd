@@ -331,6 +331,13 @@ func _sync_oracle() -> void:
 		_oracle_box.add_child(speak)
 	# The last few settled, so the outcome of a prophecy can still be read after
 	# the news of it has gone.
+	if not Oracle.record.is_empty():
+		var hits := Oracle.fulfilled_count()
+		var tally := Label.new()
+		tally.text = "この世界での神託　成就 %d　・　外れ %d" % [hits, Oracle.record.size() - hits]
+		tally.add_theme_font_size_override("font_size", 14)
+		tally.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		_oracle_box.add_child(tally)
 	var settled := Oracle.record.slice(maxi(0, Oracle.record.size() - 2))
 	settled.reverse()
 	for p in settled:

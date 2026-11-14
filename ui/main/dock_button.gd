@@ -10,12 +10,14 @@ var active := false:
 	set(value):
 		active = value
 		queue_redraw()
-## A small red mark — for the incidents tab, when a rupture is close.
+## A small mark — on the incidents tab when a rupture is close, on the god's
+## tab when there is a prophecy to be spoken.
 var badge := false:
 	set(value):
 		if badge != value:
 			badge = value
 			queue_redraw()
+var badge_colour := Palette.DANGER
 
 
 func _init() -> void:
@@ -41,5 +43,5 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, tint)
 	if badge:
 		var at := Vector2(size.x * 0.5 + 15, size.y * 0.2)
-		draw_circle(at, 6, Palette.DANGER)
+		draw_circle(at, 6, badge_colour)
 		draw_arc(at, 6, 0, TAU, 16, Palette.BG, 2.0)

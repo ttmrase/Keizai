@@ -99,10 +99,13 @@ static func are_kin(a: Organization, b: Organization) -> bool:
 
 
 ## Organizations are numbered as they are founded, so the founding houses get
-## devices in turn rather than by the luck of a hash.
+## devices in turn rather than by the luck of a hash — and a different world
+## deals them from a different place in the pack.
 static func _number(org: Organization) -> int:
 	var digits := String(org.org_id).trim_prefix("org_")
-	return absi(int(digits)) if digits.is_valid_int() else absi(hash(org.org_id))
+	var turn := absi(int(digits)) if digits.is_valid_int() else absi(hash(org.org_id))
+	var deal: int = absi(GameState.world.seed) % 16 if GameState.world != null else 0
+	return turn + deal
 
 
 static func _pieces(device: int) -> Array:

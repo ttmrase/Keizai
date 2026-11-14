@@ -146,6 +146,12 @@ func _ready() -> void:
 	await _capture("%s/fx_burst.png" % _out_dir)
 	for i in 60:
 		await get_tree().process_frame
+	shell._fx.caption("第13章　600〜650年　閉幕", "黄昏の時代")
+	for i in 30:
+		await get_tree().process_frame
+	await _capture("%s/fx_caption.png" % _out_dir)
+	for i in 100:
+		await get_tree().process_frame
 	shell._fx.wash(Palette.DANGER, 0.3, 0.9)
 	shell._fx.omen(&"plague", Palette.DANGER)
 	for i in 14:
