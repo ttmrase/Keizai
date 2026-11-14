@@ -294,14 +294,17 @@ func _draw_house(house: Organization, font: Font) -> void:
 	var centre := _canvas.to_screen(_spots[house.org_id])
 	var radius := _radius_of(house) * _canvas.view_zoom
 	var noble := house.standing == Organization.Standing.NOBLE
-	var fill: Color = Palette.HOUSE if noble else Palette.HOUSE.darkened(0.45)
+	var fill: Color = Heraldry.of_org(house)
 	# A family with no part in the chosen one's affairs stays on the field, but
 	# recedes into it.
 	var dim: float = 1.0 if _selected_id == &"" or _lit.has(house.org_id) else 0.34
 
-	_canvas.draw_circle(centre, radius, _shade(fill.darkened(0.4), dim))
-	_canvas.draw_arc(centre, radius, 0, TAU, 28, _shade(fill, dim),
+	# Each family stands on the field under its own arms: the same shield it
+	# flies on the map, so a house is one thing on every screen.
+	_canvas.draw_circle(centre, radius, _shade(Color(0.09, 0.08, 0.065), dim))
+	_canvas.draw_arc(centre, radius, 0, TAU, 28, _shade(fill, dim * (1.0 if noble else 0.7)),
 		maxf(1.0, 2.0 * _canvas.view_zoom))
+	Crest.draw(_canvas, house, centre, radius * (1.36 if noble else 1.3), dim < 1.0)
 	if _wears_a_crown(house):
 		_canvas.draw_arc(centre, radius + 7.0 * _canvas.view_zoom, 0, TAU, 32,
 			_shade(Palette.ACCENT, dim), maxf(1.0, 2.5 * _canvas.view_zoom))

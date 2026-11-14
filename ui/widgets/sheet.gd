@@ -11,14 +11,17 @@ var body: VBoxContainer
 var _panel: PanelContainer
 
 
-static func open(host: Control, title: String, subtitle: String = "") -> Sheet:
+## `margins` (left, top, right, bottom) is for a host that runs under the
+## phone's bars: the dimming covers all of it, the sheet itself stays clear.
+static func open(host: Control, title: String, subtitle: String = "",
+		margins: Vector4 = Vector4.ZERO) -> Sheet:
 	var sheet := Sheet.new()
 	host.add_child(sheet)
-	sheet._build(title, subtitle)
+	sheet._build(title, subtitle, margins)
 	return sheet
 
 
-func _build(title: String, subtitle: String) -> void:
+func _build(title: String, subtitle: String, margins: Vector4) -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var veil := ColorRect.new()
@@ -87,14 +90,17 @@ func _build(title: String, subtitle: String) -> void:
 
 	# Rises into place: offsets rather than position, so the motion does not
 	# depend on whether layout has happened yet.
-	_panel.offset_top = 60.0
-	_panel.offset_bottom = 60.0
+	_panel.offset_left = margins.x
+	_panel.offset_right = -margins.z
+	_panel.offset_top = margins.y + 60.0
+	_panel.offset_bottom = 60.0 - margins.w
 	modulate.a = 0.0
 	var tween := create_tween().set_parallel()
 	tween.tween_property(self, "modulate:a", 1.0, 0.18)
-	for side in ["offset_top", "offset_bottom"]:
-		tween.tween_property(_panel, side, 0.0, 0.22) \
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_panel, "offset_top", margins.y, 0.22) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_panel, "offset_bottom", -margins.w, 0.22) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 func clear() -> void:

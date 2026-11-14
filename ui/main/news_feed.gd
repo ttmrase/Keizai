@@ -7,31 +7,34 @@ extends Control
 ## both have to be looked at. At four times speed a kingdom can fall between two
 ## glances at the family tree, and an observation game whose drama happens
 ## off-screen is not much of one. So the things a history will remember come to
-## the reader instead: a strip of news across the top of whatever screen is open,
-## and — for the ruptures — the whole screen, with the clock stopped so nothing
-## is missed while it is read.
+## the reader instead: a headline in the news bar above the dock, and — for the
+## ruptures — the whole screen, with the clock stopped so nothing is missed
+## while it is read.
 ##
 ## It decides nothing about the world. It listens, sorts what it hears by how
 ## much it will matter in a century, and holds back the rest, so a fast hour of
 ## play reads as a sequence of headlines rather than a firehose.
+##
+## Headlines are handed on (`headline`) rather than drawn here: this control
+## lies over the open screen, and anything it drew there would sit on top of
+## that screen's own controls.
 
 signal open_tab(id: String)
 ## Asks for the family tree opened on whoever a headline is about.
 signal reveal_requested(id: StringName)
+## Something worth a line in the news bar.
+signal headline(item: Dictionary)
+## A rupture has taken the screen: `item` is what it is.
+signal rupture(item: Dictionary)
 
 enum Weight { NONE, NOTABLE, MAJOR }
 
-const MAX_SHOWN := 3
-const MAX_WAITING := 4
-## At most one new headline in this many seconds, so a burst reads as a
+## At most one new banner in this many seconds, so a burst reads as a
 ## sequence rather than arriving in one heap.
 const SPACING := 0.9
-const NOTABLE_LIFE := 4.6
 
 var _waiting: Array = []
-var _shown: Array[Control] = []
 var _since_last := 99.0
-var _stack: VBoxContainer
 var _banner: Control
 ## Where the banner that is open keeps its text, so a rupture that brings down
 ## a regime in the same season reads as one story rather than two banners.
@@ -43,27 +46,18 @@ var _resume_speed := 0.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_stack = VBoxContainer.new()
-	_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stack.add_theme_constant_override("separation", 6)
-	_stack.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_stack.offset_left = 10
-	_stack.offset_right = -10
-	_stack.offset_top = 8
-	add_child(_stack)
 	EventBus.event_recorded.connect(_on_event)
 	EventBus.world_reset.connect(_clear)
 	EventBus.game_loaded.connect(_clear)
 	EventBus.tick_advanced.connect(_on_tick)
 	Oracle.prophecy_resolved.connect(_on_prophecy)
+	Oracle.prophecy_nearing.connect(_on_prophecy_nearing)
+	Oracle.prophecy_pressing.connect(_on_prophecy_pressing)
 	Oracle.feat_unlocked.connect(_on_feat)
 
 
 func _clear() -> void:
 	_waiting.clear()
-	for card in _shown:
-		card.queue_free()
-	_shown.clear()
 	if _banner != null:
 		_banner.queue_free()
 		_banner = null
@@ -75,13 +69,10 @@ func _process(delta: float) -> void:
 		return
 	var next: Dictionary = _waiting.pop_front()
 	_since_last = 0.0
-	if next["weight"] == Weight.MAJOR:
-		if _banner != null and is_instance_valid(_banner_rows):
-			_follow_up(next)
-		else:
-			_show_banner(next)
+	if _banner != null and is_instance_valid(_banner_rows):
+		_follow_up(next)
 	else:
-		_show_card(next)
+		_show_banner(next)
 
 
 # ---------------------------------------------------------------- sorting
@@ -104,6 +95,24 @@ func _on_prophecy(p: Dictionary) -> void:
 		_queue({"weight": Weight.NOTABLE, "label": "神託外れ", "colour": Palette.TEXT_MUTED,
 			"glyph": &"scroll", "tab": "god", "subject": &"", "year": year,
 			"text": "「%s」は果たされなかった" % p["text"]})
+
+
+## The race between a prophecy and its deadline, told as it turns: when the
+## world draws near to bearing it out, and when the time is nearly gone.
+func _on_prophecy_nearing(p: Dictionary, closeness: float) -> void:
+	var where := ProphecyBook.progress(p, SimClock.current_tick)
+	_queue({"weight": Weight.NOTABLE, "label": "神託近づく", "colour": Palette.ACCENT,
+		"glyph": &"sparkle", "tab": "god", "subject": &"", "year": SimClock.year(),
+		"text": "「%s」まであと一歩%s" % [ProphecyBook.headline(p),
+			"（%s）" % where if not where.is_empty() else ""] if closeness >= 0.85
+			else "「%s」に世が傾きはじめた%s" % [ProphecyBook.headline(p),
+			"（%s）" % where if not where.is_empty() else ""]})
+
+
+func _on_prophecy_pressing(p: Dictionary, years_left: int) -> void:
+	_queue({"weight": Weight.NOTABLE, "label": "刻限迫る", "colour": Palette.DANGER,
+		"glyph": &"sparkle", "tab": "god", "subject": &"", "year": SimClock.year(),
+		"text": "「%s」——残り%d年" % [ProphecyBook.headline(p), years_left]})
 
 
 func _on_feat(feat: Dictionary) -> void:
@@ -129,22 +138,15 @@ func _on_tick(tick: int) -> void:
 func _queue(item: Dictionary) -> void:
 	if item["weight"] == Weight.NONE:
 		return
-	if item["weight"] == Weight.MAJOR:
-		# A rupture is never queued behind lesser news, and never dropped.
-		_waiting.push_front(item)
-		if UiSettings.auto_pause() and SimClock.time_scale > 0.0:
-			_resume_speed = SimClock.time_scale
-			SimClock.set_time_scale(0.0)
-			item["paused"] = true
+	if item["weight"] != Weight.MAJOR:
+		headline.emit(item)
 		return
-	if _waiting.size() >= MAX_WAITING:
-		# A burst of lesser news: the oldest is already history by the time it
-		# would be read, so it goes first.
-		for i in _waiting.size():
-			if _waiting[i]["weight"] == Weight.NOTABLE:
-				_waiting.remove_at(i)
-				break
+	# A rupture is never dropped, and is told in the order it happened.
 	_waiting.append(item)
+	if UiSettings.auto_pause() and SimClock.time_scale > 0.0:
+		_resume_speed = SimClock.time_scale
+		SimClock.set_time_scale(0.0)
+		item["paused"] = true
 
 
 ## How much an event will matter to anybody reading the history later, and how
@@ -232,103 +234,13 @@ static func subject_of(e: HistoryEvent) -> StringName:
 	return person_id if person_id != &"" else org_id
 
 
-# --------------------------------------------------------------- headlines
-
-func _show_card(item: Dictionary) -> void:
-	# The same headline twice in a row (the same calamity called down again) is
-	# one piece of news: the old card makes way for the new one.
-	for shown in _shown.duplicate():
-		if shown.get_meta("text", "") == item["text"]:
-			_dismiss(shown)
-	var card := PanelContainer.new()
-	card.set_meta("text", item["text"])
-	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.07, 0.06, 0.05, 0.95)
-	box.border_color = item["colour"]
-	box.border_width_left = 5
-	box.set_corner_radius_all(10)
-	box.shadow_color = Color(0, 0, 0, 0.45)
-	box.shadow_size = 8
-	box.content_margin_left = 12
-	box.content_margin_right = 12
-	box.content_margin_top = 8
-	box.content_margin_bottom = 8
-	card.add_theme_stylebox_override("panel", box)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(row)
-	var icon := GlyphIcon.make(item["glyph"], item["colour"], 34)
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(icon)
-
-	var text := VBoxContainer.new()
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_constant_override("separation", 0)
-	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(text)
-	var head := HBoxContainer.new()
-	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var label := Label.new()
-	label.text = item["label"]
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", 15)
-	label.add_theme_color_override("font_color", item["colour"])
-	head.add_child(label)
-	var year := Label.new()
-	year.text = "%d年" % item["year"]
-	year.add_theme_font_size_override("font_size", 13)
-	year.add_theme_color_override("font_color", Palette.TEXT_DIM)
-	head.add_child(year)
-	text.add_child(head)
-	var body := Label.new()
-	body.text = item["text"]
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.max_lines_visible = 2
-	body.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	body.add_theme_font_size_override("font_size", 16)
-	body.add_theme_color_override("font_color", Palette.TEXT)
-	text.add_child(body)
-
-	card.gui_input.connect(_on_card_input.bind(card, item))
-	_stack.add_child(card)
-	_shown.append(card)
-	while _shown.size() > MAX_SHOWN:
-		_dismiss(_shown[0])
-
-	card.modulate.a = 0.0
-	card.pivot_offset = Vector2(card.size.x * 0.5, 0)
-	var tween := card.create_tween()
-	tween.tween_property(card, "modulate:a", 1.0, 0.22)
-	tween.tween_interval(NOTABLE_LIFE)
-	tween.tween_callback(_dismiss.bind(card))
-
-
-func _on_card_input(event: InputEvent, card: Control, item: Dictionary) -> void:
-	if not Touch.tapped(card, event):
-		return
-	_follow(item)
-	_dismiss(card)
-
-
 ## Goes where a headline points. One about a branch or a family opens the tree
 ## on it, rather than leaving the reader to find it among everyone else.
-func _follow(item: Dictionary) -> void:
+func follow(item: Dictionary) -> void:
 	if item["tab"] == "lineage" and StringName(item.get("subject", &"")) != &"":
 		reveal_requested.emit(item["subject"])
 	else:
 		open_tab.emit(item["tab"])
-
-
-func _dismiss(card: Control) -> void:
-	if not is_instance_valid(card) or not _shown.has(card):
-		return
-	_shown.erase(card)
-	var tween := card.create_tween()
-	tween.tween_property(card, "modulate:a", 0.0, 0.25)
-	tween.tween_callback(card.queue_free)
 
 
 # ----------------------------------------------------------------- ruptures
@@ -343,6 +255,7 @@ func _show_banner(item: Dictionary) -> void:
 	veil.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(veil)
 	_banner = veil
+	rupture.emit(item)
 
 	var centre := CenterContainer.new()
 	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -417,7 +330,7 @@ func _show_banner(item: Dictionary) -> void:
 	var go := _banner_button("詳しく見る", true)
 	go.pressed.connect(func():
 		_close_banner(0.0)
-		_follow(item))
+		follow(item))
 	buttons.add_child(go)
 	rows.add_child(buttons)
 

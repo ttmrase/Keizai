@@ -41,6 +41,10 @@ var _guide_index := -1
 var _guide_cards: Array = []
 var _guide_card: PanelContainer
 var _after_guide := ""
+var _title_box: VBoxContainer
+## How far the phone's bars reach in from each edge (left, top, right, bottom).
+## The map runs under them; the words and buttons stay clear.
+var _margins := Vector4.ZERO
 
 
 func _ready() -> void:
@@ -97,10 +101,21 @@ func _build_backdrop() -> void:
 	add_child(shade)
 
 
+func set_safe_margins(margins: Vector4) -> void:
+	_margins = margins
+	if _title_box != null:
+		_title_box.offset_top = 150 + margins.y
+	if _menu != null:
+		_menu.offset_bottom = -56 - margins.w
+	if _guide_card != null and is_instance_valid(_guide_card):
+		_guide_card.offset_bottom = -60 - margins.w
+
+
 func _build_title() -> void:
 	var box := VBoxContainer.new()
+	_title_box = box
 	box.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	box.offset_top = 150
+	box.offset_top = 150 + _margins.y
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 10)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -138,7 +153,7 @@ func _build_menu() -> void:
 	_menu.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_menu.offset_left = 40
 	_menu.offset_right = -40
-	_menu.offset_bottom = -70
+	_menu.offset_bottom = -56 - _margins.w
 	_menu.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_menu.add_theme_constant_override("separation", 12)
 	add_child(_menu)
@@ -167,12 +182,13 @@ func _build_menu() -> void:
 	var annals := Button.new()
 	annals.flat = true
 	annals.focus_mode = Control.FOCUS_NONE
-	annals.text = "史録　%d / %d" % [Oracle.unlocked_count(), Feats.ALL.size()]
+	annals.text = "%s　・　史録 %d / %d" % [Feats.rank_name(Oracle.unlocked_count()),
+		Oracle.unlocked_count(), Feats.ALL.size()]
 	annals.custom_minimum_size = Vector2(0, 44)
 	annals.add_theme_font_size_override("font_size", 16)
 	for state in ["font_color", "font_hover_color", "font_pressed_color"]:
 		annals.add_theme_color_override(state, Palette.ACCENT_SOFT.lightened(0.35))
-	annals.pressed.connect(func(): FeatsSheet.open(self))
+	annals.pressed.connect(func(): FeatsSheet.open(self, _margins))
 	_menu.add_child(annals)
 
 
@@ -247,7 +263,7 @@ func _show_guide_card() -> void:
 	_guide_card.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_guide_card.offset_left = 30
 	_guide_card.offset_right = -30
-	_guide_card.offset_bottom = -60
+	_guide_card.offset_bottom = -60 - _margins.w
 	_guide_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(_guide_card)
 

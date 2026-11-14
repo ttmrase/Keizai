@@ -923,6 +923,12 @@ func _draw_node(id: StringName) -> void:
 	var name_size := maxi(9, int(19 * view_zoom))
 	var sub_size := maxi(8, int(15 * view_zoom))
 	var pad := 12.0 * view_zoom
+	var arms: StringName = source.crest(id)
+	if arms != &"":
+		var shield := 34.0 * view_zoom
+		Crest.draw(self, GameState.get_organization(arms),
+			rect.position + Vector2(pad + shield * 0.42, rect.size.y * 0.5), shield, faded)
+		pad += shield * 0.95
 
 	draw_string(font, rect.position + Vector2(pad, 24.0 * view_zoom), source.label(id),
 		HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - pad * 2.0 - CHEVRON_WIDTH * view_zoom,

@@ -11,11 +11,14 @@ extends Control
 signal speed_changed(scale: float)
 ## The might chip was tapped: the reader wants the god's panel.
 signal oracle_requested
+## The reader asked what the open screen is showing.
+signal help_requested
 
 const SPEEDS := [0.0, 1.0, 2.0, 4.0]
 
 var _speed_buttons: Array[SpeedButton] = []
 var _realm: Label
+var _might: MightChip
 
 @onready var _date: Label = $Rows/Top/Date
 @onready var _speed_row: HBoxContainer = $Rows/Top/Speeds
@@ -39,10 +42,15 @@ func _ready() -> void:
 	_realm.clip_text = true
 	when.add_child(_realm)
 
-	var might := MightChip.new()
-	might.pressed.connect(func(): oracle_requested.emit())
-	top.add_child(might)
-	top.move_child(might, 1)
+	_might = MightChip.new()
+	_might.pressed.connect(func(): oracle_requested.emit())
+	top.add_child(_might)
+	top.move_child(_might, 1)
+	var help := HelpButton.new()
+	help.pressed.connect(func(): help_requested.emit())
+	top.add_child(help)
+	top.move_child(help, 2)
+	top.add_theme_constant_override("separation", 6)
 
 	_speed_row.add_theme_constant_override("separation", 0)
 	for i in SPEEDS.size():
@@ -61,6 +69,12 @@ func _ready() -> void:
 	EventBus.world_reset.connect(_on_world_changed)
 	_sync_speed_buttons(SimClock.time_scale)
 	_refresh()
+
+
+## Where the might is shown, in the shell's coordinates: gains rise from here.
+func might_anchor() -> Vector2:
+	return _might.global_position - get_parent().get_parent().global_position \
+		+ Vector2(4, _might.size.y + 74)
 
 
 func _on_world_changed() -> void:

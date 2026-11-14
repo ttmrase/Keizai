@@ -453,6 +453,80 @@ static func progress(p: Dictionary, tick: int) -> String:
 	return ""
 
 
+## What a prophecy foretells, without its deadline — the part worth a headline.
+static func headline(p: Dictionary) -> String:
+	var text := String(p["text"])
+	var cut := text.find("のうちに、")
+	return text.substr(cut + 5) if cut >= 0 else text
+
+
+## How bold a prophecy is, one to three, read off what it pays.
+static func stars(p: Dictionary) -> int:
+	var reward := int(p["reward"])
+	if reward <= 45:
+		return 1
+	return 2 if reward <= 80 else 3
+
+
+## Where the world stood on the thing a prophecy measures when it was spoken:
+## the population, or the age. Kept so progress can be read as distance covered.
+static func baseline(p: Dictionary, tick: int) -> float:
+	match String(p["kind"]):
+		GROWTH, DECLINE:
+			return GameState.world.global_population
+		LONGEVITY:
+			var person := GameState.get_person(StringName(p["target"]))
+			return float(person.age_years(tick)) if person != null else 0.0
+	return 0.0
+
+
+## How near the world stands to bearing a prophecy out, 0 to 1, for the kinds
+## where the world offers a number for it — and -1 for the ones that simply
+## happen or do not. This is the half of the race the god can push; the other
+## half is the time running out.
+static func closeness(p: Dictionary, tick: int) -> float:
+	var target := StringName(p["target"])
+	match String(p["kind"]):
+		HEGEMONY:
+			var org := GameState.get_organization(target)
+			var ranked := PowerCalculator.ranked(-1)
+			if org == null or ranked.is_empty() or ranked[0].power_score <= 0.0:
+				return -1.0
+			return clampf(org.power_score / ranked[0].power_score, 0.0, 1.0)
+		INCIDENT:
+			for entry in Incidents.pressures():
+				if String(entry["kind"]) == String(p["target"]):
+					return clampf(float(entry["pressure"]), 0.0, 1.0)
+			return -1.0
+		EXTINCTION:
+			var house := GameState.get_organization(target)
+			if house == null or not house.is_active():
+				return 1.0
+			return clampf(1.5 / float(house.member_count + 1), 0.0, 0.9)
+		GROWTH, DECLINE:
+			var goal := float(p["param"])
+			var from := float(p.get("base", goal / 1.25 if String(p["kind"]) == GROWTH else goal / 0.8))
+			if is_equal_approx(goal, from):
+				return 1.0
+			return clampf((GameState.world.global_population - from) / (goal - from), 0.0, 1.0)
+		LONGEVITY:
+			var person := GameState.get_person(target)
+			if person == null or not person.is_alive():
+				return -1.0
+			var goal := float(p["param"])
+			var from := float(p.get("base", goal - 12.0))
+			if goal <= from:
+				return 1.0
+			return clampf((float(person.age_years(tick)) - from) / (goal - from), 0.0, 1.0)
+		REGIME:
+			var realm := HouseRank.dominant_realm()
+			if realm == null:
+				return -1.0
+			var challenge := RegimeShift.standing_challenge(realm)
+			return clampf(float(challenge.get("hold", 0.0)), 0.0, 1.0) if not challenge.is_empty() else 0.0
+	return -1.0
+
+
 static func years_left(p: Dictionary, tick: int) -> int:
 	return maxi(0, int(ceil(float(int(p["deadline"]) - tick) / float(Y))))
 

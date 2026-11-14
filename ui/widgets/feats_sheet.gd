@@ -5,11 +5,11 @@ extends RefCounted
 ## waiting to be seen. The unseen ones are listed too — a list of what can
 ## happen is the best reason to go and make a world where it does.
 
-static func open(host: Control) -> Sheet:
+static func open(host: Control, margins: Vector4 = Vector4.ZERO) -> Sheet:
 	var total := Feats.ALL.size()
 	var seen := Oracle.unlocked_count()
 	var sheet := Sheet.open(host, "史録　%d / %d" % [seen, total],
-		"どの世界で見届けたものも、ここに残る。")
+		"%s　——　どの世界で見届けたものも、ここに残る。" % Feats.rank_name(seen), margins)
 	for feat in Feats.ALL:
 		sheet.body.add_child(_row(feat))
 	return sheet

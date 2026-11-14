@@ -81,6 +81,12 @@ func is_faded(id: StringName) -> bool:
 	return org != null and not org.is_active()
 
 
+## A family is drawn with its arms, so kin read as kin by the device they share.
+func crest(id: StringName) -> StringName:
+	var org := GameState.get_organization(id)
+	return id if org != null and org.kind == Organization.OrgKind.HOUSE else &""
+
+
 func exists(id: StringName) -> bool:
 	return GameState.get_organization(id) != null
 

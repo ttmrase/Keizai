@@ -1,0 +1,146 @@
+class_name HelpSheet
+extends RefCounted
+
+## 「この画面の読み方」— what the open screen is showing and how to work it.
+##
+## Every screen here is dense on purpose: it is a window onto a society, and a
+## society is a lot. What was missing was a legend. This is one per screen, in
+## the same place on all of them, plus the three-step loop the whole game turns
+## on — so that "what am I looking at?" and "what do I do?" each have an answer
+## one tap away.
+
+const LOOP := [
+	{"glyph": &"sparkle", "title": "① 未来を告げる",
+		"text": "「神の力」で神託を下す。「この家が王座に就く」「このギルドが天下を取る」——世界が自分で決めることを、先に言い当てる。"},
+	{"glyph": &"sun", "title": "② 世を傾ける",
+		"text": "神が触れられるのは鉱石・木材・収穫・魔物の四つの理と、七つの災厄と恵みだけ。それで人の世を告げた未来へ傾ける。"},
+	{"glyph": &"scroll", "title": "③ 見届ける",
+		"text": "時を進め、地図と年代記で成り行きを追う。当たれば神威が満ち、もっと大きく世を揺らせるようになる。"},
+]
+
+const PAGES := {
+	"map": {"title": "世界の読み方", "rows": [
+		{"glyph": &"map", "title": "色分け",
+			"text": "上のボタンで、土地を何で塗り分けるかを選ぶ。支配家・信仰・国・不満・産業。同じ色は同じ家（信仰・国）。"},
+		{"glyph": &"keep", "title": "城と旗",
+			"text": "城の大きさは人口。旗と盾はその地を治める家の紋章。冠が載っているのが王都。"},
+		{"glyph": &"flame", "title": "炎と枯れ木",
+			"text": "炎は不満が高い町、枯れ木は飢えている町。放っておくと蜂起や政変の火種になる。"},
+		{"glyph": &"sparkle", "title": "光る輪",
+			"text": "神託で名指しした家の領地。告げた未来の主役がどこにいるかの目印。"},
+		{"glyph": &"unrest", "title": "兆しの帯",
+			"text": "地図の上の一行は、いま起きそうなこと。タップするとそれを見られる画面へ飛ぶ。"},
+		{"glyph": &"play", "title": "操作",
+			"text": "ドラッグで移動、ピンチで拡大。町をタップすると詳細が開き、地名も改められる。"},
+	]},
+	"chronicle": {"title": "年代記の読み方", "rows": [
+		{"glyph": &"scroll", "title": "一行と札",
+			"text": "出生・婚姻・死没は印つきの一行。分家・政変・事件のような転機は色つきの札で目立たせてある。"},
+		{"glyph": &"tree", "title": "名前を追う",
+			"text": "人や家の名が出てくる記事はタップできる。その人・その家の系譜が開く。"},
+		{"glyph": &"banner", "title": "絞り込み",
+			"text": "上のボタンで種類を絞る。「家で絞る」は一つの家の記事だけを追う。側近家の出来事は数が多いので別枠。"},
+		{"glyph": &"crown", "title": "時代",
+			"text": "「時代」は五十年ごとの章。その半世紀が何の時代だったかに名前が付き、要点がまとめられる。"},
+	]},
+	"lineage": {"title": "系譜の読み方", "rows": [
+		{"glyph": &"tree", "title": "三つの図",
+			"text": "「組織」はギルド・派閥・国・信仰の分かれ方。「家」は貴族家の分家図。「人物」は血のつながり。どれも最初のひとつまで辿れる。"},
+		{"glyph": &"seal", "title": "色と紋",
+			"text": "札の左端の色は生まれた家。同じ模様の紋章は同じ源流から分かれた家。冠の印はいま役職にある人。"},
+		{"glyph": &"people", "title": "長押し",
+			"text": "人物を長押しすると、その人の直系ときょうだいだけの系図が開く。「源流へ」で一番上の祖へ飛ぶ。"},
+		{"glyph": &"split", "title": "分かれた理由",
+			"text": "家を選ぶと、なぜ本家から分かれたのかが当時の言葉で出る。「この家の家系図」でその家だけの図へ。"},
+	]},
+	"relations": {"title": "関係の読み方", "rows": [
+		{"glyph": &"web", "title": "家と家の線",
+			"text": "緑の線は友好、赤の線は反目。婚姻・信仰・争いの積み重ねで変わっていく。"},
+		{"glyph": &"keep", "title": "大きな円と小さな円",
+			"text": "大きな円は貴族家、そのまわりの小さな円は仕える側近家。側近家からの線の色は忠誠の厚さ。"},
+		{"glyph": &"play", "title": "操作",
+			"text": "家をタップすると、その家の縁だけが明るくなる。ドラッグで移動、ピンチで拡大。"},
+	]},
+	"incidents": {"title": "事件の読み方", "rows": [
+		{"glyph": &"unrest", "title": "兆し",
+			"text": "いま世界で起きそうなことの一覧。差し迫ったものほど上。タップするとそれを見られる画面へ飛ぶ。"},
+		{"glyph": &"flame", "title": "四つの破局",
+			"text": "破門・暗殺・王都制圧・民衆蜂起。めったに起きないが、起きると世界が塗り替わる。棒は機運、その下は「まだ足りないもの」。"},
+		{"glyph": &"sun", "title": "神の出番",
+			"text": "足りないものを理と災厄で満たしてやれば、破局は近づく。逆に遠ざけることもできる。"},
+	]},
+	"power": {"title": "勢力の読み方", "rows": [
+		{"glyph": &"crown", "title": "いちばん上の札",
+			"text": "いまの国のかたち。誰が長で、議場をどの派閥が占め、誰が体制に迫っているか。"},
+		{"glyph": &"bars", "title": "順位と棒",
+			"text": "力の強い順。棒の長さが力、折れ線はここ数十年の推移、▲▼は直近十年の伸び。"},
+		{"glyph": &"sparkle", "title": "✦の印",
+			"text": "神託で名指しした組織。"},
+		{"glyph": &"play", "title": "タップ",
+			"text": "行を開くと「なぜ強いのか」の内訳が出る。そこに並ぶ理（鉱石・魔物…）が、神の動かせるところ。"},
+	]},
+	"god": {"title": "神の力の使い方", "rows": [
+		{"glyph": &"sparkle", "title": "神託",
+			"text": "三つの未来から一つを選んで告げる。★が多いほど難しく、当たったときの神威も大きい。外れても失うものはない。同時に三つまで。"},
+		{"glyph": &"sun", "title": "世界の理",
+			"text": "四つのつまみを左右になぞる。それぞれの下に「上げると／下げると力を増す組織」が出る。"},
+		{"glyph": &"flame", "title": "災厄と恵み",
+			"text": "二度押すと下る。世界全体に及び、神威を費やす。神威は年に少しずつ、神託が当たると大きく満ちる。"},
+		{"glyph": &"scroll", "title": "史録",
+			"text": "これまでに見届けた出来事の記録。どの世界で見たものも残る。"},
+	]},
+}
+
+
+static func open(host: Control, tab: String, margins: Vector4 = Vector4.ZERO) -> Sheet:
+	var page: Dictionary = PAGES.get(tab, PAGES["map"])
+	var sheet := Sheet.open(host, page["title"], "", margins)
+	for row in page["rows"]:
+		sheet.body.add_child(_row(row, Palette.ACCENT))
+	sheet.body.add_child(_heading("この遊びの流れ"))
+	for row in LOOP:
+		sheet.body.add_child(_row(row, Palette.TEXT_MUTED))
+	return sheet
+
+
+static func _heading(text: String) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 6)
+	box.add_child(gap)
+	var rule := ColorRect.new()
+	rule.color = Color(Palette.ACCENT, 0.25)
+	rule.custom_minimum_size = Vector2(0, 1)
+	box.add_child(rule)
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", Palette.ACCENT)
+	box.add_child(label)
+	return box
+
+
+static func _row(entry: Dictionary, colour: Color) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var icon := GlyphIcon.make(entry["glyph"], colour, 28)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	icon.custom_minimum_size = Vector2(30, 34)
+	row.add_child(icon)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 1)
+	row.add_child(words)
+	var title := Label.new()
+	title.text = entry["title"]
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Palette.TEXT)
+	words.add_child(title)
+	var text := Label.new()
+	text.text = entry["text"]
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_theme_font_size_override("font_size", 15)
+	text.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	words.add_child(text)
+	return row

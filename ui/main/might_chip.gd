@@ -5,20 +5,47 @@ extends Button
 ## number to spend, and a pip for each prophecy waiting to come true. Tapping it
 ## goes to the god's panel.
 
+## A real gain (a prophecy paying out, not the yearly trickle) lights the chip.
+const GAIN_WORTH_SHOWING := 5.0
+
+var _last := -1.0
+var _glow := 0.0
+
+
 func _ready() -> void:
 	flat = true
 	focus_mode = Control.FOCUS_NONE
 	custom_minimum_size = Vector2(98, 44)
-	Oracle.might_changed.connect(func(_v): queue_redraw())
+	_last = Oracle.might
+	set_process(false)
+	Oracle.might_changed.connect(_on_might)
 	Oracle.prophecies_changed.connect(queue_redraw)
 	EventBus.world_reset.connect(queue_redraw)
 	EventBus.game_loaded.connect(queue_redraw)
 
 
+func _on_might(value: float) -> void:
+	if _last >= 0.0 and value - _last >= GAIN_WORTH_SHOWING:
+		_glow = 1.0
+		set_process(true)
+	_last = value
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	_glow = maxf(0.0, _glow - delta * 0.8)
+	queue_redraw()
+	if _glow <= 0.0:
+		set_process(false)
+
+
 func _draw() -> void:
 	var rect := Rect2(Vector2(2, 2), size - Vector2(4, 4))
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(Palette.ACCENT, 0.16 if button_pressed or is_hovered() else 0.1)
+	box.bg_color = Color(Palette.ACCENT, (0.16 if button_pressed or is_hovered() else 0.1)
+		+ 0.45 * _glow)
+	box.shadow_color = Color(Palette.ACCENT, 0.5 * _glow)
+	box.shadow_size = int(14.0 * _glow)
 	box.border_color = Color(Palette.ACCENT, 0.55)
 	box.set_border_width_all(1)
 	box.set_corner_radius_all(int(rect.size.y * 0.5))

@@ -45,6 +45,11 @@ func badge(_id: StringName) -> StringName:
 	return &""
 
 
+## The house whose arms a node should carry, if it is a house. Empty for none.
+func crest(_id: StringName) -> StringName:
+	return &""
+
+
 ## BBCode shown when a node is tapped.
 func detail(_id: StringName) -> String:
 	return ""

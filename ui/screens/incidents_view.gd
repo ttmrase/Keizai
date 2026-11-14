@@ -14,6 +14,10 @@ extends Control
 ## afterwards. That is the whole game in miniature: you turn four dials, and this
 ## is where you find out what they were doing.
 
+## Asks the shell to follow a portent to whoever or wherever it is about.
+signal reveal_requested(id: StringName)
+signal tab_requested(id: String)
+
 @onready var _rows: VBoxContainer = $Scroll/Rows
 
 
@@ -37,14 +41,21 @@ func _rebuild() -> void:
 	for child in _rows.get_children():
 		child.queue_free()
 
-	_rows.add_child(_heading("いま高まっているもの"))
+	# What is brewing, of every kind, most pressing first — the same list the
+	# map shows a line of, here in full.
+	_rows.add_child(_heading("兆し", "いま起きそうなこと。タップするとそれを見に行ける"))
+	for item in Portents.current(SimClock.current_tick):
+		_rows.add_child(_portent_row(item))
+
+	_rows.add_child(_spacer())
+	_rows.add_child(_heading("四つの破局", "めったに起きず、起きれば世界が塗り替わる。棒は機運"))
 	var pressures := Incidents.pressures()
 	pressures.sort_custom(func(a, b): return float(a["pressure"]) > float(b["pressure"]))
 	for entry in pressures:
 		_rows.add_child(_pressure_row(entry))
 
 	_rows.add_child(_spacer())
-	_rows.add_child(_heading("起きたこと"))
+	_rows.add_child(_heading("起きたこと", ""))
 	var found := 0
 	for i in range(HistoryLog.buffer.size() - 1, -1, -1):
 		var e: HistoryEvent = HistoryLog.buffer[i]
@@ -63,12 +74,76 @@ func _rebuild() -> void:
 		_rows.add_child(empty)
 
 
-func _heading(text: String) -> Control:
+func _heading(text: String, note: String) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", -2)
 	var label := Label.new()
 	label.text = text
 	label.add_theme_color_override("font_color", Palette.ACCENT)
 	label.add_theme_font_size_override("font_size", 20)
-	return label
+	box.add_child(label)
+	if not note.is_empty():
+		var sub := Label.new()
+		sub.text = note
+		sub.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		sub.add_theme_font_size_override("font_size", 13)
+		box.add_child(sub)
+	return box
+
+
+## One thing that is brewing: what, how pressing, and a way to go and look.
+func _portent_row(item: Dictionary) -> Control:
+	var colour: Color = item["colour"]
+	var card := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Palette.PANEL_RAISED.lerp(colour, 0.05)
+	box.border_color = Color(colour, 0.75)
+	box.border_width_left = 4
+	box.set_corner_radius_all(10)
+	box.content_margin_left = 12
+	box.content_margin_right = 12
+	box.content_margin_top = 8
+	box.content_margin_bottom = 8
+	card.add_theme_stylebox_override("panel", box)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	var icon := GlyphIcon.make(item["glyph"], colour, 30)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 0)
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(words)
+	var title := Label.new()
+	title.text = item["title"]
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_color_override("font_color", Palette.TEXT)
+	title.add_theme_font_size_override("font_size", 18)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(title)
+	var sub := Label.new()
+	sub.text = item["sub"]
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	sub.add_theme_font_size_override("font_size", 14)
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(sub)
+	var go := GlyphIcon.make(&"play", Palette.TEXT_DIM, 14)
+	go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(go)
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	card.gui_input.connect(func(event: InputEvent):
+		if not Touch.tapped(card, event):
+			return
+		var subject := StringName(item.get("subject", &""))
+		if item["tab"] == "lineage" and subject != &"":
+			reveal_requested.emit(subject)
+		elif item["tab"] != "incidents":
+			tab_requested.emit(item["tab"]))
+	return card
 
 
 func _spacer() -> Control:

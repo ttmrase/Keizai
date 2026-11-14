@@ -14,6 +14,11 @@ extends Control
 ## they believe, which state they answer to, how angry they are, what they live
 ## on. One map, five questions.
 
+## Asks the shell to open the family tree on whoever a portent is about, or to
+## go to the screen where it can be watched.
+signal reveal_requested(id: StringName)
+signal tab_requested(id: String)
+
 const MAP_SIZE := Vector2(1000, 1450)
 
 enum Overlay { HOUSE, FAITH, REALM, UNREST, INDUSTRY }
@@ -45,6 +50,7 @@ var _land_material: ShaderMaterial
 var _chips: HBoxContainer
 var _legend: PanelContainer
 var _legend_rows: VBoxContainer
+var _portents: PortentStrip
 
 ## Settlement ids in a fixed order, so index n in the shader is always the same
 ## town between one frame and the next.
@@ -56,6 +62,7 @@ var _clock := 0.0
 func _ready() -> void:
 	_build_land()
 	_build_chips()
+	_build_portents()
 	_build_legend()
 
 	_canvas.draw.connect(_draw_map)
@@ -294,6 +301,25 @@ func _build_chips() -> void:
 	_style_chips()
 
 
+## What is brewing, in a line under the chips. Tapping it goes to where the
+## thing can be watched — or stays here, if the map is that place.
+func _build_portents() -> void:
+	_portents = PortentStrip.new()
+	_portents.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_portents.offset_left = 10
+	_portents.offset_right = -10
+	_portents.offset_top = 58
+	add_child(_portents)
+	_portents.chosen.connect(func(item: Dictionary):
+		var subject := StringName(item.get("subject", &""))
+		if item["tab"] == "lineage" and subject != &"":
+			reveal_requested.emit(subject)
+		elif item["tab"] == "map":
+			_on_overlay(Overlay.UNREST if item["glyph"] != &"altar" else Overlay.FAITH)
+		else:
+			tab_requested.emit(item["tab"]))
+
+
 func _style_chips() -> void:
 	for i in _chips.get_child_count():
 		Palette.style_pill(_chips.get_child(i), int(OVERLAYS[i]["id"]) == _overlay)
@@ -340,11 +366,17 @@ func _rebuild_legend() -> void:
 	for entry in entries.slice(0, 6):
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		var swatch := ColorRect.new()
-		swatch.color = entry["colour"]
-		swatch.custom_minimum_size = Vector2(14, 14)
-		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(swatch)
+		if entry.has("house"):
+			# A family is known by its arms, here as on the map.
+			var arms := CrestIcon.make(entry["house"], 20)
+			arms.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(arms)
+		else:
+			var swatch := ColorRect.new()
+			swatch.color = entry["colour"]
+			swatch.custom_minimum_size = Vector2(14, 14)
+			swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(swatch)
 		var label := Label.new()
 		label.text = entry["label"]
 		label.add_theme_font_size_override("font_size", 14)
@@ -395,8 +427,11 @@ func _legend_entries() -> Array:
 				continue
 			label = org.display_name
 			colour = Heraldry.of_org(org)
-		out.append({"label": "%s　%d" % [label, counts[key]], "colour": colour,
-			"n": counts[key]})
+		var entry := {"label": "%s　%d" % [label, counts[key]], "colour": colour,
+			"n": counts[key]}
+		if _overlay == Overlay.HOUSE:
+			entry["house"] = key
+		out.append(entry)
 	out.sort_custom(func(a, b): return int(a["n"]) > int(b["n"]))
 	return out
 
@@ -494,12 +529,12 @@ func _draw_town(s: SettlementState, font: Font, zoom: float, is_capital: bool) -
 	# A dark plinth so the keep reads on any colour of ground.
 	_canvas.draw_circle(centre + Vector2(0, scale * 0.08), scale * 0.62, Color(0, 0, 0, 0.45))
 	Glyph.draw(_canvas, &"keep", centre, scale, Palette.TEXT.darkened(0.08))
-	# The holding family's colour flies over the gate.
-	_canvas.draw_rect(Rect2(centre + Vector2(-scale * 0.14, -scale * 0.72),
-		Vector2(scale * 0.28, scale * 0.2)), banner)
+	# The holding family's arms hang beside the gate.
+	if house != null:
+		Crest.draw(_canvas, house, centre + Vector2(scale * 0.62, scale * 0.12), scale * 0.62)
 
 	if is_capital:
-		Glyph.draw(_canvas, &"crown", centre + Vector2(0, -scale * 0.95), scale * 0.5,
+		Glyph.draw(_canvas, &"crown", centre + Vector2(0, -scale * 0.82), scale * 0.5,
 			Palette.ACCENT)
 	if s.id == _selected_id:
 		_canvas.draw_arc(centre, scale * 0.85, 0, TAU, 40, Palette.ACCENT, maxf(2.0, 3.0 * zoom))

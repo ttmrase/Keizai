@@ -70,6 +70,17 @@ const ALL := [
 		"text": "三つ目の世界を興す"},
 ]
 
+## What a god is called, by how much it has witnessed. A name and nothing more:
+## it buys no power, it only says how long this god has been at it.
+const RANKS := [
+	[0, "名もなき神"],
+	[3, "里の小さき神"],
+	[7, "土地の守り神"],
+	[12, "国つ神"],
+	[18, "天つ神"],
+	[24, "創世の神"],
+]
+
 const INCIDENT_FEATS := [&"excommunication", &"assassination", &"capital_seizure", &"uprising"]
 
 
@@ -78,3 +89,19 @@ static func find(id: String) -> Dictionary:
 		if feat["id"] == id:
 			return feat
 	return {}
+
+
+static func rank_name(unlocked: int) -> String:
+	var name: String = RANKS[0][1]
+	for rank in RANKS:
+		if unlocked >= int(rank[0]):
+			name = rank[1]
+	return name
+
+
+## How many more feats until the next name, or 0 at the top.
+static func to_next_rank(unlocked: int) -> int:
+	for rank in RANKS:
+		if unlocked < int(rank[0]):
+			return int(rank[0]) - unlocked
+	return 0

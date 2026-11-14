@@ -67,12 +67,16 @@ var _might_note: Label
 var _oracle_box: VBoxContainer
 var _feats_label: Label
 var _sheet: Sheet
+var _sections: Dictionary = {}
+var _jump: HBoxContainer
+@onready var _scroll: ScrollContainer = $Scroll
 
 
 func _ready() -> void:
 	for child in _rows.get_children():
 		child.queue_free()
 	_rows.add_theme_constant_override("separation", 12)
+	_build_jump_bar()
 	_build_header()
 	_rows.add_child(_might_card())
 	_rows.add_child(_section("神託", "未来を告げ、理と災厄で世をそちらへ導く。成就すれば神威が満ちる"))
@@ -92,7 +96,7 @@ func _ready() -> void:
 	_rows.add_child(grid)
 	_rows.add_child(_section("史録", ""))
 	_rows.add_child(_feats_card())
-	_rows.add_child(_section("観察", ""))
+	_rows.add_child(_section("設定", ""))
 	_rows.add_child(_settings_card())
 	var note := Label.new()
 	note.text = "神が触れられるのは世界だけであり、人の営みではない。誰が王となり、どの組織が興り、どこで袂を分かつかは、すべて人の側が決める。"
@@ -148,8 +152,63 @@ func _build_header() -> void:
 	_rows.add_child(row)
 
 
+## The panel is long — might, prophecies, four dials, seven calamities, the
+## record, the settings — so its parts are one tap away from the top, wherever
+## the reader has scrolled to.
+func _build_jump_bar() -> void:
+	_jump = HBoxContainer.new()
+	_jump.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_jump.offset_left = 12
+	_jump.offset_right = -12
+	_jump.offset_top = 8
+	_jump.offset_bottom = 48
+	_jump.add_theme_constant_override("separation", 6)
+	add_child(_jump)
+	_scroll.offset_top = 56
+	for title in ["神託", "世界の理", "災厄と恵み", "設定"]:
+		var pill := Button.new()
+		pill.text = title
+		pill.focus_mode = Control.FOCUS_NONE
+		pill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pill.custom_minimum_size = Vector2(0, 38)
+		pill.add_theme_font_size_override("font_size", 15)
+		Palette.style_pill(pill, false)
+		pill.pressed.connect(_jump_to.bind(title))
+		_jump.add_child(pill)
+	_scroll.get_v_scroll_bar().value_changed.connect(func(_v): _sync_jump_bar())
+	# The sections only know where they are once the panel has been laid out.
+	_rows.sort_children.connect(_sync_jump_bar, CONNECT_DEFERRED)
+
+
+func _jump_to(title: String) -> void:
+	var section: Control = _sections.get(title)
+	if section == null:
+		return
+	var target := maxf(0.0, section.position.y - 4.0)
+	create_tween().tween_property(_scroll, "scroll_vertical", int(target), 0.25) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## Lights the pill for the part of the panel the reader is now in.
+func _sync_jump_bar() -> void:
+	if _jump == null or _jump.get_child_count() == 0:
+		return
+	var at := float(_scroll.scroll_vertical) + _scroll.size.y * 0.3
+	var current: String = (_jump.get_child(0) as Button).text
+	for i in _jump.get_child_count():
+		var pill: Button = _jump.get_child(i)
+		var section: Control = _sections.get(pill.text)
+		if section != null and section.position.y > 0.0 and section.position.y <= at:
+			current = pill.text
+	for i in _jump.get_child_count():
+		var pill: Button = _jump.get_child(i)
+		Palette.style_pill(pill, pill.text == current)
+		pill.button_pressed = false
+
+
 func _section(title: String, note: String) -> Control:
 	var box := VBoxContainer.new()
+	_sections[title] = box
 	box.add_theme_constant_override("separation", 0)
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 6)
@@ -493,6 +552,7 @@ func _who_gains(world_var: StringName) -> Dictionary:
 
 
 func _sync() -> void:
+	_sync_jump_bar()
 	_sync_might()
 	_sync_oracle()
 	_sync_feats()
@@ -677,6 +737,26 @@ func _settings_card() -> Control:
 	free_note.add_theme_color_override("font_color", Palette.TEXT_DIM)
 	rows.add_child(free_note)
 
+	rows.add_child(_rule())
+	var bars := CheckButton.new()
+	bars.text = "全画面にする（時計やボタンの帯を隠す）"
+	bars.button_pressed = SafeArea.wants_fullscreen()
+	bars.focus_mode = Control.FOCUS_NONE
+	bars.add_theme_font_size_override("font_size", 17)
+	bars.toggled.connect(func(on: bool):
+		UiSettings.set_value("hide_system_bars", on)
+		_display_changed())
+	rows.add_child(bars)
+	rows.add_child(_nudge_row("上の余白", "margin_top"))
+	rows.add_child(_nudge_row("下の余白", "margin_bottom"))
+	var display_note := Label.new()
+	display_note.text = "画面の端が隠れたり、押しにくい所があるときは余白を広げる。"
+	display_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	display_note.add_theme_font_size_override("font_size", 13)
+	display_note.add_theme_color_override("font_color", Palette.TEXT_DIM)
+	rows.add_child(display_note)
+	rows.add_child(_rule())
+
 	var new_world := Button.new()
 	new_world.text = "新しい世界を興す"
 	new_world.focus_mode = Control.FOCUS_NONE
@@ -685,6 +765,65 @@ func _settings_card() -> Control:
 	new_world.pressed.connect(func(): _new_world_confirm.popup_centered())
 	rows.add_child(new_world)
 	return card
+
+
+func _rule() -> Control:
+	var rule := ColorRect.new()
+	rule.color = Color(1, 1, 1, 0.07)
+	rule.custom_minimum_size = Vector2(0, 1)
+	return rule
+
+
+## A margin the reader can widen by hand, for a phone whose bars or corners
+## reach further in than it admits.
+func _nudge_row(title: String, key: String) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var label := Label.new()
+	label.text = title
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 17)
+	label.add_theme_color_override("font_color", Palette.TEXT)
+	row.add_child(label)
+	var value := Label.new()
+	value.custom_minimum_size = Vector2(56, 0)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.add_theme_font_size_override("font_size", 17)
+	value.add_theme_color_override("font_color", Palette.ACCENT)
+	var refresh_value := func(): value.text = "+%d" % SafeArea.nudge(key)
+	refresh_value.call()
+	var less := _step_button("－")
+	less.pressed.connect(func():
+		SafeArea.set_nudge(key, SafeArea.nudge(key) - SafeArea.NUDGE_STEP)
+		refresh_value.call()
+		_display_changed())
+	var more := _step_button("＋")
+	more.pressed.connect(func():
+		SafeArea.set_nudge(key, SafeArea.nudge(key) + SafeArea.NUDGE_STEP)
+		refresh_value.call()
+		_display_changed())
+	row.add_child(less)
+	row.add_child(value)
+	row.add_child(more)
+	return row
+
+
+func _step_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(56, 44)
+	button.add_theme_font_size_override("font_size", 20)
+	return button
+
+
+## The arrangement of the screen belongs to main; the panel only says it changed.
+func _display_changed() -> void:
+	var shell := get_parent()
+	while shell != null and not shell.has_method("notify_display_changed"):
+		shell = shell.get_parent()
+	if shell != null:
+		shell.notify_display_changed()
 
 
 ## Asks for a world rather than making one: creating it belongs to main, not to

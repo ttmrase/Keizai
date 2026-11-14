@@ -22,6 +22,10 @@ extends Node
 signal might_changed(value: float)
 signal prophecies_changed()
 signal prophecy_resolved(prophecy: Dictionary)
+## A spoken prophecy has come markedly nearer to being borne out.
+signal prophecy_nearing(prophecy: Dictionary, closeness: float)
+## A spoken prophecy is running out of time.
+signal prophecy_pressing(prophecy: Dictionary, years_left: int)
 signal feat_unlocked(feat: Dictionary)
 
 const START_MIGHT := 60.0
@@ -35,6 +39,10 @@ const OFFER_COUNT := 3
 ## moved on.
 const OFFER_SHELF_LIFE := 10 * SimConfig.TICKS_PER_YEAR
 const RECORD_KEEP := 40
+## How near a prophecy has to stand before it is worth saying so, each said once.
+const NEARING_MARKS := [0.6, 0.85]
+## With this many years left, the god is reminded the time is short.
+const PRESSING_YEARS := 5
 
 ## What each calamity and blessing costs. Blessings are cheaper than ruin, and a
 ## plague — which can end a family — is the dearest of all.
@@ -186,6 +194,10 @@ func declare(index: int) -> bool:
 	p["deadline"] = tick + int(p["years"]) * SimConfig.TICKS_PER_YEAR
 	p["met"] = false
 	p["id"] = next_id
+	p["base"] = ProphecyBook.baseline(p, tick)
+	# Marks already passed when it was spoken are not news later.
+	p["told"] = _marks_passed(ProphecyBook.closeness(p, tick))
+	p["warned"] = int(p["years"]) <= PRESSING_YEARS
 	next_id += 1
 	offers.remove_at(index)
 	prophecies.append(p)
@@ -199,6 +211,28 @@ func _judge_all(tick: int) -> void:
 		var verdict := ProphecyBook.judge(p, tick)
 		if verdict != ProphecyBook.Verdict.PENDING:
 			_resolve(p, verdict == ProphecyBook.Verdict.FULFILLED, tick)
+
+
+static func _marks_passed(closeness: float) -> int:
+	var passed := 0
+	for mark in NEARING_MARKS:
+		if closeness >= float(mark):
+			passed += 1
+	return passed
+
+
+## Says so when a prophecy draws near or its time runs short — once each, so
+## a number hovering at a mark is not announced every season.
+func _watch_progress(tick: int) -> void:
+	for p in prophecies:
+		var passed := _marks_passed(ProphecyBook.closeness(p, tick))
+		if passed > int(p.get("told", 0)):
+			p["told"] = passed
+			prophecy_nearing.emit(p, ProphecyBook.closeness(p, tick))
+		var left := ProphecyBook.years_left(p, tick)
+		if left <= PRESSING_YEARS and not bool(p.get("warned", false)):
+			p["warned"] = true
+			prophecy_pressing.emit(p, left)
 
 
 func _resolve(p: Dictionary, fulfilled: bool, tick: int) -> void:
@@ -247,6 +281,7 @@ func _on_event(e: HistoryEvent) -> void:
 
 func _on_epoch(tick: int) -> void:
 	_judge_all(tick)
+	_watch_progress(tick)
 	_feats_from_world(tick)
 
 
@@ -469,7 +504,7 @@ static func _numbers_fixed(list: Array) -> Array:
 	var out: Array = []
 	for item in list:
 		var p: Dictionary = item.duplicate(true)
-		for key in ["declared", "deadline", "years", "reward", "resolved", "id"]:
+		for key in ["declared", "deadline", "years", "reward", "resolved", "id", "told"]:
 			if p.has(key):
 				p[key] = int(p[key])
 		out.append(p)

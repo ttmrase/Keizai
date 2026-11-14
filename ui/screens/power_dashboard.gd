@@ -238,7 +238,13 @@ func _row(org: Organization, strongest: float, rank: int) -> Control:
 	place.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(place)
 
-	var icon := GlyphIcon.make(KIND_GLYPHS.get(org.kind, &"seal"), tint, 26)
+	# A family is shown by its arms; everything else by what kind of body it is.
+	var icon: Control
+	if org.kind == Organization.OrgKind.HOUSE:
+		icon = CrestIcon.make(org.org_id, 30)
+	else:
+		icon = GlyphIcon.make(KIND_GLYPHS.get(org.kind, &"seal"), tint, 26)
+		icon.custom_minimum_size = Vector2(30, 26)
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(icon)
 

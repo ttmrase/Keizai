@@ -61,8 +61,15 @@ static func build(p: Dictionary, tick: int, mode: String,
 	label.text = kind_look[0]
 	label.add_theme_font_size_override("font_size", 14)
 	label.add_theme_color_override("font_color", colour)
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(label)
+	# How bold the prophecy is: the bolder, the more it pays.
+	var bold := ProphecyBook.stars(p)
+	var stars := Label.new()
+	stars.text = "★".repeat(bold) + "☆".repeat(3 - bold)
+	stars.add_theme_font_size_override("font_size", 13)
+	stars.add_theme_color_override("font_color", Color(colour, 0.9) if not settled else Palette.TEXT_DIM)
+	stars.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(stars)
 	var right := Label.new()
 	right.add_theme_font_size_override("font_size", 14)
 	match mode:
@@ -95,7 +102,13 @@ static func build(p: Dictionary, tick: int, mode: String,
 			line.add_theme_font_size_override("font_size", 15)
 			line.add_theme_color_override("font_color", colour.lightened(0.2))
 			rows.add_child(line)
-		rows.add_child(_bar(p, tick, colour))
+		# The race: how near the world stands, against how much time is gone.
+		var span := maxf(1.0, float(int(p["deadline"]) - int(p["declared"])))
+		var used := clampf(float(tick - int(p["declared"])) / span, 0.0, 1.0)
+		var near := ProphecyBook.closeness(p, tick)
+		if near >= 0.0:
+			rows.add_child(_meter("近さ", near, colour))
+		rows.add_child(_meter("時", used, Palette.TEXT_MUTED if used < 0.8 else Palette.DANGER))
 	if not settled:
 		var hint := Label.new()
 		hint.text = p["hint"]
@@ -122,24 +135,33 @@ static func build(p: Dictionary, tick: int, mode: String,
 	return card
 
 
-## How much of the allotted time has run.
-static func _bar(p: Dictionary, tick: int, colour: Color) -> Control:
-	var span := maxf(1.0, float(int(p["deadline"]) - int(p["declared"])))
-	var used := clampf(float(tick - int(p["declared"])) / span, 0.0, 1.0)
+## One of the two bars of the race, with its name beside it.
+static func _meter(name: String, value: float, colour: Color) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var label := Label.new()
+	label.text = name
+	label.custom_minimum_size = Vector2(34, 0)
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Palette.TEXT_DIM)
+	row.add_child(label)
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(0, 6)
+	bar.custom_minimum_size = Vector2(0, 7)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.max_value = 1.0
-	bar.value = used
+	bar.value = value
 	var back := StyleBoxFlat.new()
 	back.bg_color = Palette.BG
 	back.set_corner_radius_all(3)
 	var fill := StyleBoxFlat.new()
-	fill.bg_color = Color(colour, 0.7) if used < 0.8 else Palette.DANGER
+	fill.bg_color = Color(colour, 0.85)
 	fill.set_corner_radius_all(3)
 	bar.add_theme_stylebox_override("background", back)
 	bar.add_theme_stylebox_override("fill", fill)
-	return bar
+	row.add_child(bar)
+	return row
 
 
 static func _small_button(text: String, primary: bool) -> Button:

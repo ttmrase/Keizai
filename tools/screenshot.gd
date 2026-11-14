@@ -4,10 +4,29 @@ extends Node
 ## each screen. Development tooling for looking at the UI without a device.
 ##
 ##   xvfb-run -a godot --path . res://tools/Screenshot.tscn -- --out=/tmp/shots
+##
+## --phone draws it as a phone would show it: a tall window with the status and
+## navigation bars floating over the game, and the game keeping clear of them.
+## Run it as
+##   xvfb-run -a --server-args="-screen 0 720x1600x24" godot --path . \
+##     --resolution 720x1600 res://tools/Screenshot.tscn -- --phone --out=/tmp/shots
+##
+## --cache keeps the fast-forwarded world between runs, so looking at a change
+## to a screen does not mean waiting for six centuries again.
+
+const CACHE_SLOT := 9
+## How much of the run is always played out, cache or not, so the things only
+## the screens remember (who has been rising) have something in them.
+const WARM_TICKS := 320
+## The bars a phone keeps over the game, in screen units: status above,
+## navigation below.
+const PHONE_MARGINS := Vector4(0, 46, 0, 62)
 
 var _out_dir := "/tmp/keizai-shots"
 var _ticks := 1600
 var _seed := 20260908
+var _phone := false
+var _cache := false
 
 
 func _ready() -> void:
@@ -18,39 +37,50 @@ func _ready() -> void:
 			_ticks = int(arg.split("=")[1])
 		elif arg.begins_with("--seed="):
 			_seed = int(arg.split("=")[1])
+		elif arg == "--phone":
+			_phone = true
+		elif arg == "--cache":
+			_cache = true
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 
 	ContentRegistry.ensure_loaded()
 	Oracle.use_annals("%s/annals.cfg" % _out_dir)
 	DirAccess.remove_absolute("%s/annals.cfg" % _out_dir)
-	WorldGenerator.generate(_seed)
-	SimClock.start(0)
 	# The power screen remembers what it was shown; here nothing is shown while
 	# the world runs ahead, so it is fed directly.
 	EventBus.power_recalculated.connect(func(tick: int): PowerHistory.sample(tick))
-
-	# A world with something to show: monsters, then hardship, then plenty.
-	GodPowerAPI.set_monster_spawn_rate(2.2)
-	SimClock.advance_n_ticks_instant(int(_ticks * 0.4))
-	GodPowerAPI.set_harvest_modifier(0.55)
-	GodPowerAPI.trigger_disaster(&"drought", &"", 1.3)
-	SimClock.advance_n_ticks_instant(int(_ticks * 0.25))
-	GodPowerAPI.trigger_disaster(&"plague", &"", 1.0)
-	GodPowerAPI.set_harvest_modifier(1.2)
-	GodPowerAPI.set_ore_supply_rate(2.2)
-	GodPowerAPI.set_monster_spawn_rate(0.9)
-	SimClock.advance_n_ticks_instant(_ticks - int(_ticks * 0.65))
+	_run_world()
 	SimClock.set_time_scale(0.0)
+
+	if _phone:
+		SafeArea.pretend = PHONE_MARGINS
+	var margins := SafeArea.margins(get_viewport())
+	var frame := Control.new()
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.draw.connect(_draw_backdrop.bind(frame, margins))
+	add_child(frame)
+	var host := Control.new()
+	host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	SafeArea.inset(host, margins)
+	frame.add_child(host)
 
 	var shell: Control = preload("res://ui/main/ObservationShell.tscn").instantiate()
 	shell.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(shell)
+	host.add_child(shell)
+	if _phone:
+		var bars := Control.new()
+		bars.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bars.z_index = 100
+		bars.draw.connect(_draw_phone_bars.bind(bars, margins))
+		frame.add_child(bars)
 	await get_tree().process_frame
 	await get_tree().process_frame
 
 	# The title over everything, and the first card of the guide.
 	var title := TitleScreen.new()
-	shell.add_child(title)
+	frame.add_child(title)
+	title.set_safe_margins(margins)
 	for i in 40:
 		await get_tree().process_frame
 	await _capture("%s/title.png" % _out_dir)
@@ -89,12 +119,41 @@ func _ready() -> void:
 	await _settle()
 	await _capture("%s/god_calamities.png" % _out_dir)
 	god_scroll.scroll_vertical = 0
+	god_scroll.scroll_vertical = 100000
+	await _settle()
+	await _capture("%s/god_settings.png" % _out_dir)
+	god_scroll.scroll_vertical = 0
 	var feats := FeatsSheet.open(god)
 	for i in 20:
 		await get_tree().process_frame
 	await _capture("%s/feats.png" % _out_dir)
 	feats.close()
 	await _settle()
+	# The legend for a screen, and the light a fulfilled prophecy is given.
+	shell.show_tab("map")
+	await _settle()
+	shell.show_help()
+	for i in 20:
+		await get_tree().process_frame
+	await _capture("%s/help_map.png" % _out_dir)
+	shell.show_help()
+	await _settle()
+	shell._fx.wash(Palette.ACCENT, 0.3, 1.0)
+	shell._fx.burst(Palette.ACCENT, &"sun")
+	shell._fx.rise("神威 +64", Palette.ACCENT, shell._status.might_anchor())
+	for i in 9:
+		await get_tree().process_frame
+	await _capture("%s/fx_burst.png" % _out_dir)
+	for i in 60:
+		await get_tree().process_frame
+	shell._fx.wash(Palette.DANGER, 0.3, 0.9)
+	shell._fx.omen(&"plague", Palette.DANGER)
+	for i in 14:
+		await get_tree().process_frame
+	await _capture("%s/fx_omen.png" % _out_dir)
+	for i in 50:
+		await get_tree().process_frame
+
 	shell.show_tab("chronicle")
 	var book: Control = shell._screens["chronicle"]
 	book._on_filter(book.FILTERS.size() - 1)
@@ -118,7 +177,7 @@ func _ready() -> void:
 		await _capture("%s/reveal_%s.png" % [_out_dir,
 			"branch" if kind == HistoryEvent.EventType.SCHISM else "person"])
 
-	# The news reaching the reader: two headlines over the map, then a rupture.
+	# The news reaching the reader: a headline in the bar, then a rupture.
 	shell.show_tab("map")
 	await _settle()
 	var news: NewsFeed = shell._news
@@ -126,12 +185,11 @@ func _ready() -> void:
 	for e in HistoryLog.buffer.slice(maxi(0, HistoryLog.buffer.size() - 400)):
 		if NewsFeed.classify(e)["weight"] == NewsFeed.Weight.NOTABLE \
 				and e.event_type != HistoryEvent.EventType.DISASTER_OCCURRED:
-			news._show_card(NewsFeed.classify(e))
+			shell._news_bar.push(NewsFeed.classify(e))
 			break
-	news._show_card(NewsFeed.classify(HistoryLog.buffer[HistoryLog.buffer.size() - 1]))
-	for i in 12:
+	for i in 30:
 		await get_tree().process_frame
-	await _capture("%s/news_cards.png" % _out_dir)
+	await _capture("%s/news_bar.png" % _out_dir)
 	var rupture := HistoryEvent.new()
 	rupture.event_type = HistoryEvent.EventType.INCIDENT
 	rupture.tick = SimClock.current_tick
@@ -310,6 +368,58 @@ func _somebody_with_relatives() -> StringName:
 			best_depth = depth
 			best = id
 	return best
+
+
+## Builds the world the screens are shown over: monsters, then hardship, then
+## plenty. With --cache, everything but the last stretch is kept between runs.
+func _run_world() -> void:
+	var warm := maxi(0, _ticks - WARM_TICKS)
+	var manifest_path := SaveManager.slot_dir(CACHE_SLOT).path_join("manifest.json")
+	var cached := false
+	if _cache and FileAccess.file_exists(manifest_path):
+		var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+		if int(manifest.get("tick", -1)) == warm and int(manifest.get("world_seed", 0)) == _seed:
+			cached = SaveManager.load_game(CACHE_SLOT)
+	if not cached:
+		WorldGenerator.generate(_seed)
+		SimClock.start(0)
+		GodPowerAPI.set_monster_spawn_rate(2.2)
+		SimClock.advance_n_ticks_instant(int(_ticks * 0.4))
+		GodPowerAPI.set_harvest_modifier(0.55)
+		GodPowerAPI.trigger_disaster(&"drought", &"", 1.3)
+		SimClock.advance_n_ticks_instant(int(_ticks * 0.25))
+		GodPowerAPI.trigger_disaster(&"plague", &"", 1.0)
+		GodPowerAPI.set_harvest_modifier(1.2)
+		GodPowerAPI.set_ore_supply_rate(2.2)
+		GodPowerAPI.set_monster_spawn_rate(0.9)
+		SimClock.advance_n_ticks_instant(maxi(0, warm - SimClock.current_tick))
+		if _cache:
+			SaveManager.save_game(CACHE_SLOT)
+	SimClock.advance_n_ticks_instant(maxi(0, _ticks - SimClock.current_tick))
+
+
+## What main.gd paints under the phone's bars.
+func _draw_backdrop(frame: Control, margins: Vector4) -> void:
+	frame.draw_rect(Rect2(Vector2.ZERO, frame.size), Palette.BG)
+	frame.draw_rect(Rect2(0, 0, frame.size.x, margins.y), Palette.PANEL)
+	frame.draw_rect(Rect2(0, frame.size.y - margins.w, frame.size.x, margins.w), Palette.PANEL)
+
+
+## A phone's own furniture, floating over the game as Android draws it.
+func _draw_phone_bars(bars: Control, margins: Vector4) -> void:
+	var font := bars.get_theme_default_font()
+	var ink := Color(1, 1, 1, 0.9)
+	bars.draw_string(font, Vector2(34, margins.y * 0.5 + 8), "22:16", HORIZONTAL_ALIGNMENT_LEFT,
+		-1, 20, ink)
+	bars.draw_string(font, Vector2(bars.size.x - 150, margins.y * 0.5 + 8), "5G  ▮▮▮  54",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ink)
+	bars.draw_circle(Vector2(bars.size.x * 0.5, margins.y * 0.5), 9, Color.BLACK)
+	var y := bars.size.y - margins.w * 0.5
+	bars.draw_rect(Rect2(0, bars.size.y - margins.w, bars.size.x, margins.w), Color(0, 0, 0, 0.35))
+	bars.draw_colored_polygon(PackedVector2Array([Vector2(bars.size.x * 0.25 + 9, y - 11),
+		Vector2(bars.size.x * 0.25 - 9, y), Vector2(bars.size.x * 0.25 + 9, y + 11)]), ink)
+	bars.draw_circle(Vector2(bars.size.x * 0.5, y), 10, ink)
+	bars.draw_rect(Rect2(bars.size.x * 0.75 - 10, y - 10, 20, 20), ink)
 
 
 func _settle() -> void:

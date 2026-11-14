@@ -8,6 +8,8 @@ extends Control
 ## GodPowerAPI, on the god-power screen.
 
 signal new_world_requested
+## The reader changed how the screen is arranged (bars hidden, margins widened).
+signal display_changed
 
 const TABS := [
 	{"id": "map", "label": "世界", "glyph": &"map", "scene": "res://ui/screens/WorldMapView.tscn"},
@@ -25,9 +27,13 @@ const BADGE_PRESSURE := 0.75
 var _screens: Dictionary = {}
 var _current_id: String = ""
 var _news: NewsFeed
+var _fx: FxLayer
+var _help: Sheet
 
+@onready var _root: Control = $Root
 @onready var _status: Control = $Root/StatusBar
 @onready var _screen_host: Control = $Root/ScreenHost
+@onready var _news_bar: NewsBar = $Root/NewsBar
 @onready var _dock: HBoxContainer = $Root/Dock
 
 
@@ -40,13 +46,61 @@ func _ready() -> void:
 	_build_dock()
 	_status.speed_changed.connect(_on_speed_changed)
 	_status.oracle_requested.connect(show_tab.bind("god"))
-	# The news sits over the screens and under nothing: whatever is open, a
-	# headline can reach the reader.
+	_status.help_requested.connect(show_help)
+	# Ruptures take the screen wherever the reader is; headlines go to the bar
+	# above the dock, which covers nothing.
 	_news = NewsFeed.new()
 	_screen_host.add_child(_news)
 	_news.open_tab.connect(show_tab)
 	_news.reveal_requested.connect(reveal)
+	_news.headline.connect(_news_bar.push)
+	_news_bar.followed.connect(_news.follow)
+	_build_fx()
 	show_tab("map")
+
+
+## The moments worth a second of light: what the god foretold coming true, what
+## the god called down landing, and the ruptures a history is remembered by.
+func _build_fx() -> void:
+	_fx = FxLayer.new()
+	add_child(_fx)
+	_fx.shake_target = _root
+	Oracle.prophecy_resolved.connect(func(p: Dictionary):
+		if p["state"] == "fulfilled":
+			_fx.wash(Palette.ACCENT, 0.3, 1.0)
+			_fx.burst(Palette.ACCENT, &"sun")
+			_fx.rise("神威 +%d" % int(p["reward"]), Palette.ACCENT, _status.might_anchor()))
+	Oracle.feat_unlocked.connect(func(_feat: Dictionary):
+		_fx.burst(Palette.ACCENT, &"scroll", _news_bar.global_position - global_position
+			+ Vector2(32, NewsBar.HEIGHT * 0.5), 0.3))
+	_news.rupture.connect(func(item: Dictionary):
+		if item.get("label", "") != "神託成就":
+			_fx.wash(item["colour"], 0.38, 0.9)
+			_fx.quake(0.4, 8.0))
+	EventBus.event_recorded.connect(func(e: HistoryEvent):
+		if e.event_type != HistoryEvent.EventType.DISASTER_OCCURRED or not is_visible_in_tree():
+			return
+		var def := ContentRegistry.get_disaster(StringName(e.payload.get("definition_id", "")))
+		if def == null:
+			return
+		var colour := Palette.GOOD if def.is_benevolent else Palette.DANGER
+		_fx.wash(colour, 0.3, 0.9)
+		_fx.omen(Glyph.DISASTER_GLYPHS.get(def.definition_id, &"sun"), colour)
+		if not def.is_benevolent:
+			_fx.quake(0.3, 5.0))
+
+
+## 「この画面の読み方」for whichever screen is open.
+func show_help() -> void:
+	if _help != null and is_instance_valid(_help):
+		_help.close()
+		return
+	_help = HelpSheet.open(self, _current_id)
+	move_child(_fx, get_child_count() - 1)
+
+
+func current_tab() -> String:
+	return _current_id
 
 
 func _build_dock() -> void:
@@ -92,6 +146,8 @@ func show_tab(id: String) -> void:
 				screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 				if screen.has_signal("reveal_requested"):
 					screen.reveal_requested.connect(reveal)
+				if screen.has_signal("tab_requested"):
+					screen.tab_requested.connect(show_tab)
 				_screen_host.add_child(screen)
 				_screens[id] = screen
 				break
@@ -132,6 +188,12 @@ func _on_speed_changed(scale: float) -> void:
 ## itself — main.gd owns that.
 func request_new_world() -> void:
 	new_world_requested.emit()
+
+
+## Lets the settings say the screen's arrangement changed; main.gd owns the
+## window and the margins.
+func notify_display_changed() -> void:
+	display_changed.emit()
 
 
 func _draw() -> void:

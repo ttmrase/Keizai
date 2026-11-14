@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://bkeizaishell01"]
+[gd_scene load_steps=5 format=3 uid="uid://bkeizaishell01"]
 
 [ext_resource type="Script" path="res://ui/main/observation_shell.gd" id="1_shell"]
 [ext_resource type="Script" path="res://ui/main/status_bar.gd" id="2_status"]
 [ext_resource type="Script" path="res://ui/widgets/gauge.gd" id="3_gauge"]
+[ext_resource type="Script" path="res://ui/main/news_bar.gd" id="4_news"]
 
 [node name="ObservationShell" type="Control"]
 layout_mode = 3
@@ -88,6 +89,11 @@ script = ExtResource("3_gauge")
 [node name="ScreenHost" type="Control" parent="Root"]
 layout_mode = 2
 size_flags_vertical = 3
+
+[node name="NewsBar" type="Control" parent="Root"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+script = ExtResource("4_news")
 
 [node name="Dock" type="HBoxContainer" parent="Root"]
 custom_minimum_size = Vector2(0, 68)
