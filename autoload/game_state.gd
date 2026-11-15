@@ -96,12 +96,47 @@ func leader_roll(org_id: StringName) -> Array:
 
 
 func organizations_of_kind(kind: Organization.OrgKind, only_active := true) -> Array[Organization]:
+	if only_active:
+		# Asked for many thousands of times a season (every reading of a family's
+		# precedence asks which families wear crowns). The active list of each
+		# kind only changes when an organization is founded or dissolved, so it
+		# is kept, and handed out as a copy so nobody can reorder it for others.
+		_settle_kind_index()
+		var active: Array[Organization] = []
+		for o in _kind_index.get(kind, []):
+			# Something marked dissolved without the record (a test) drops out here.
+			if o.is_active():
+				active.append(o)
+		return active
 	var out: Array[Organization] = []
 	for id in organizations:
 		var o: Organization = organizations[id]
 		if o.kind == kind and (not only_active or o.is_active()):
 			out.append(o)
 	return out
+
+
+var _kind_index: Dictionary = {}
+var _kind_index_key: Array = []
+
+
+## Bumped whenever an organization stops being active, so the index is rebuilt.
+var _dissolutions := 0
+
+
+func _settle_kind_index() -> void:
+	var key := [organizations.size(), _dissolutions, world]
+	if key == _kind_index_key:
+		return
+	_kind_index_key = key
+	_kind_index = {}
+	for id in organizations:
+		var o: Organization = organizations[id]
+		if not o.is_active():
+			continue
+		if not _kind_index.has(o.kind):
+			_kind_index[o.kind] = [] as Array[Organization]
+		(_kind_index[o.kind] as Array[Organization]).append(o)
 
 
 func active_organizations() -> Array[Organization]:
@@ -134,20 +169,59 @@ func child_organizations(org_id: StringName) -> Array[Organization]:
 
 
 func living_people() -> Array[NotableIndividual]:
+	# Read several times a season (deaths, matches, births, crowding) over a
+	# record that keeps everybody who ever lived. Kept as an index of the living,
+	# rebuilt when somebody is born or dies; anyone found dead is dropped here.
+	var key := [people.size(), _deaths, world]
+	if key != _living_key:
+		_living_key = key
+		_living = []
+		for id in people:
+			if people[id].is_alive():
+				_living.append(people[id])
 	var out: Array[NotableIndividual] = []
-	for id in people:
-		if people[id].is_alive():
-			out.append(people[id])
+	for p in _living:
+		if p.is_alive():
+			out.append(p)
 	return out
+
+
+var _living: Array[NotableIndividual] = []
+var _living_key: Array = []
+var _deaths := 0
 
 
 func house_members(house_id: StringName, only_living := true) -> Array[NotableIndividual]:
+	# Every succession, every marriage match and every retainer asks this, and
+	# each used to read the whole population. Kept as an index, rebuilt when
+	# somebody is born, dies into the record or changes house; a person who has
+	# left a house since is filtered out here.
+	var key := [people.size(), _house_moves, world]
+	if key != _members_key:
+		_members_key = key
+		_members_index = {}
+		for id in people:
+			var p: NotableIndividual = people[id]
+			if p.house_org_id == &"":
+				continue
+			if not _members_index.has(p.house_org_id):
+				_members_index[p.house_org_id] = []
+			_members_index[p.house_org_id].append(p)
 	var out: Array[NotableIndividual] = []
-	for id in people:
-		var p: NotableIndividual = people[id]
+	for p in _members_index.get(house_id, []):
 		if p.house_org_id == house_id and (not only_living or p.is_alive()):
 			out.append(p)
 	return out
+
+
+var _members_index: Dictionary = {}
+var _members_key: Array = []
+## Bumped whenever somebody moves into a house (see HouseNaming).
+var _house_moves := 0
+
+
+func note_house_move() -> void:
+	_house_moves += 1
 
 
 ## Every seat in the world currently held by somebody of this family — the guild
@@ -328,6 +402,7 @@ func _apply_death(e: HistoryEvent) -> void:
 		return
 	p.death_tick = e.tick
 	p.death_event_id = e.event_id
+	_deaths += 1
 	# Every seat, not the first one found: a monarch usually also heads their own
 	# house, and closing only one leaves the other open forever — which reads, in
 	# the roll of that body's leaders, as somebody still in office two centuries
@@ -505,6 +580,7 @@ func _apply_dissolution(e: HistoryEvent) -> void:
 	if org == null or not org.is_active():
 		return
 	org.dissolved_tick = e.tick
+	_dissolutions += 1
 	org.power_score = 0.0
 	org.power_drivers.clear()
 	# A state that ends ends its offices with it; who held them stays recorded.

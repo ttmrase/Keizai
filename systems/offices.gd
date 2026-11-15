@@ -237,22 +237,27 @@ static func _refresh(polity: Organization, realm_of: Dictionary, tick: int) -> v
 		var entry: Dictionary = polity.offices.get(key, {})
 		var holder := GameState.get_person(StringName(entry.get("person", "")))
 		var holder_house := GameState.get_organization(StringName(entry.get("house", "")))
-		var best := _best(polity, key, houses, ruler, ruler_house, regency)
+		var best := {}
 		if holder != null and holder.is_alive():
 			var fit := holder_house != null and holder_house.is_active() \
 				and StringName(realm_of.get(holder_house.org_id, &"")) == polity.org_id \
 				and HouseRank.precedence(holder_house) >= min_rank_of(key, polity)
 			if fit:
 				var years := int((tick - int(entry.get("since", tick))) / SimConfig.TICKS_PER_YEAR)
+				# A holder inside their first years is not weighed against anybody.
+				if years < RESHUFFLE_YEARS:
+					continue
+				best = _best(polity, key, houses, ruler, ruler_house, regency)
 				var mine := _score(polity, key, holder_house, ruler, ruler_house, regency)
-				if best.is_empty() or years < RESHUFFLE_YEARS \
-						or float(best["score"]) <= mine * RESHUFFLE_MARGIN + 0.2 \
+				if best.is_empty() or float(best["score"]) <= mine * RESHUFFLE_MARGIN + 0.2 \
 						or best["house"] == holder_house:
 					continue
 				_vacate(polity, key, "replaced", tick,
 					{"successor_house": String(best["house"].org_id)})
 			else:
 				_vacate(polity, key, "unfit", tick)
+		if best.is_empty():
+			best = _best(polity, key, houses, ruler, ruler_house, regency)
 		if not best.is_empty():
 			_appoint(polity, key, best["person"], best["house"], tick)
 
@@ -309,18 +314,22 @@ static func _regency_wanted(polity: Organization, ruler: NotableIndividual,
 ## The best family for a seat and the person it would send.
 static func _best(polity: Organization, key: String, houses: Array[Organization],
 		ruler: NotableIndividual, ruler_house: Organization, regency: Dictionary) -> Dictionary:
-	var best := {}
-	var best_score := -INF
-	for house in houses:
-		var score := _score(polity, key, house, ruler, ruler_house, regency)
-		if score == -INF or score <= best_score:
-			continue
+	# Every family scored, best first; the first that has somebody to send gets
+	# it. (Asking each family for a person before knowing whether it would win
+	# was most of the cost of a year at court.)
+	var ranked: Array = []
+	for i in houses.size():
+		var score := _score(polity, key, houses[i], ruler, ruler_house, regency)
+		if score != -INF:
+			ranked.append([score, i])
+	ranked.sort_custom(func(x: Array, y: Array) -> bool:
+		return x[0] > y[0] if x[0] != y[0] else x[1] < y[1])
+	for entry in ranked:
+		var house: Organization = houses[entry[1]]
 		var person := _sent_by(house, polity)
-		if person == null:
-			continue
-		best_score = score
-		best = {"house": house, "person": person, "score": score}
-	return best
+		if person != null:
+			return {"house": house, "person": person, "score": entry[0]}
+	return {}
 
 
 ## What a family is worth for a seat, under the kind of state this is.
@@ -334,6 +343,7 @@ static func _score(polity: Organization, key: String, house: Organization,
 	var axes := polity.ideology
 	var structure := axes.decision_structure
 	var basis := axes.legitimacy_basis
+	var parts := _parts_of(polity, house, ruler, ruler_house)
 	var favour_w := 0.8 if structure == PoliticalSystemAxes.DecisionStructure.AUTOCRATIC \
 		else (0.45 if structure == PoliticalSystemAxes.DecisionStructure.OLIGARCHIC_COUNCIL else 0.2)
 	var seats_w := 1.2 - favour_w
@@ -342,14 +352,14 @@ static func _score(polity: Organization, key: String, house: Organization,
 
 	var score := rank / 8.0 * rank_w
 	if ruler_house != null:
-		score += favour_w * HouseRelations.relation(ruler_house.org_id, house.org_id)
+		score += favour_w * float(parts["relation"])
 		if house.uji_id != &"" and house.uji_id == ruler_house.uji_id:
 			score += 0.2 * favour_w
 		if house.org_id == ruler_house.org_id and key != "regent":
 			score -= 0.6
-	score += seats_w * _chamber_weight(polity, house)
-	var wealth := _wealth_of(house)
-	var martial := _martial_of(house)
+	score += seats_w * float(parts["chamber"])
+	var wealth: float = parts["wealth"]
+	var martial: float = parts["martial"]
 	var faithful := 1.0 if ruler_house != null and house.faith_id != &"" \
 		and house.faith_id == ruler_house.faith_id else 0.0
 	match key:
@@ -358,16 +368,16 @@ static func _score(polity: Organization, key: String, house: Organization,
 		"marshal", "general":
 			score += martial
 		"high_priest":
-			score += faithful + (0.3 if _head_has(house, &"pious") else 0.0)
+			score += faithful + (0.3 if bool(parts["pious"]) else 0.0)
 		"strategist":
-			score += (0.6 if _head_has(house, &"scholarly") else 0.0) + martial * 0.5
+			score += (0.6 if bool(parts["scholarly"]) else 0.0) + martial * 0.5
 		"regent":
 			if StringName(regency.get("house", &"")) == house.org_id:
 				score += 1.5
-			if ruler != null and in_law_houses(ruler).has(house.org_id):
+			if bool(parts["in_law"]):
 				score += 0.6
 		_:
-			score += (0.3 if _head_has(house, &"just") or _head_has(house, &"scholarly") else 0.0)
+			score += (0.3 if bool(parts["just"]) or bool(parts["scholarly"]) else 0.0)
 	if basis == PoliticalSystemAxes.LegitimacyBasis.WEALTH_BASED:
 		score += wealth * 0.6
 	elif basis == PoliticalSystemAxes.LegitimacyBasis.THEOCRATIC:
@@ -382,13 +392,44 @@ static func _score(polity: Organization, key: String, house: Organization,
 	if StringName(polity.hereditary_offices.get(key, "")) == house.org_id:
 		score += 2.0
 	# A family just put down at court is not soon given a seat there again.
-	score -= 2.0 * Intrigue.disgrace(house)
+	score -= 2.0 * float(parts["disgrace"])
 	# A family already sitting beside the head is less likely to be given a
 	# second seat — the others would not stand for it.
 	for other in polity.offices:
 		if String(other) != key and StringName(polity.offices[other].get("house", "")) == house.org_id:
 			score -= 0.6
 	return score
+
+
+## What a family brings to any seat at this court, worked out once a season
+## rather than once for every seat it is weighed for.
+static var _parts_signature: Array = []
+static var _parts: Dictionary = {}
+
+
+static func _parts_of(polity: Organization, house: Organization, ruler: NotableIndividual,
+		ruler_house: Organization) -> Dictionary:
+	var signature := [SimClock.current_tick, GameState.world, polity.org_id,
+		ruler.person_id if ruler != null else &""]
+	if signature != _parts_signature:
+		_parts_signature = signature
+		_parts = {}
+	if _parts.has(house.org_id):
+		return _parts[house.org_id]
+	var head := GameState.get_current_leader(house.org_id)
+	var parts := {
+		"relation": HouseRelations.relation(ruler_house.org_id, house.org_id) if ruler_house != null else 0.0,
+		"chamber": _chamber_weight(polity, house),
+		"wealth": _wealth_of(house),
+		"martial": _martial_of(house),
+		"disgrace": Intrigue.disgrace(house),
+		"in_law": ruler != null and in_law_houses(ruler).has(house.org_id),
+		"pious": head != null and head.has_tag(&"pious"),
+		"scholarly": head != null and head.has_tag(&"scholarly"),
+		"just": head != null and head.has_tag(&"just"),
+	}
+	_parts[house.org_id] = parts
+	return parts
 
 
 ## How much of the chamber stands behind a family: its share of the seats of
@@ -410,11 +451,34 @@ static func _chamber_weight(polity: Organization, house: Organization) -> float:
 
 
 static func _wealth_of(house: Organization) -> float:
-	var gold := float(house.resources.get(&"gold", 0.0))
-	for guild in GameState.organizations_of_kind(Organization.OrgKind.GUILD):
-		if guild.patron_house_id == house.org_id:
-			gold += float(guild.resources.get(&"gold", 0.0))
+	_refresh_caches()
+	var gold := float(house.resources.get(&"gold", 0.0)) + float(_patron_gold.get(house.org_id, 0.0))
 	return clampf(gold / 1200.0, 0.0, 1.0)
+
+
+# Read many times a season by every family scored for a seat, and each a pass
+# over every guild: what the guilds a house owns hold. Gathered once a tick.
+static var _cache_tick := -1
+static var _cache_world: WorldState = null
+static var _patron_gold := {}
+
+
+static func _refresh_caches() -> void:
+	var tick := SimClock.current_tick
+	if _cache_tick == tick and _cache_world == GameState.world:
+		return
+	_cache_tick = tick
+	_cache_world = GameState.world
+	_patron_gold = {}
+	for guild in GameState.organizations_of_kind(Organization.OrgKind.GUILD):
+		if guild.patron_house_id != &"":
+			_patron_gold[guild.patron_house_id] = float(_patron_gold.get(guild.patron_house_id, 0.0)) \
+				+ float(guild.resources.get(&"gold", 0.0))
+
+
+## The living members of a house.
+static func members_of(house_id: StringName) -> Array[NotableIndividual]:
+	return GameState.house_members(house_id)
 
 
 static func _martial_of(house: Organization) -> float:
@@ -439,7 +503,7 @@ static func _sent_by(house: Organization, polity: Organization) -> NotableIndivi
 	if head != null and head.is_alive() and head.is_adult(tick) and not holds_office(head) \
 			and not _leads_a_state(head):
 		return head
-	var members := GameState.house_members(house.org_id)
+	var members := members_of(house.org_id)
 	members.sort_custom(func(x: NotableIndividual, y: NotableIndividual):
 		return x.birth_tick < y.birth_tick if x.birth_tick != y.birth_tick \
 			else String(x.person_id) < String(y.person_id))

@@ -145,8 +145,18 @@ func detail(id: StringName) -> String:
 	if root != null and org.kind != Organization.OrgKind.HOUSE:
 		lines.append("[color=#9a9080]源流[/color]  %s（%d代前）" % [root.formal_name(), org.branch_depth])
 	if org.ideology != null:
-		lines.append("[color=#9a9080]思想[/color]  %s"
+		lines.append("[color=#9a9080]志向[/color]  %s"
 			% PoliticalSystemGenerator.ideology_summary(org.ideology))
+	# The doctrine it holds as a creed or a platform, or the one it leans to.
+	var creed_doc := Doctrines.get_doctrine(org.doctrine_id)
+	if creed_doc != null and org.kind == Organization.OrgKind.POLITICAL_SYSTEM:
+		lines.append("[color=#9a9080]国是[/color]  %s" % creed_doc.name)
+	elif creed_doc != null and org.kind == Organization.OrgKind.FACTION:
+		lines.append("[color=#9a9080]綱領[/color]  %s" % creed_doc.name)
+	elif org.kind == Organization.OrgKind.HOUSE and org.is_active():
+		var leaning := Doctrines.sympathy_of(org)
+		if leaning != null:
+			lines.append("[color=#9a9080]共感する思想[/color]  %s" % leaning.name)
 
 	if org.kind == Organization.OrgKind.POLITICAL_SYSTEM:
 		var form := PolityFormEvaluator.form_of(org)

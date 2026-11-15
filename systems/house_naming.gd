@@ -36,6 +36,7 @@ static func adopt_into_house(person: NotableIndividual, house_org_id: StringName
 		previous.leader_person_id = &""
 
 	person.house_org_id = house_org_id
+	GameState.note_house_move()
 	person.family_name = surname_of(house_org_id)
 
 

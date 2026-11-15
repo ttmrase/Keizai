@@ -99,18 +99,21 @@ static func holder_of(g: Dictionary) -> StringName:
 static func toward(holder_id: StringName, target_id: StringName, tick: int = -1) -> float:
 	if holder_id == target_id or holder_id == &"" or target_id == &"":
 		return 0.0
-	var best := 0.0
-	for g in GameState.world.grudges:
-		if StringName(g["target"]) != target_id or holder_of(g) != holder_id:
-			continue
-		best = maxf(best, strength_of(g, tick))
-	return best
+	return float(table(tick).get("%s|%s" % [holder_id, target_id], 0.0))
 
 
 ## Every live grudge at once, as "holder|target" -> strength — for a pass that
 ## asks about every pair of houses, which would otherwise rescan the list for
 ## each of them.
 static func table(tick: int = -1) -> Dictionary:
+	if tick < 0:
+		tick = SimClock.current_tick
+	# Asked for by every family's loyalty, every pair's relation and every court
+	# in the same season: worked out once for as long as nothing has changed.
+	var signature := [tick, GameState.world, _version, GameState.world.next_grudge_id,
+		GameState.world.grudges.size(), GameState.people.size()]
+	if signature == _table_signature:
+		return _table
 	var out := {}
 	for g in GameState.world.grudges:
 		var holder := holder_of(g)
@@ -121,7 +124,16 @@ static func table(tick: int = -1) -> Dictionary:
 			continue
 		var key := "%s|%s" % [holder, g["target"]]
 		out[key] = maxf(float(out.get(key, 0.0)), s)
+	_table_signature = signature
+	_table = out
 	return out
+
+
+## Bumped by every write, so a reading taken earlier in the same season is
+## never mistaken for a current one.
+static var _version := 0
+static var _table_signature: Array = []
+static var _table: Dictionary = {}
 
 
 ## The record itself, for the strongest grudge one house holds against another.
@@ -267,6 +279,7 @@ static func _from_succession(e: HistoryEvent, pre: Dictionary) -> void:
 ## A cadet line founded by somebody who lost a quarrel inside the family takes
 ## the quarrel with it: from now on it is one house against another.
 static func _from_branching(e: HistoryEvent) -> void:
+	_version += 1
 	var house := GameState.get_organization(e.subject_org_id)
 	if house == null or house.kind != Organization.OrgKind.HOUSE or house.parent_org_id == &"":
 		return
@@ -401,6 +414,7 @@ static func _from_intrigue(e: HistoryEvent) -> void:
 static func _add(holder: StringName, target: StringName, holder_person: StringName,
 		target_person: StringName, amount: float, e: HistoryEvent, kind: String,
 		why: String, root_kind := "", root_since := -1) -> void:
+	_version += 1
 	if holder == &"" or target == &"" or amount <= 0.0:
 		return
 	if holder == target and holder_person == &"":
@@ -442,6 +456,7 @@ static func _add(holder: StringName, target: StringName, holder_person: StringNa
 
 
 static func _satisfy(holder: StringName, target: StringName, tick: int) -> void:
+	_version += 1
 	for g in GameState.world.grudges:
 		if g["target"] == String(target) and holder_of(g) == holder:
 			g["strength"] = strength_of(g, tick) * SATISFIED
@@ -449,6 +464,7 @@ static func _satisfy(holder: StringName, target: StringName, tick: int) -> void:
 
 
 static func _on_head_change(house_id: StringName, tick: int) -> void:
+	_version += 1
 	for g in GameState.world.grudges:
 		if g["holder"] == String(house_id) and g["holder"] != g["target"]:
 			g["strength"] = strength_of(g, tick) * HEAD_CHANGE
@@ -458,6 +474,7 @@ static func _on_head_change(house_id: StringName, tick: int) -> void:
 
 ## A house that is gone holds nothing and is held to nothing.
 static func _forget_house(house_id: StringName) -> void:
+	_version += 1
 	var kept: Array = []
 	for g in GameState.world.grudges:
 		if g["holder"] != String(house_id) and g["target"] != String(house_id):
@@ -466,6 +483,7 @@ static func _forget_house(house_id: StringName) -> void:
 
 
 static func _prune(tick: int) -> void:
+	_version += 1
 	var kept: Array = []
 	for g in GameState.world.grudges:
 		if strength_of(g, tick) >= FORGOTTEN * 0.5:

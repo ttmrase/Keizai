@@ -233,7 +233,15 @@ static func _consider(tick: int) -> void:
 		if not courts.has(realm):
 			courts[realm] = []
 		courts[realm].append(house)
+	# Grudges by the family that holds them, so a family with none (and no
+	# ambition) is passed over without weighing it against every other.
+	var held := {}
 	var table := Grudges.table(tick)
+	for key in table:
+		var pair := String(key).split("|")
+		var mine: Dictionary = held.get(StringName(pair[0]), {})
+		mine[StringName(pair[1])] = float(table[key])
+		held[StringName(pair[0])] = mine
 	var busy := {}
 	for state in GameState.world.intrigues:
 		busy[state["polity"]] = true
@@ -256,26 +264,32 @@ static func _consider(tick: int) -> void:
 			return String(x.org_id) < String(y.org_id))
 		var ruler := GameState.get_current_leader(polity.org_id)
 		var ruler_house := GameState.get_organization(ruler.house_org_id) if ruler != null else null
+		# What is the same for every pair at this court, read once.
+		var seated := {}
+		for key in polity.offices:
+			seated[StringName(polity.offices[key].get("house", ""))] = true
+		var court := {"seated": seated, "new_ruler": _ruler_is_new(polity, ruler, tick)}
 		var chosen := {}
 		var best := 0.0
 		for a: Organization in houses:
 			if busy.has(String(a.org_id)) or _cooling(a, tick, cooldown):
 				continue
+			var mine: Dictionary = held.get(a.org_id, {})
 			var actor := _acting_for(a, tick)
-			if actor == null:
+			if actor == null or (mine.is_empty() and not actor.has_tag(&"ambitious")):
 				continue
 			for b: Organization in houses:
 				if b.org_id == a.org_id or busy.has(String(b.org_id)) or _cooling(b, tick, cooldown):
 					continue
-				var grudge := float(table.get("%s|%s" % [a.org_id, b.org_id], 0.0))
+				var grudge := float(mine.get(b.org_id, 0.0))
 				var chance := 0.0
 				if grudge >= MOTIVE:
 					chance = GRUDGE_CHANCE * minf(1.2, grudge)
-				elif actor.has_tag(&"ambitious") and _holds_seat(polity, b):
+				elif seated.has(b.org_id) and actor.has_tag(&"ambitious"):
 					chance = AMBITION_CHANCE
 				else:
 					continue
-				chance *= _opening(polity, a, b, actor, ruler, ruler_house, tick)
+				chance *= _opening(polity, a, b, actor, ruler, ruler_house, tick, court)
 				var roll := rng.randf()
 				if roll >= chance:
 					continue
@@ -316,13 +330,15 @@ static func _holds_seat(polity: Organization, house: Organization) -> bool:
 ## ambition, and a body both belong to where they meet every day.
 static func _opening(polity: Organization, a: Organization, b: Organization,
 		actor: NotableIndividual, ruler: NotableIndividual, ruler_house: Organization,
-		tick: int) -> float:
+		tick: int, court: Dictionary = {}) -> float:
 	var o := 1.0 + 0.8 * (1.0 - polity.legitimacy)
-	if ruler != null:
-		var seat := ruler.tenure_in(polity.org_id)
-		if seat != null and tick - seat.start_tick < 3 * SimConfig.TICKS_PER_YEAR:
-			o += 0.6
-	if _holds_seat(polity, b):
+	var new_ruler: bool = court["new_ruler"] if court.has("new_ruler") \
+		else _ruler_is_new(polity, ruler, tick)
+	if new_ruler:
+		o += 0.6
+	var holds: bool = (court["seated"] as Dictionary).has(b.org_id) if court.has("seated") \
+		else _holds_seat(polity, b)
+	if holds:
 		o += 0.5
 	var above := HouseRank.precedence(b) - HouseRank.precedence(a)
 	if above > 0.0:
@@ -360,17 +376,40 @@ static func _prospects(polity: Organization, a: Organization, b: Organization,
 	return clampf(0.55 + 0.6 * lead + reckless, 0.08, 1.0)
 
 
+static func _ruler_is_new(polity: Organization, ruler: NotableIndividual, tick: int) -> bool:
+	if ruler == null:
+		return false
+	var seat := ruler.tenure_in(polity.org_id)
+	return seat != null and tick - seat.start_tick < 3 * SimConfig.TICKS_PER_YEAR
+
+
 ## Whether two families meet in the same guild, faction or faith.
 static func _share_a_body(a: Organization, b: Organization) -> bool:
 	if a.faith_id != &"" and a.faith_id == b.faith_id and Religion.division() > 0.2:
 		return true
-	for kind in [Organization.OrgKind.GUILD, Organization.OrgKind.FACTION]:
-		for org in GameState.organizations_of_kind(kind):
-			var ha := org.patron_house_id == a.org_id or org.support_base.has(a.org_id)
-			var hb := org.patron_house_id == b.org_id or org.support_base.has(b.org_id)
-			if ha and hb:
-				return true
+	var signature := [SimClock.current_tick, GameState.world]
+	if signature != _bodies_signature:
+		_bodies_signature = signature
+		_bodies = {}
+		for kind in [Organization.OrgKind.GUILD, Organization.OrgKind.FACTION]:
+			for org in GameState.organizations_of_kind(kind):
+				var backers: Array = org.support_base.keys()
+				if org.patron_house_id != &"":
+					backers.append(org.patron_house_id)
+				for house_id in backers:
+					var held: Dictionary = _bodies.get(house_id, {})
+					held[org.org_id] = true
+					_bodies[house_id] = held
+	var of_a: Dictionary = _bodies.get(a.org_id, {})
+	var of_b: Dictionary = _bodies.get(b.org_id, {})
+	for id in of_a:
+		if of_b.has(id):
+			return true
 	return false
+
+
+static var _bodies_signature: Array = []
+static var _bodies: Dictionary = {}
 
 
 # ===================================================================== stages

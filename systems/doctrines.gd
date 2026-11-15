@@ -196,14 +196,33 @@ static func sympathy_of(org: Organization) -> Doctrine:
 		return null
 	if org.kind == Organization.OrgKind.FACTION and org.doctrine_id != &"":
 		return get_doctrine(org.doctrine_id)
+	if GameState.doctrines.is_empty():
+		return null
+	# Asked about every family several times a season; the answer only moves
+	# when a doctrine does, so it is kept for the tick.
+	var signature := [SimClock.current_tick, GameState.world, GameState.doctrines.size()]
+	if signature != _sympathy_signature:
+		_sympathy_signature = signature
+		_sympathy = {}
+		_living = living()
+	if _sympathy.has(org.org_id):
+		return _sympathy[org.org_id]
 	var best: Doctrine = null
 	var most := 0.6
-	for d in living():
+	for d in _living:
+		if not d.is_alive():
+			continue
 		var c := closeness(d, org.ideology)
 		if c > most:
 			most = c
 			best = d
+	_sympathy[org.org_id] = best
 	return best
+
+
+static var _sympathy_signature: Array = []
+static var _sympathy: Dictionary = {}
+static var _living: Array[Doctrine] = []
 
 
 ## Its argument, in a line: what makes rule right, who decides, and the two
