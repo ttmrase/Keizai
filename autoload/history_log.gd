@@ -26,6 +26,8 @@ const _LINEAGE_CRITICAL_TYPES := [
 	HistoryEvent.EventType.DISSOLVED,
 	# A rupture is the hinge a later century is explained by. Never compacted.
 	HistoryEvent.EventType.INCIDENT,
+	# Who the histories remember is decided once and kept.
+	HistoryEvent.EventType.GREATNESS,
 	# A war's beginning and its end: the states it made and unmade hang on them.
 	HistoryEvent.EventType.CONFLICT_DECLARED,
 	HistoryEvent.EventType.CONFLICT_RESOLVED,

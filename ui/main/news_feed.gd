@@ -195,6 +195,8 @@ static func classify(e: HistoryEvent) -> Dictionary:
 						listed.append("・" + String(line))
 					item["text"] = "%s\n%s" % [e.description, "\n".join(listed)]
 				return item
+		HistoryEvent.EventType.GREATNESS:
+			return _item(e, Weight.NOTABLE, "偉人", Palette.ACCENT, &"laurel", "lineage")
 		HistoryEvent.EventType.DEATH:
 			if bool(e.payload.get("killed_in_battle", false)):
 				return _item(e, Weight.NOTABLE, "討死", Palette.DANGER, &"swords", "incidents")

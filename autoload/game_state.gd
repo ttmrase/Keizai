@@ -14,6 +14,10 @@ extends Node
 var world: WorldState
 var organizations: Dictionary[StringName, Organization] = {}
 var people: Dictionary[StringName, NotableIndividual] = {}
+## 偉人 — everyone the histories have come to keep, in the order they were
+## recognised: {person_id, field, title, text, tick, basis}. Written only by
+## apply(), from GREATNESS events.
+var greats: Array[Dictionary] = []
 
 # Deterministic id counters. Persisted, so ids stay stable across save/load.
 var _next_event_seq: int = 0
@@ -201,6 +205,8 @@ func apply(e: HistoryEvent) -> void:
 			_apply_war_declared(e)
 		HistoryEvent.EventType.CONFLICT_RESOLVED:
 			_apply_war_resolved(e)
+		HistoryEvent.EventType.GREATNESS:
+			_apply_greatness(e)
 		_:
 			# IDEOLOGY_SHIFT, CONFLICT_*, RESOURCE_SHOCK and EPOCH_SUMMARY are
 			# chronicle markers for values their owning system already changed.
@@ -552,6 +558,18 @@ func _apply_war_resolved(e: HistoryEvent) -> void:
 	world.wars = still
 
 
+func _apply_greatness(e: HistoryEvent) -> void:
+	greats.append({
+		"person_id": String(e.subject_person_id),
+		"field": String(e.payload.get("field", "")),
+		"title": String(e.payload.get("title", "")),
+		"text": String(e.payload.get("text", "")),
+		"tick": e.tick,
+		"basis": e.payload.get("basis", []).duplicate(),
+		"event_id": String(e.event_id),
+	})
+
+
 func war_by_id(war_id: StringName) -> WarState:
 	for war in world.wars:
 		if war.war_id == war_id:
@@ -811,6 +829,7 @@ func reset() -> void:
 	world = WorldState.new()
 	organizations.clear()
 	people.clear()
+	greats.clear()
 	_next_event_seq = 0
 	_next_org_seq = 0
 	_next_person_seq = 0
@@ -828,6 +847,7 @@ func to_dict() -> Dictionary:
 		"world": world.to_dict(),
 		"organizations": orgs,
 		"people": folks,
+		"greats": greats.duplicate(true),
 		"next_event_seq": _next_event_seq,
 		"next_org_seq": _next_org_seq,
 		"next_person_seq": _next_person_seq,
@@ -843,6 +863,18 @@ func from_dict(d: Dictionary) -> void:
 	people.clear()
 	for id in d.get("people", {}):
 		people[StringName(id)] = NotableIndividual.from_dict(d["people"][id])
+	greats.clear()
+	for entry in d.get("greats", []):
+		if entry is Dictionary:
+			greats.append({
+				"person_id": String(entry.get("person_id", "")),
+				"field": String(entry.get("field", "")),
+				"title": String(entry.get("title", "")),
+				"text": String(entry.get("text", "")),
+				"tick": int(entry.get("tick", 0)),
+				"basis": (entry.get("basis", []) as Array).duplicate(),
+				"event_id": String(entry.get("event_id", "")),
+			})
 	_next_event_seq = int(d.get("next_event_seq", 0))
 	_next_org_seq = int(d.get("next_org_seq", 0))
 	_next_person_seq = int(d.get("next_person_seq", 0))

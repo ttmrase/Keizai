@@ -141,6 +141,11 @@ const STANDING_LABELS := {
 ## backed won or lost, or a war that swelled it is over. Feeds its power score
 ## as one more driver and fades over a couple of generations. Cached.
 @export var fortune: float = 0.0
+## What the current head's time in the seat has seen so far — the lowest the
+## state's standing fell, the people it started with, the worst the monsters
+## got — so that when the seat changes hands, history can say what the reign
+## amounted to. Cached, read by Greatness; reset with each new head.
+@export var reign_marks: Dictionary = {}
 
 
 func kind_name() -> String:
@@ -245,6 +250,8 @@ func to_dict() -> Dictionary:
 		d["honour"] = honour
 	if not is_zero_approx(fortune):
 		d["fortune"] = fortune
+	if not reign_marks.is_empty():
+		d["reign_marks"] = reign_marks.duplicate()
 	return d
 
 
@@ -313,6 +320,7 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.favour = float(d.get("favour", 0.0))
 	o.honour = float(d.get("honour", 0.0))
 	o.fortune = float(d.get("fortune", 0.0))
+	o.reign_marks = (d.get("reign_marks", {}) as Dictionary).duplicate()
 	return o
 
 

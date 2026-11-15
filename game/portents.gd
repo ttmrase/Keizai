@@ -38,6 +38,7 @@ static func current(tick: int) -> Array[Dictionary]:
 	_restless_land(out)
 	_divided_faith(out)
 	_monsters(out)
+	_nearing_greatness(out, tick)
 	out.sort_custom(func(a, b): return float(a["weight"]) > float(b["weight"]))
 	if out.size() > MAX_ITEMS:
 		out.resize(MAX_ITEMS)
@@ -208,3 +209,38 @@ static func _monsters(out: Array[Dictionary]) -> void:
 		"武を頼む者が力を増す。討伐の者たちが国を動かしはじめる",
 		&"claw", Palette.DANGER, 0.25 + 0.3 * threat, "power"))
 
+
+## Somebody history is about to weigh: a founder whose state nears its hundred
+## and fiftieth year, a head whose family has held the rank they raised it to
+## for nearly fifty. Read from what Greatness will look at, decided by nothing.
+const GREATNESS_HORIZON_YEARS := 20
+
+
+static func _nearing_greatness(out: Array[Dictionary], tick: int) -> void:
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		var age := int((tick - polity.founding_tick) / SimConfig.TICKS_PER_YEAR)
+		var left := Greatness.FOUNDER_YEARS - age
+		if left <= 0 or left > GREATNESS_HORIZON_YEARS \
+				or (polity.reign_marks.get("judged", []) as Array).has("founder"):
+			continue
+		if Greatness._taken_by_somebody(polity):
+			continue
+		var first := Greatness._first_holding(polity.org_id)
+		if first.is_empty() or int(first["years"]) < Greatness.FOUNDER_REIGN_YEARS:
+			continue
+		var founder: NotableIndividual = first["person"]
+		out.append(_item("偉人", "あと%d年で、%sが歴史に刻まれる" % [left, founder.full_name],
+			"%sが百二十年を保てば、その国を開いた者は「建国の父」と呼ばれる" % polity.formal_name(),
+			&"laurel", Palette.ACCENT, 0.3 + 0.02 * float(GREATNESS_HORIZON_YEARS - left),
+			"lineage", founder.person_id))
+	for entry in GameState.world.great_pending:
+		var left := int((int(entry.get("due", 0)) - tick) / SimConfig.TICKS_PER_YEAR)
+		if left > GREATNESS_HORIZON_YEARS:
+			continue
+		var who := GameState.get_person(StringName(entry.get("person_id", "")))
+		var house := GameState.get_organization(StringName(entry.get("house_id", "")))
+		if who == null or house == null or not house.is_active():
+			continue
+		out.append(_item("偉人", "あと%d年で、%sが歴史に刻まれる" % [maxi(1, left), who.full_name],
+			"%sがそれまで公爵の座を保てば、家を引き上げた当主は「家門の祖」となる" % house.formal_name(),
+			&"laurel", Palette.ACCENT, 0.3, "lineage", who.person_id))

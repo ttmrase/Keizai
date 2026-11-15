@@ -368,6 +368,16 @@ func _feats_from_event(e: HistoryEvent) -> void:
 			if bool(e.payload.get("regime_change", false)):
 				last_turmoil_tick = e.tick
 				_unlock("regime")
+		HistoryEvent.EventType.GREATNESS:
+			_unlock("first_great")
+			if Greatness.entries_of(e.subject_person_id).size() >= 2:
+				_unlock("great_pair")
+			var fields := {}
+			for entry in Greatness.all():
+				fields[entry["field"]] = true
+			if fields.size() >= Greatness.FIELDS.size():
+				_unlock("all_fields")
+			_remember_great(e)
 		HistoryEvent.EventType.CONFLICT_DECLARED:
 			if e.payload.has("war"):
 				last_turmoil_tick = e.tick
@@ -388,6 +398,31 @@ func _feats_from_event(e: HistoryEvent) -> void:
 			var org := GameState.get_organization(e.subject_org_id)
 			if org != null and org.is_noble():
 				_unlock("extinction")
+
+
+## Every world's 偉人, kept in the annals beside the feats: the histories of all
+## the worlds this god has watched, by name.
+const ANNALS_GREATS_KEPT := 60
+
+
+func _remember_great(e: HistoryEvent) -> void:
+	var who := GameState.get_person(e.subject_person_id)
+	if who == null:
+		return
+	var annals := _load_annals()
+	var kept: Array = annals.get_value("greats", "list", [])
+	kept.append({"name": who.full_name, "title": String(e.payload.get("title", "")),
+		"field": String(e.payload.get("field", "")), "year": int(e.tick / SimConfig.TICKS_PER_YEAR),
+		"seed": GameState.world.seed})
+	if kept.size() > ANNALS_GREATS_KEPT:
+		kept = kept.slice(kept.size() - ANNALS_GREATS_KEPT)
+	annals.set_value("greats", "list", kept)
+	_save_annals()
+
+
+## Every 偉人 this god has seen in any world, oldest first.
+func remembered_greats() -> Array:
+	return _load_annals().get_value("greats", "list", [])
 
 
 func _feats_from_world(tick: int) -> void:

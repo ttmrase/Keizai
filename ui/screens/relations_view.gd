@@ -313,8 +313,10 @@ func _draw_house(house: Organization, font: Font) -> void:
 			Palette.TEXT, 2.0)
 
 	var size := maxi(11, int((16 if noble else 12) * _canvas.view_zoom))
+	# A household in service sits beside its liege and almost always shares its
+	# 氏, so the field gives it its own name only; the sheet gives the whole.
 	var label := "%s　%s" % [house.formal_name(), HouseRank.title_of_house(house)] if noble \
-		else house.formal_name()
+		else house.short_name()
 	var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	_canvas.draw_string(font, centre + Vector2(-width * 0.5, radius + 20.0 * _canvas.view_zoom),
 		label, HORIZONTAL_ALIGNMENT_LEFT, -1, size,

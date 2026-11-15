@@ -350,6 +350,7 @@ func _ready() -> void:
 	await _capture("%s/map_detail.png" % _out_dir)
 
 	await _capture_uji(shell)
+	await _capture_greats(shell)
 	await _capture_war(shell)
 
 	print("captured to %s" % _out_dir)
@@ -396,6 +397,19 @@ func _capture_uji(shell: Control) -> void:
 	await _settle()
 	await _capture("%s/power_uji.png" % _out_dir)
 	power._on_filter(0)
+	await _settle()
+
+
+## 偉人: the hall, and the light when somebody enters it. A world this young
+## may have nobody in it yet; the shot then shows the empty shelves as they are.
+func _capture_greats(shell: Control) -> void:
+	shell.show_tab("lineage")
+	await _settle()
+	var lineage: Control = shell._screens["lineage"]
+	lineage._show_greats()
+	await _settle()
+	await _capture("%s/lineage_greats.png" % _out_dir)
+	lineage._show_institutions()
 	await _settle()
 
 

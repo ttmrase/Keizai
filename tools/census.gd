@@ -74,6 +74,7 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 	var counts := {}
 	var incidents := {}
 	var wars: Array[String] = []
+	var greats: Array[String] = []
 	for e in HistoryLog.backbone:
 		match e.event_type:
 			HistoryEvent.EventType.INCIDENT:
@@ -90,6 +91,11 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 					counts["battles"] = int(counts.get("battles", 0)) + 1
 				if e.payload.has("defector_house_id"):
 					counts["defections"] = int(counts.get("defections", 0)) + 1
+			HistoryEvent.EventType.GREATNESS:
+				var field := String(e.payload.get("field", ""))
+				counts["great_" + field] = int(counts.get("great_" + field, 0)) + 1
+				greats.append("  ★%d年 [%s] %s" % [int(e.tick / 4),
+					Greatness.field_label(field), e.description])
 			HistoryEvent.EventType.CONFLICT_DECLARED:
 				if e.payload.has("war"):
 					var cause := String(e.payload["war"].get("cause", ""))
@@ -106,6 +112,13 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 		GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM).size(),
 		counts, incidents])
 	for line in wars:
+		print(line)
+	var officers := 0
+	for id in GameState.people:
+		if GameState.people[id].ever_held_office():
+			officers += 1
+	print("  偉人 %d人 / 役職経験者 %d人" % [greats.size(), officers])
+	for line in greats:
 		print(line)
 	for war in GameState.world.wars:
 		print("  (進行中) %d年〜 front %.2f" % [int(war.start_tick / 4), war.front])

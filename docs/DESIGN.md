@@ -1176,3 +1176,145 @@ parts one tap from the top.
 Left out on purpose again: sound, which cannot be judged from here; any change
 to the dock's seven screens, which are the game's original shape; and feedback
 from fulfilment into the world, for the reason given last time.
+
+## Thirteenth iteration: 氏, war, and the people history keeps
+
+Three additions, each meant to make a long history easier to hold in the head
+without giving the god anything new to press. The god still touches four dials
+and seven calamities; nothing here can be started, won or awarded by hand.
+
+**氏 — where a family came from, on its name.** A surname said which house
+somebody belonged to and nothing about where that house came from, so after
+three centuries a house tree of forty names was forty unrelated words. Now only
+the great houses of the first day found a 氏, named for them, and every family
+after carries the 氏 of the house it came out of, for good: ネシ家 founds
+ネシ氏, its first servants are ネシ氏カベ家, a cadet line three removes down is
+ネシ氏コド家, and its people ネシ氏コド・名. Only the founding house writes
+ネシ・名. The house lineage tree still has one root (the invariant every kind
+keeps), and that is why 氏 had to be a separate field rather than a walk up
+`parent_org_id`: walked up, every founding house but one descends from the
+first, and the whole nobility would be one 氏.
+
+Design decisions worth keeping:
+
+- *A pointer, not a copy.* `uji_id` names the founding house; the 氏's text is
+  read from that house's name each time. Renaming a founding house renames its
+  氏 everywhere, which is the rule the brief asked for and the only one that
+  stays consistent with surnames already following houses.
+- *Set on the one path.* Every house after the first day is founded through
+  `SchismResolver.create_branch`, so that is where it is set, with the record
+  filling it from the parent if a founding ever arrives without one.
+- *Names composed in one place.* `HouseNaming` builds the full and short forms;
+  `NotableIndividual.full_name` is now always the full form, so every sentence
+  the chronicle writes from now on carries the 氏 without each writer knowing
+  about it. Narrow places (cards) use `short_name` with the 氏 drawn small in
+  front. Text already written stays as written — the chronicle is a record of
+  what was said at the time.
+- *Old saves are migrated from the backbone.* The FOUNDING events keep each
+  house's standing and liege at the moment of founding, which identifies the
+  great houses of the first day exactly; failing a backbone, they are the first
+  houses minted, one per region.
+- *Arms follow the 氏.* The crest device used to come from walking up to the
+  first founding ancestor, which for the first day's retainers meant a device
+  of their own. It now comes from the 氏, so one device is one 氏.
+
+**War.** A change of regime used to take the whole country with it, always.
+That is right when the old order has no one left and wrong when half the
+country stands by it. `CivilWar.plan_split` reads, at the moment of the fall,
+which side each region would take — its lord's standing with the falling
+ruler's house (same 氏, friendship, feud) and with the challenger's backers,
+the faction it leans to, its faith, its anger, and the old regime's remaining
+legitimacy — with a push toward the old order when the change came by force
+(a seizure, an uprising, or an assassination in the last ten years). If the
+old order keeps enough of the people (27%; 20% after force) and both sides
+have two regions, the country splits; otherwise it falls whole exactly as
+before.
+
+- *One root still.* The breakaway is founded as a branch of the old state
+  (SCHISM `civil_war`), so the polity lineage keeps its single root. A loser is
+  dissolved and its regions annexed through ordinary transfers; a peace leaves
+  two living states. `GameState._apply_dissolution` now never leaves a region
+  answering to a dead state (it falls to the named successor, then the nearest
+  living ancestor, then the largest state), and the power-vacuum rule hands a
+  lost region only to another state — both had been able to break "every
+  region belongs to exactly one living state", which the war tests check.
+- *Events for facts, a cache for the state of things.* CONFLICT_DECLARED opens
+  a war and CONFLICT_RESOLVED closes it (both now lineage-critical); battles,
+  defections, annexation and confiscations are POWER_TRANSFERs carrying the
+  war id, and GameState folds them into the war's record. The front,
+  exhaustion and strengths are cached on the `WarState` and saved with the
+  snapshot.
+- *Abstract fighting, concrete ending.* A campaign a year: strength is land and
+  people, food, the noble houses and the guilds and factions on each side
+  (hunters and juntas count as arms, artisans as arms makers, merchants as
+  money), legitimacy, unrest, the monster threat against whoever lacks hunters,
+  exhaustion, and an incumbency edge for the old order. The ending is where the
+  design spends its effort: attainder for the houses at the centre of the
+  losing cause (their land to the winners' leading houses, their rank cut, and
+  a house left with nothing put in a victor's service), reduction for the rest,
+  pardon for early defectors, honours for the winners; `fortune` on guilds,
+  factions and faiths carries their side's result into their power score (and
+  through it their seats) and fades over a couple of generations; martial
+  bodies that swelled for the war shrink after it; the victors' faith follows
+  them into annexed regions; the losing ruler is executed and their state
+  ends. A peace freezes the border, and after a truce the two states may fight
+  again if one has grown far stronger and their ruling houses are estranged.
+- *More than one realm.* `HouseRank.dominant_realm()` had become a quiet
+  assumption in many places. Kept where only the main country matters (the
+  prophecies, the incidents, the regard the world pays to birth, the crown's
+  envy in house relations); generalised where it would stop the second state
+  working: every hereditary crown is outside the peerage (`royal_house_ids`),
+  every crown grants and strips honours over its own nobility, every state
+  keeps its seats and fills its throne, and every capital wears a crown on
+  the map. A state at war is not overturned from within, splintered by rules,
+  or subject to a capital seizure or uprising until the war ends.
+
+**偉人.** Holding a throne a long time does not make anyone memorable; the
+histories keep a few per age. `Greatness` judges six fields — rule, arms,
+faith, wealth and craft, change, family — and almost always after the fact:
+whether a founded state lasted, whether a family stayed great, whether a faith
+took hold. Each recognition is a GREATNESS event (appended last to the enum, so
+saved events keep their meaning), lineage-critical, folded into
+`GameState.greats`. Reigns are judged the year they are seen to end from a
+small record kept on each seat while it lasts (`reign_marks`), and a family's
+rise is judged fifty years after the head who achieved it (`great_pending`).
+
+Tuning is where most of the time went. The first criteria produced 16–18
+people a millennium, mostly revolutionaries whose new state lasted sixty
+years (every refounding qualified) and heads who took a retainer family to the
+nobility (common once the vacancy rule exists). What made the list read like a
+short history book: a new order must last 130 years; a state that was taken
+rather than founded is remembered once, for who took it, not again for whoever
+sat in it first; a family must reach a duke's coronet or a crown and still
+hold it fifty years on; a faith's founder needs half the world, or three
+regions for two centuries; a war's victor must have held the seat for at
+least half of it, and a plain victory (not from behind) must have taken six
+years. One bug is worth recording: with the founder judged at 120 years and
+the taker at 130, the loop skipped a state once its first judgement was made
+and the second never happened; each judgement is now made on its own, and
+`test_greatness` checks that every state taken and lasting names its taker.
+
+Measured with `tools/Census.tscn` (five seeds a mode, 1,500 years each):
+
+
+| | quiet (left alone) | eventful (the harness's hard world, repeated) |
+|---|---|---|
+| wars | 4 in 7,500 years (0.5 per millennium; per world 0–1.3) | 10 in 7,500 years (1.3 per millennium; per world 0–3.3, three of them renewals) |
+| how they ended (all 14) | restoration 6, peace 4, revolution 2, reunification 2 | |
+| 偉人 | 29 (3.9 per millennium; per world 0.7–5.3) | 41 (5.5 per millennium; per world 3.3–7.3) |
+| share of office-holders | 0.05–0.4% | 0.3–0.6% |
+
+By field, over both: change 28, faith 15, rule 10, family 8, arms 6, wealth and
+craft 3. The average sits a little under the brief's "about eight a
+millennium": the bar was kept where the list still reads like a short world
+history rather than raised to hit a number. The quietest world (one
+refounding in 1,500 years) remembered a single person; turbulent worlds lean
+toward 変革, which is what a turbulent history is about. A tick costs the same
+as before within noise (two seeds × 300 quiet years: 10.2 ms before, 10.5
+after; 800 eventful years: 20.8 before, 20.4 after).
+
+Left out: notoriety (the brief's optional tyrants and usurpers); a prophecy
+about wars ("a civil war will break out", "this side will win") — the oracle's
+offers are built from readings that settle within decades, and a war's
+probability does not reduce to one honestly; and per-realm regard for birth,
+which would make the peerage of a divided country two peerages.

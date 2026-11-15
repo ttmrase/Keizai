@@ -9,7 +9,7 @@ extends Control
 ## most of the tree, and putting it next to the guilds and faiths leaves those
 ## squeezed into a corner of a chart that is mostly surnames.
 
-enum Mode { INSTITUTIONS, HOUSES, PEOPLE }
+enum Mode { INSTITUTIONS, HOUSES, PEOPLE, GREATS }
 
 var _institution_source := OrganizationLineageSource.new()
 var _house_source := OrganizationLineageSource.new()
@@ -41,10 +41,31 @@ var _spine_only := true
 var _rename_dialog: RenameDialog
 ## Families screen only: narrows the chart to one 氏.
 var _uji_button: Button
+## The fourth view: the hall of the people history keeps, shelf by field.
+var _greats_button: Button
+var _hall: ScrollContainer
+var _hall_rows: VBoxContainer
 
 
 func _ready() -> void:
 	_house_source.root_kinds = [Organization.OrgKind.HOUSE]
+	_greats_button = _people_button.duplicate()
+	_greats_button.text = "偉人"
+	_people_button.get_parent().add_child(_greats_button)
+	_greats_button.pressed.connect(_show_greats)
+	_hall = ScrollContainer.new()
+	_hall.visible = false
+	_hall.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_hall.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hall.offset_top = 62.0
+	_hall.offset_left = 12.0
+	_hall.offset_right = -12.0
+	add_child(_hall)
+	move_child(_hall, $Top.get_index())
+	_hall_rows = VBoxContainer.new()
+	_hall_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hall_rows.add_theme_constant_override("separation", 10)
+	_hall.add_child(_hall_rows)
 	_uji_button = Button.new()
 	_uji_button.custom_minimum_size = Vector2(80, 44)
 	_uji_button.add_theme_font_size_override("font_size", 15)
@@ -94,6 +115,12 @@ func _on_renamed(_subject_id: StringName) -> void:
 
 
 func on_shown() -> void:
+	_rebuild()
+
+
+func _show_greats() -> void:
+	_mode = Mode.GREATS
+	_sync_modes()
 	_rebuild()
 
 
@@ -179,8 +206,16 @@ func _most_notable_living() -> StringName:
 
 func _sync_modes() -> void:
 	for entry in [[_org_button, Mode.INSTITUTIONS], [_house_button, Mode.HOUSES],
-			[_people_button, Mode.PEOPLE]]:
+			[_people_button, Mode.PEOPLE], [_greats_button, Mode.GREATS]]:
 		Palette.style_pill(entry[0], _mode == entry[1])
+	var hall := _mode == Mode.GREATS
+	_hall.visible = hall
+	_graph.visible = not hall
+	$Top/SearchRow.visible = not hall
+	$Top/NoteRow.visible = not hall
+	if hall:
+		_detail.visible = false
+		_results.visible = false
 
 	_scope_button.visible = _mode != Mode.INSTITUTIONS \
 		and not (_mode == Mode.HOUSES and _house_source.uji_filter != &"")
@@ -197,6 +232,9 @@ func _sync_modes() -> void:
 
 
 func _rebuild() -> void:
+	if _mode == Mode.GREATS:
+		_build_hall()
+		return
 	_graph.rebuild()
 	if not _graph.is_focused():
 		_graph.frame_all()
@@ -329,6 +367,128 @@ func _set_uji_filter(uji_id: StringName) -> void:
 	_graph.selected_id = &""
 	_sync_modes()
 	_rebuild()
+
+
+# -------------------------------------------------------------- the hall
+
+## 偉人 — the people later history keeps, shelf by field. A field nobody has yet
+## earned shows, faintly, what it would take.
+func _build_hall() -> void:
+	for child in _hall_rows.get_children():
+		child.queue_free()
+	var total := Greatness.all().size()
+	var head := Label.new()
+	head.text = "後の世に名を残した者　%d人" % total if total > 0 \
+		else "まだ誰も、歴史に名を刻んでいない"
+	head.add_theme_font_size_override("font_size", 15)
+	head.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	_hall_rows.add_child(head)
+	for field in Greatness.FIELDS:
+		_hall_rows.add_child(_shelf_heading(field))
+		var entries := Greatness.in_field(field)
+		if entries.is_empty():
+			var hint := Label.new()
+			hint.text = "まだ誰もいない——%s" % Greatness.FIELD_HINTS[field]
+			hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			hint.add_theme_font_size_override("font_size", 14)
+			hint.add_theme_color_override("font_color", Palette.TEXT_DIM)
+			_hall_rows.add_child(hint)
+			continue
+		for entry in entries:
+			_hall_rows.add_child(_great_card(entry))
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 40)
+	_hall_rows.add_child(gap)
+
+
+func _shelf_heading(field: String) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 8)
+	var box := VBoxContainer.new()
+	box.add_child(gap)
+	box.add_child(row)
+	row.add_child(GlyphIcon.make(Greatness.FIELD_GLYPHS[field], Palette.ACCENT, 26))
+	var label := Label.new()
+	label.text = Greatness.field_label(field)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Palette.ACCENT)
+	row.add_child(label)
+	var count := Label.new()
+	count.text = "%d人" % Greatness.in_field(field).size()
+	count.add_theme_font_size_override("font_size", 15)
+	count.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	row.add_child(count)
+	var rule := ColorRect.new()
+	rule.color = Color(Palette.ACCENT, 0.3)
+	rule.custom_minimum_size = Vector2(0, 1)
+	box.add_child(rule)
+	return box
+
+
+func _great_card(entry: Dictionary) -> Control:
+	var person := GameState.get_person(StringName(entry["person_id"]))
+	var card := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Palette.PANEL_RAISED
+	box.border_color = Color(Palette.ACCENT, 0.55)
+	box.border_width_left = 3
+	box.set_corner_radius_all(10)
+	box.content_margin_left = 12
+	box.content_margin_right = 12
+	box.content_margin_top = 10
+	box.content_margin_bottom = 10
+	card.add_theme_stylebox_override("panel", box)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	var house_id := &""
+	if person != null:
+		house_id = person.house_org_id if person.house_org_id != &"" else person.birth_house_org_id
+	var shield := CrestIcon.make(house_id, 44)
+	shield.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(shield)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 1)
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(words)
+	var uji := HouseNaming.person_uji_line(person)
+	if not uji.is_empty():
+		var over := Label.new()
+		over.text = uji
+		over.add_theme_font_size_override("font_size", 13)
+		over.add_theme_color_override("font_color", Palette.ACCENT_SOFT.lightened(0.2))
+		words.add_child(over)
+	var name := Label.new()
+	name.text = "%s　「%s」" % [person.short_name if person != null else "?", entry["title"]]
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name.add_theme_font_size_override("font_size", 19)
+	name.add_theme_color_override("font_color", Palette.TEXT)
+	words.add_child(name)
+	if person != null:
+		var life := Label.new()
+		life.text = "%d年〜%s　・　%d年に列す" % [int(person.birth_tick / SimConfig.TICKS_PER_YEAR),
+			"存命" if person.is_alive() else "%d年" % int(person.death_tick / SimConfig.TICKS_PER_YEAR),
+			int(int(entry["tick"]) / SimConfig.TICKS_PER_YEAR)]
+		life.add_theme_font_size_override("font_size", 13)
+		life.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		words.add_child(life)
+	var text := Label.new()
+	text.text = entry["text"]
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_theme_font_size_override("font_size", 15)
+	text.add_theme_color_override("font_color", Palette.TEXT)
+	words.add_child(text)
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	var id := StringName(entry["person_id"])
+	card.gui_input.connect(func(event: InputEvent):
+		if Touch.tapped(card, event) and GameState.get_person(id) != null:
+			reveal(id))
+	return card
 
 
 ## Walks up to where this lineage began — the point of the whole design, so it

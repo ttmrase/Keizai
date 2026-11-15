@@ -901,7 +901,7 @@ static func _settle_victory(war: WarState, winner_side: String, tick: int) -> vo
 	if not up_bodies.is_empty():
 		lines.append("%sは伸びた" % "・".join(up_bodies.slice(0, 3)))
 
-	HistoryLog.emit_event(
+	var ending := HistoryLog.emit_event(
 		HistoryEvent.EventType.CONFLICT_RESOLVED,
 		tick,
 		"%d年の戦が終わった。%s" % [war.years(tick), headline],
@@ -1046,7 +1046,8 @@ static func _settle_victory(war: WarState, winner_side: String, tick: int) -> vo
 		loser.org_id,
 		loser.leader_person_id,
 		loser.origin_event_id)
-
+	# Whoever won it may be one the histories keep.
+	Greatness.consider_war(ending, tick)
 
 
 static func _opening_of(war: WarState, side: String) -> float:

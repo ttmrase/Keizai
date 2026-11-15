@@ -31,6 +31,10 @@ enum EventType {
 	## the headline that says what they were all part of.
 	INCIDENT,
 	EPOCH_SUMMARY,
+	## Somebody judged by later history to belong among the few the histories
+	## keep — 偉人. Appended last: events are saved by name, and nothing that
+	## reads a type by number may see the earlier ones move.
+	GREATNESS,
 }
 
 const TYPE_NAMES := {
@@ -51,6 +55,7 @@ const TYPE_NAMES := {
 	EventType.RENAMED: "RENAMED",
 	EventType.INCIDENT: "INCIDENT",
 	EventType.EPOCH_SUMMARY: "EPOCH_SUMMARY",
+	EventType.GREATNESS: "GREATNESS",
 }
 
 @export var event_id: StringName = &""

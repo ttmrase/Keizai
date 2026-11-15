@@ -501,6 +501,8 @@ func _look_of(e: HistoryEvent) -> Dictionary:
 		HistoryEvent.EventType.SUCCESSION:
 			return {"glyph": &"crown", "colour": Palette.POLITY, "ink": Palette.TEXT}
 		HistoryEvent.EventType.POWER_TRANSFER:
+			if e.payload.has("war_id"):
+				return {"glyph": &"swords", "colour": Palette.DANGER, "ink": Palette.TEXT}
 			return {"glyph": &"banner", "colour": Palette.POLITY, "ink": Palette.TEXT}
 		HistoryEvent.EventType.SCHISM:
 			return {"glyph": &"split", "colour": Palette.ACCENT, "ink": Palette.TEXT}
@@ -513,7 +515,9 @@ func _look_of(e: HistoryEvent) -> Dictionary:
 		HistoryEvent.EventType.DISASTER_OCCURRED:
 			return {"glyph": &"drought", "colour": Palette.HOUSE, "ink": Palette.TEXT}
 		HistoryEvent.EventType.CONFLICT_DECLARED, HistoryEvent.EventType.CONFLICT_RESOLVED:
-			return {"glyph": &"unrest", "colour": Palette.DANGER, "ink": Palette.TEXT}
+			return {"glyph": &"swords", "colour": Palette.DANGER, "ink": Palette.TEXT}
+		HistoryEvent.EventType.GREATNESS:
+			return {"glyph": &"laurel", "colour": Palette.ACCENT, "ink": Palette.TEXT}
 		HistoryEvent.EventType.IDEOLOGY_SHIFT:
 			# A house's rank moving is written as a shift in what it stands for.
 			if e.payload.has("to_tier"):

@@ -85,6 +85,14 @@ func _build_fx() -> void:
 			_fx.wash(item["colour"], 0.38, 0.9)
 			_fx.quake(0.4, 8.0))
 	EventBus.event_recorded.connect(func(e: HistoryEvent):
+		# Somebody enters the histories: a light, their name across the screen,
+		# and the clock left running.
+		if e.event_type == HistoryEvent.EventType.GREATNESS and is_visible_in_tree():
+			var who := GameState.get_person(e.subject_person_id)
+			_fx.burst(Palette.ACCENT, &"laurel", Vector2(-1, -1), 0.7)
+			_fx.caption("偉人　%s" % Greatness.field_label(String(e.payload.get("field", ""))),
+				"%s「%s」" % [who.full_name if who != null else "", e.payload.get("title", "")])
+			return
 		if e.event_type != HistoryEvent.EventType.DISASTER_OCCURRED or not is_visible_in_tree():
 			return
 		var def := ContentRegistry.get_disaster(StringName(e.payload.get("definition_id", "")))

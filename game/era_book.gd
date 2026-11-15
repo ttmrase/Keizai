@@ -119,6 +119,7 @@ static func _empty_tally(index: int) -> Dictionary:
 		"calamities": {},
 		"blessings": {},
 		"wars": [],
+		"greats": [],
 		"war_ends": [],
 		"battles": 0,
 		"births": 0,
@@ -137,6 +138,11 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 		HistoryEvent.EventType.INCIDENT:
 			t["incidents"].append([Incidents.label_of(StringName(e.payload.get("incident_kind", ""))),
 				int(e.tick / SimConfig.TICKS_PER_YEAR)])
+			moment = true
+		HistoryEvent.EventType.GREATNESS:
+			var who := GameState.get_person(e.subject_person_id)
+			t["greats"].append("%s「%s」" % [who.full_name if who != null else "ある者",
+				String(e.payload.get("title", ""))])
 			moment = true
 		HistoryEvent.EventType.CONFLICT_DECLARED:
 			if e.payload.has("war"):
@@ -278,6 +284,9 @@ static func _lines(t: Dictionary) -> Array[String]:
 	for entry in t["war_ends"]:
 		lines.append("%d年の戦が%sに終わった（%d年）" % [entry[2],
 			CivilWar.outcome_label(entry[0]), entry[1]])
+
+	if not t["greats"].is_empty():
+		lines.append("%sが歴史に名を刻んだ" % _some(t["greats"], "人"))
 
 	if not t["incidents"].is_empty():
 		var parts: Array[String] = []

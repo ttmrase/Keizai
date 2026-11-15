@@ -78,6 +78,12 @@ const ALL := [
 		"text": "戦が講和に終わり、国が二つのまま残る"},
 	{"id": "reunification", "title": "再統一", "glyph": &"keep",
 		"text": "分かれた国が戦の末にふたたび一つになる"},
+	{"id": "first_great", "title": "歴史に名を刻む者", "glyph": &"laurel",
+		"text": "後の世に偉人と称えられる者が現れる"},
+	{"id": "great_pair", "title": "二つの殿堂", "glyph": &"laurel",
+		"text": "一人の者が二つの分野で偉人に列せられる"},
+	{"id": "all_fields", "title": "六つの殿堂", "glyph": &"laurel",
+		"text": "一つの世界で、六つの分野すべてに偉人が出る"},
 ]
 
 ## What a god is called, by how much it has witnessed. A name and nothing more:

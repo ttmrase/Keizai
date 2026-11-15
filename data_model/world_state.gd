@@ -54,6 +54,9 @@ extends Resource
 ## Wars in progress. Opened and closed only through the record (see WarState);
 ## how each is going is cached on it.
 @export var wars: Array[WarState] = []
+## Heads whose rise history will judge once enough time has passed to know
+## whether it lasted (see Greatness). Cached: {person_id, house_id, due, from, to}.
+@export var great_pending: Array = []
 
 
 func get_settlement(id: StringName) -> SettlementState:
@@ -72,6 +75,7 @@ func to_dict() -> Dictionary:
 		fighting.append(w.to_dict())
 	return {
 		"wars": fighting,
+		"great_pending": great_pending.duplicate(true),
 		"tick": tick,
 		"seed": seed,
 		"settlements": settle,
@@ -131,4 +135,11 @@ static func from_dict(d: Dictionary) -> WorldState:
 	for entry in d.get("wars", []):
 		fighting.append(WarState.from_dict(entry))
 	w.wars = fighting
+	var waiting: Array = []
+	for entry in d.get("great_pending", []):
+		if entry is Dictionary:
+			var copy: Dictionary = entry.duplicate()
+			copy["due"] = int(copy.get("due", 0))
+			waiting.append(copy)
+	w.great_pending = waiting
 	return w

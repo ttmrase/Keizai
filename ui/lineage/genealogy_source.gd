@@ -149,9 +149,12 @@ func colour(id: StringName) -> Color:
 	return Heraldry.of_id(house_id)
 
 
-## Office is marked rather than coloured, now that colour means family.
+## Office is marked rather than coloured, now that colour means family. Somebody
+## the histories keep wears the laurel instead, alive or dead.
 func badge(id: StringName) -> StringName:
 	var p := GameState.get_person(id)
+	if p != null and Greatness.is_great(p.person_id):
+		return &"laurel"
 	if p != null and p.is_alive() and p.current_tenure() != null:
 		return &"crown"
 	return &""
@@ -171,6 +174,9 @@ func detail(id: StringName) -> String:
 	if p == null:
 		return ""
 	var lines: Array[String] = []
+	for entry in Greatness.entries_of(p.person_id):
+		lines.append("[color=#d4a748]偉人・%s「%s」[/color]  %s" % [
+			Greatness.field_label(entry["field"]), entry["title"], entry["text"]])
 	var age := p.age_years(SimClock.current_tick)
 	lines.append("[color=#9a9080]生没[/color]  %d年〜%s（%d歳%s）" % [
 		int(p.birth_tick / SimConfig.TICKS_PER_YEAR),

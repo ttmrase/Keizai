@@ -12,6 +12,23 @@ static func open(host: Control, margins: Vector4 = Vector4.ZERO) -> Sheet:
 		"%s　——　どの世界で見届けたものも、ここに残る。" % Feats.rank_name(seen), margins)
 	for feat in Feats.ALL:
 		sheet.body.add_child(_row(feat))
+	# The people every world's histories kept, newest first.
+	var greats: Array = Oracle.remembered_greats()
+	if not greats.is_empty():
+		var head := Label.new()
+		head.text = "諸世界の偉人　%d人" % greats.size()
+		head.add_theme_font_size_override("font_size", 18)
+		head.add_theme_color_override("font_color", Palette.ACCENT)
+		sheet.body.add_child(head)
+		for i in range(greats.size() - 1, -1, -1):
+			var entry: Dictionary = greats[i]
+			var line := Label.new()
+			line.text = "%d年　%s「%s」（%s）" % [int(entry.get("year", 0)), entry.get("name", ""),
+				entry.get("title", ""), Greatness.field_label(String(entry.get("field", "")))]
+			line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			line.add_theme_font_size_override("font_size", 14)
+			line.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+			sheet.body.add_child(line)
 	return sheet
 
 
