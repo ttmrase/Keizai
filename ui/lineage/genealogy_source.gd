@@ -219,11 +219,18 @@ func detail(id: StringName) -> String:
 		for record in p.office_history:
 			var polity := GameState.get_organization(StringName(record.get("polity", "")))
 			var ended := int(record.get("end", -1))
-			seats.append("%s%s（%d年〜%s）" % [polity.formal_name() if polity != null else "",
+			seats.append("%s%s（%d年〜%s%s）" % [polity.formal_name() if polity != null else "",
 				Offices.label_of(String(record.get("office", "")), polity),
 				int(int(record.get("start", 0)) / SimConfig.TICKS_PER_YEAR),
-				"現在" if ended < 0 else "%d年" % int(ended / SimConfig.TICKS_PER_YEAR)])
+				"現在" if ended < 0 else "%d年" % int(ended / SimConfig.TICKS_PER_YEAR),
+				"・政争で左遷" if String(record.get("why", "")) == "intrigue" else ""])
 		lines.append("[color=#9a9080]要職[/color]  %s" % "\n　　　".join(seats))
+
+	if not p.falls.is_empty():
+		var fell: Array[String] = []
+		for f in p.falls:
+			fell.append(OrganizationLineageSource.fall_text(p, f, false))
+		lines.append("[color=#9a9080]失脚[/color]  %s" % "\n　　　".join(fell))
 
 	if not p.personality_tags.is_empty():
 		var traits: Array[String] = []

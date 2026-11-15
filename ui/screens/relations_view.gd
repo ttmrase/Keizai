@@ -23,6 +23,9 @@ const RELATION_FLOOR := 0.2
 const UNLIT := 0.15
 ## And how far forward the ties that were chosen come.
 const LIT_WIDTH := 1.8
+## A grudge is drawn apart from a relation: broken, pointed, and the colour of
+## an old bruise rather than of an open quarrel.
+const GRUDGE_COLOUR := Color(0.62, 0.3, 0.66)
 ## Room to leave around a family so its circle and its name are its own. Two
 ## great houses seated in the same county, or a crowded ring of servants, used to
 ## be drawn on top of each other and read as one.
@@ -197,6 +200,7 @@ func _settle_lit() -> void:
 	if house.standing == Organization.Standing.RETAINER:
 		if house.liege_house_id != &"":
 			_lit[house.liege_house_id] = true
+		_light_grudges()
 		return
 	for retainer in Retainers.retainers_of(_selected_id):
 		_lit[retainer.org_id] = true
@@ -210,6 +214,17 @@ func _settle_lit() -> void:
 			+ HouseRelations.relation(id, _selected_id)) * 0.5
 		if absf(value) >= RELATION_FLOOR:
 			_lit[id] = true
+	_light_grudges()
+
+
+func _light_grudges() -> void:
+	for g in Grudges.live():
+		var holder := Grudges.holder_of(g)
+		var target := StringName(g["target"])
+		if holder == _selected_id and _spots.has(target):
+			_lit[target] = true
+		elif target == _selected_id and _spots.has(holder):
+			_lit[holder] = true
 
 
 ## A line is only worth its full weight when it is one of the chosen family's.
@@ -236,8 +251,10 @@ func _draw_field() -> void:
 	# ties on top, so a lit line is never crossed out by a dim one drawn later.
 	_draw_relations(false)
 	_draw_allegiances(false)
+	_draw_grudges(false)
 	_draw_relations(true)
 	_draw_allegiances(true)
+	_draw_grudges(true)
 	for id in _spots:
 		_draw_house(GameState.get_organization(id), font)
 
@@ -268,6 +285,34 @@ func _draw_relations(lit_pass: bool) -> void:
 			_canvas.draw_line(_canvas.to_screen(_spots[a.org_id]),
 				_canvas.to_screen(_spots[b.org_id]), colour,
 				maxf(1.0, weight * _canvas.view_zoom))
+
+
+## 遺恨: a broken line from the family that holds the grudge to the one it is
+## held against, ending in a point, heavier the deeper it goes.
+func _draw_grudges(lit_pass: bool) -> void:
+	for g in Grudges.live():
+		var holder := Grudges.holder_of(g)
+		var target := StringName(g["target"])
+		if not _spots.has(holder) or not _spots.has(target):
+			continue
+		var lit := _tie_is_lit(holder, target)
+		if lit != lit_pass:
+			continue
+		var strength := minf(1.0, Grudges.strength_of(g))
+		var colour := GRUDGE_COLOUR
+		colour.a = clampf(0.35 + strength * 0.6, 0.35, 0.95) * (1.0 if lit else UNLIT)
+		var from := _canvas.to_screen(_spots[holder])
+		var to := _canvas.to_screen(_spots[target])
+		var along := (to - from)
+		if along.length() < 1.0:
+			continue
+		var dir := along.normalized()
+		var stop := to - dir * (_radius_of(GameState.get_organization(target)) + 4.0) * _canvas.view_zoom
+		var width := maxf(1.0, (1.0 + strength * 2.5) * (LIT_WIDTH if lit else 1.0) * _canvas.view_zoom)
+		_canvas.draw_dashed_line(from, stop, colour, width, 7.0 * _canvas.view_zoom)
+		var side := Vector2(-dir.y, dir.x) * 6.0 * _canvas.view_zoom
+		_canvas.draw_colored_polygon(PackedVector2Array([stop, stop - dir * 12.0 * _canvas.view_zoom
+			+ side, stop - dir * 12.0 * _canvas.view_zoom - side]), colour)
 
 
 ## And how far the households below them can be trusted.
@@ -383,6 +428,9 @@ func _show_detail(id: StringName) -> void:
 	var grounds := OrganizationLineageSource.grounds_lines(house)
 	if not grounds.is_empty():
 		lines.append(grounds)
+	var grudges := OrganizationLineageSource.grudge_lines(house)
+	if not grudges.is_empty():
+		lines.append(grudges)
 
 	# Why this family exists at all, for every family that was not simply always
 	# here. The founding houses came out of nothing and have nothing to say.

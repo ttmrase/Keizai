@@ -216,6 +216,16 @@ static func draw(ci: CanvasItem, glyph: StringName, centre: Vector2, size: float
 					var out := at + Vector2(cos(angle + flip * 1.2), sin(angle + flip * 1.2)) * 0.32
 					_leaf(ci, centre, r, at, out, colour)
 			ci.draw_circle(centre + Vector2(0, -0.05) * r, r * 0.16, colour)
+		&"dagger":
+			# A short blade held point down, half hidden behind a sleeve: a quarrel
+			# fought at court rather than in the field.
+			_fill(ci, centre, r, [Vector2(-0.08, -0.25), Vector2(0.08, -0.25),
+				Vector2(0.06, 0.62), Vector2(0.0, 0.92), Vector2(-0.06, 0.62)], colour)
+			_line(ci, centre, r, Vector2(-0.34, -0.25), Vector2(0.34, -0.25), colour, w * 1.2)
+			_line(ci, centre, r, Vector2(0, -0.3), Vector2(0, -0.7), colour, w * 1.4)
+			ci.draw_circle(_p(centre, r, Vector2(0, -0.8)), r * 0.11, colour)
+			ci.draw_arc(centre + Vector2(-0.2, -0.45) * r, r * 0.62, PI * 0.95, PI * 1.6, 10,
+				colour, w * 0.8)
 		_:
 			ci.draw_circle(centre, r * 0.5, colour)
 

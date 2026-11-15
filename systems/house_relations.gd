@@ -28,6 +28,10 @@ const INFLATION_WEIGHT := 0.28
 ## agreeing costs nothing when there is nothing to disagree about — and a great
 ## deal in one that has just split down the middle.
 const FAITH_WEIGHT := 0.34
+## And what one of them has not forgiven the other (see Grudges). Felt only by
+## the house that holds it: the one that won the quarrel may not give it a
+## second thought.
+const GRUDGE_WEIGHT := 0.5
 
 const ADJUST_RATE := 0.12
 
@@ -125,6 +129,7 @@ static func _gather(houses: Array[Organization]) -> Dictionary:
 		"members_in": members_in,
 		"crown": _crown_house_id(),
 		"over_titled": over_titled,
+		"grudges": Grudges.table(),
 	}
 
 
@@ -180,6 +185,9 @@ static func _target_relation(a: Organization, b: Organization, facts: Dictionary
 
 	# And what the two of them believe, once there is more than one answer.
 	score += FAITH_WEIGHT * Religion.alignment(a, b)
+
+	# And what a has not forgiven b.
+	score -= GRUDGE_WEIGHT * minf(1.0, float(facts["grudges"].get(key, 0.0)))
 
 	return clampf(score, -1.0, 1.0)
 

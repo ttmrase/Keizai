@@ -77,6 +77,10 @@ var short_name: String:
 ## The great offices this person held beside a head of state:
 ## {office, polity, house, start, end}. Written only by GameState.apply.
 @export var office_history: Array = []
+## What quarrels at court cost this person: {kind, tick, polity, office, by,
+## intrigue} — 左遷 (put out of a seat), 降格 (a family's standing cut down),
+## 隠居 (made to stand down as head). Written only by GameState.apply.
+@export var falls: Array = []
 
 
 func has_retired_from(org_id: StringName) -> bool:
@@ -178,6 +182,8 @@ func to_dict() -> Dictionary:
 		d["fate_tick"] = fate_tick
 	if not office_history.is_empty():
 		d["office_history"] = office_history.duplicate(true)
+	if not falls.is_empty():
+		d["falls"] = falls.duplicate(true)
 	return d
 
 
@@ -216,4 +222,11 @@ static func from_dict(d: Dictionary) -> NotableIndividual:
 			copy["end"] = int(copy.get("end", -1))
 			held.append(copy)
 	p.office_history = held
+	var fell: Array = []
+	for entry in d.get("falls", []):
+		if entry is Dictionary:
+			var copy: Dictionary = entry.duplicate()
+			copy["tick"] = int(copy.get("tick", 0))
+			fell.append(copy)
+	p.falls = fell
 	return p

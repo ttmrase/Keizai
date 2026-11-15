@@ -35,6 +35,7 @@ static func current(tick: int) -> Array[Dictionary]:
 	_challenge(out)
 	_old_ruler(out, tick)
 	_offices(out, tick)
+	_quarrels(out, tick)
 	_thin_blood(out)
 	_restless_land(out)
 	_divided_faith(out)
@@ -160,6 +161,36 @@ static func _offices(out: Array[Dictionary], tick: int) -> void:
 			out.append(_item("兆し", "跡目の順位に異論",
 				"跡目家の第一位%sは王家と険悪だ" % first.formal_name(),
 				&"crown", Palette.HOUSE, 0.36, "power", first.org_id))
+
+
+## 政争 under way, and the deepest grudge that has not been answered yet.
+static func _quarrels(out: Array[Dictionary], tick: int) -> void:
+	for state in Intrigue.active():
+		var a := GameState.get_organization(StringName(state["instigator"]))
+		var b := GameState.get_organization(StringName(state["target"]))
+		if a == null or b == null:
+			continue
+		var near := int(state["resolve_tick"]) - tick <= 2 and int(state["stage"]) >= 2
+		out.append(_item("政争", "%sが%sを狙う" % [a.short_name(), b.short_name()],
+			"%sをめぐる政争が進行中（%s）%s" % [Intrigue.prize_label(state),
+				Intrigue.motive_phrase(state), "。決着は近い" if near else ""],
+			&"dagger", Palette.HOUSE, 0.5 if near else 0.4, "incidents", a.org_id))
+	var deepest := {}
+	var most := 0.75
+	for g in Grudges.live(tick):
+		var s := Grudges.strength_of(g, tick)
+		var holder := GameState.get_organization(Grudges.holder_of(g))
+		if s < most or holder == null or not Intrigue.involving(holder.org_id).is_empty():
+			continue
+		most = s
+		deepest = g
+	if not deepest.is_empty():
+		var holder := GameState.get_organization(Grudges.holder_of(deepest))
+		var target := GameState.get_organization(StringName(deepest["target"]))
+		if holder != null and target != null:
+			out.append(_item("兆し", "%sは%sに遺恨を抱く" % [holder.short_name(), target.short_name()],
+				"%s。%s" % [Grudges.why_label(deepest), String(deepest.get("why", ""))],
+				&"dagger", Palette.HOUSE, 0.3 + 0.1 * minf(most, 1.5), "relations", holder.org_id))
 
 
 static func _old_ruler(out: Array[Dictionary], tick: int) -> void:

@@ -197,6 +197,10 @@ static func _retainer_houses() -> Array[Organization]:
 ## has actually passed between them — marriages made, land granted, ideals shared
 ## — rather than accumulated, so a liege that starts treating its retainers well
 ## gets the benefit within a generation.
+## What an unforgiven quarrel with the liege costs in loyalty.
+const GRUDGE_LOYALTY := 0.25
+
+
 static func _settle_loyalty(house: Organization) -> void:
 	var liege := GameState.get_organization(house.liege_house_id)
 	if liege == null or not liege.is_active():
@@ -219,6 +223,8 @@ static func _settle_loyalty(house: Organization) -> void:
 	# And one that raised the whole household to the same rung bought nothing:
 	# a title every neighbour holds singles nobody out.
 	target -= Honours.sameness_penalty(house)
+	# And a line that left its liege over a quarrel has not forgotten why.
+	target -= GRUDGE_LOYALTY * minf(1.0, Grudges.toward(house.org_id, liege.org_id))
 	house.loyalty = move_toward(house.loyalty, clampf(target, 0.0, 1.0), LOYALTY_ADJUST)
 
 

@@ -38,6 +38,12 @@ const FORBIDDEN := [
 	"Greatness.step(",
 	"Greatness._recognise(",
 	"Greatness.consider_war(",
+	"Intrigue.step(",
+	"Intrigue._begin(",
+	"Intrigue._resolve(",
+	"Intrigue._carry_out(",
+	"Grudges.observe(",
+	"Grudges._add(",
 ]
 
 ## Anything on GodPowerAPI naming one of these would be a way to command society

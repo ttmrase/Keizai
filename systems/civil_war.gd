@@ -292,6 +292,8 @@ static func _loyalty_of_region(s: SettlementState, polity: Organization, winner:
 				score += HouseRelations.relation(lord.org_id, ruler_house.org_id) * 0.7
 				if lord.uji_id != &"" and lord.uji_id == ruler_house.uji_id:
 					score += 0.3
+				# A lord who has not forgiven the crown's house will not die for it.
+				score -= 0.6 * minf(1.0, Grudges.toward(lord.org_id, ruler_house.org_id))
 		score -= float(claimant_houses.get(lord.org_id, 0.0))
 	if s.faction_lean_id != &"":
 		if s.faction_lean_id == winner.org_id:
@@ -700,6 +702,11 @@ static func _maybe_defect(war: WarState, a: Organization, b: Organization, tick:
 				pull += 0.35
 		if losing_house != null:
 			pull -= 0.3 * HouseRelations.relation(house.org_id, losing_house.org_id)
+			# An old grudge against one's own side is the easiest reason to leave it,
+			# and one against the other side the hardest to get past.
+			pull += 0.45 * minf(1.0, Grudges.toward(house.org_id, losing_house.org_id))
+		if winning_house != null:
+			pull -= 0.45 * minf(1.0, Grudges.toward(house.org_id, winning_house.org_id))
 		if pull > best_pull:
 			best_pull = pull
 			best = house

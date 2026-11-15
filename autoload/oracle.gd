@@ -377,6 +377,12 @@ func _feats_from_event(e: HistoryEvent) -> void:
 		HistoryEvent.EventType.SUCCESSION:
 			if e.description.contains("跡目家の"):
 				_unlock("heir_succession")
+		HistoryEvent.EventType.INTRIGUE:
+			var outcome := String(e.payload.get("outcome", ""))
+			if outcome == "won" or outcome == "backfired":
+				_unlock("first_intrigue")
+				if outcome == "won" and int(e.payload.get("motive_generations", 0)) >= 2:
+					_unlock("revenge_three")
 		HistoryEvent.EventType.GREATNESS:
 			_unlock("first_great")
 			if Greatness.entries_of(e.subject_person_id).size() >= 2:

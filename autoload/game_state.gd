@@ -184,6 +184,13 @@ func children_of(person_id: StringName, only_living := true) -> Array[NotableInd
 
 ## Applies one recorded event to the projection. Called only by HistoryLog.record().
 func apply(e: HistoryEvent) -> void:
+	# Who an event wrongs is worked out from the world as it was and as it is.
+	var before := Grudges.before(e)
+	_apply_by_type(e)
+	Grudges.observe(e, before)
+
+
+func _apply_by_type(e: HistoryEvent) -> void:
 	match e.event_type:
 		HistoryEvent.EventType.FOUNDING, HistoryEvent.EventType.SCHISM:
 			_apply_org_created(e)
@@ -209,6 +216,8 @@ func apply(e: HistoryEvent) -> void:
 			_apply_greatness(e)
 		HistoryEvent.EventType.OFFICE:
 			_apply_office(e)
+		HistoryEvent.EventType.INTRIGUE:
+			_apply_intrigue(e)
 		_:
 			# IDEOLOGY_SHIFT, CONFLICT_*, RESOURCE_SHOCK and EPOCH_SUMMARY are
 			# chronicle markers for values their owning system already changed.
@@ -594,7 +603,7 @@ func _apply_office(e: HistoryEvent) -> void:
 				"house": house, "start": e.tick, "end": -1})
 		"vacate":
 			if polity != null:
-				_close_office(polity, key, e.tick)
+				_close_office(polity, key, e.tick, String(p.get("reason", "")))
 		"hereditary":
 			if polity == null:
 				return
@@ -623,7 +632,7 @@ func _apply_office(e: HistoryEvent) -> void:
 
 
 ## Ends whoever holds an office: their record of it closes, the seat empties.
-func _close_office(polity: Organization, key: String, tick: int) -> void:
+func _close_office(polity: Organization, key: String, tick: int, reason := "") -> void:
 	var entry: Dictionary = polity.offices.get(key, {})
 	if entry.is_empty():
 		return
@@ -634,7 +643,76 @@ func _close_office(polity: Organization, key: String, tick: int) -> void:
 					and String(record.get("polity", "")) == String(polity.org_id) \
 					and int(record.get("end", -1)) < 0:
 				record["end"] = tick
+				if reason != "":
+					record["why"] = reason
 	polity.offices.erase(key)
+
+
+## A quarrel at court: opened, carried a stage further, or ended. What the
+## loser lost is recorded by the events that took it (an office vacated, an
+## honour stripped); this keeps the quarrel's own state, the houses' record of
+## how their quarrels have gone, and the falls on the loser's record.
+func _apply_intrigue(e: HistoryEvent) -> void:
+	var p: Dictionary = e.payload
+	var id := String(e.payload.get("id", e.event_id))
+	match String(p.get("action", "")):
+		"begin":
+			var state := Intrigue.settled(p.get("state", {}))
+			state["id"] = id
+			world.intrigues.append(state)
+			for house_id in [state["instigator"], state["target"]]:
+				var house: Organization = organizations.get(StringName(house_id))
+				if house != null:
+					house.last_intrigue_tick = e.tick
+		"scheme":
+			for state in world.intrigues:
+				if String(state["id"]) == id:
+					state["stage"] = 2
+					state["resolve_tick"] = int(p.get("resolve_tick", state["resolve_tick"]))
+		"resolve":
+			var kept: Array = []
+			for state in world.intrigues:
+				if String(state["id"]) != id:
+					kept.append(state)
+			world.intrigues = kept
+			var outcome := String(p.get("outcome", ""))
+			var instigator: Organization = organizations.get(StringName(p.get("instigator", "")))
+			var target: Organization = organizations.get(StringName(p.get("target", "")))
+			var winner: Organization = null
+			var loser: Organization = null
+			if outcome == "won":
+				winner = instigator
+				loser = target
+			elif outcome == "backfired":
+				winner = target
+				loser = instigator
+			for house in [instigator, target]:
+				if house != null:
+					house.last_intrigue_tick = e.tick
+			if winner != null:
+				winner.intrigue_won += 1
+			if loser != null:
+				loser.intrigue_lost += 1
+			# What it cost each person who fell.
+			for fall in p.get("falls", []):
+				var person: NotableIndividual = people.get(StringName(fall.get("person", "")))
+				if person == null:
+					continue
+				person.falls.append({"kind": String(fall.get("kind", "")), "tick": e.tick,
+					"polity": String(p.get("polity", "")), "office": String(fall.get("office", "")),
+					"by": String(winner.org_id) if winner != null else "", "intrigue": id})
+				if String(fall.get("kind", "")) == "retired":
+					# Made to stand down as head of the family: the seat empties and
+					# the family's own succession fills it.
+					var house: Organization = organizations.get(person.house_org_id)
+					if house != null and house.leader_person_id == person.person_id:
+						var seat := person.tenure_in(house.org_id)
+						if seat != null:
+							seat.end_tick = e.tick
+							seat.end_event_id = e.event_id
+						if not person.retired_from.has(house.org_id):
+							person.retired_from.append(house.org_id)
+						house.leader_person_id = &""
 
 
 func _apply_greatness(e: HistoryEvent) -> void:

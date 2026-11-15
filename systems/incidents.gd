@@ -177,13 +177,17 @@ static func _try_assassination(tick: int) -> bool:
 	var victim_house: Organization = null
 	var killer_house: Organization = null
 	var worst := ASSASSIN_HOSTILITY
+	var grudges := Grudges.table()
 	for a in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if a.standing != Organization.Standing.NOBLE:
 			continue
 		for b in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 			if b.org_id == a.org_id or b.standing != Organization.Standing.NOBLE:
 				continue
-			var standing := HouseRelations.relation(a.org_id, b.org_id)
+			# A grudge is the reason somebody has stopped talking and started
+			# planning; the relation alone is just bad manners.
+			var standing := HouseRelations.relation(a.org_id, b.org_id) \
+				- 0.3 * minf(1.0, float(grudges.get("%s|%s" % [a.org_id, b.org_id], 0.0)))
 			if standing >= worst:
 				continue
 			# The one with an office to lose is the one who gets killed.

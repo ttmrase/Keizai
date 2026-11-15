@@ -33,6 +33,8 @@ const _LINEAGE_CRITICAL_TYPES := [
 	HistoryEvent.EventType.CONFLICT_RESOLVED,
 	# Who held the great offices is what a family's standing is counted from.
 	HistoryEvent.EventType.OFFICE,
+	# And the quarrels at court: a grudge three generations old points back here.
+	HistoryEvent.EventType.INTRIGUE,
 ]
 
 

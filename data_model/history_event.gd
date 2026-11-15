@@ -40,6 +40,11 @@ enum EventType {
 	## to a crown, the chief house of a 氏, a war's commanders and what they won
 	## or lost. Appended last for the same reason as GREATNESS.
 	OFFICE,
+	## A quarrel fought with favour rather than arms — 政争: who moved against
+	## whom at court, how it went, and how it ended. What it cost the loser goes
+	## through the ordinary records (an office vacated, an honour stripped); this
+	## is the account of the quarrel itself. Appended last, as above.
+	INTRIGUE,
 }
 
 const TYPE_NAMES := {
@@ -62,6 +67,7 @@ const TYPE_NAMES := {
 	EventType.EPOCH_SUMMARY: "EPOCH_SUMMARY",
 	EventType.GREATNESS: "GREATNESS",
 	EventType.OFFICE: "OFFICE",
+	EventType.INTRIGUE: "INTRIGUE",
 }
 
 @export var event_id: StringName = &""

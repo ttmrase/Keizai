@@ -57,6 +57,15 @@ extends Resource
 ## Heads whose rise history will judge once enough time has passed to know
 ## whether it lasted (see Greatness). Cached: {person_id, house_id, due, from, to}.
 @export var great_pending: Array = []
+## Who resents whom, and why (see Grudges). Each is a discrete fact written by
+## GameState.apply from the event that caused it; only how far it has faded is
+## worked out on reading. {id, holder, target, holder_person, target_person,
+## strength, updated, since, cause, kind, why, causes, generations}
+@export var grudges: Array = []
+@export var next_grudge_id: int = 1
+## Quarrels at court still being fought (see Intrigue). Opened, advanced and
+## closed only through the record. {id, polity, instigator, target, ...}
+@export var intrigues: Array = []
 
 
 func get_settlement(id: StringName) -> SettlementState:
@@ -76,6 +85,9 @@ func to_dict() -> Dictionary:
 	return {
 		"wars": fighting,
 		"great_pending": great_pending.duplicate(true),
+		"grudges": grudges.duplicate(true),
+		"next_grudge_id": next_grudge_id,
+		"intrigues": intrigues.duplicate(true),
 		"tick": tick,
 		"seed": seed,
 		"settlements": settle,
@@ -142,4 +154,17 @@ static func from_dict(d: Dictionary) -> WorldState:
 			copy["due"] = int(copy.get("due", 0))
 			waiting.append(copy)
 	w.great_pending = waiting
+	# Saved before grudges existed: none are invented — the quarrels already in
+	# the record were never written down as grudges, and nobody remembers them.
+	var held: Array = []
+	for entry in d.get("grudges", []):
+		if entry is Dictionary:
+			held.append(Grudges.settled(entry))
+	w.grudges = held
+	w.next_grudge_id = int(d.get("next_grudge_id", held.size() + 1))
+	var fought: Array = []
+	for entry in d.get("intrigues", []):
+		if entry is Dictionary:
+			fought.append(Intrigue.settled(entry))
+	w.intrigues = fought
 	return w

@@ -210,6 +210,17 @@ static func classify(e: HistoryEvent) -> Dictionary:
 				"heirs":
 					if bool(e.payload.get("reordered", false)):
 						return _item(e, Weight.NOTABLE, "跡目", Palette.HOUSE, &"crown", "power")
+		HistoryEvent.EventType.INTRIGUE:
+			if String(e.payload.get("action", "")) == "resolve":
+				var outcome := String(e.payload.get("outcome", ""))
+				if outcome == "faded":
+					return none
+				# Only a fall from the very top stops the world for it.
+				if bool(e.payload.get("major", false)):
+					return _item(e, Weight.MAJOR, "失脚", Palette.DANGER, &"dagger", "incidents")
+				return _item(e, Weight.NOTABLE,
+					"政争" if outcome != "backfired" else "返り討ち", Palette.HOUSE, &"dagger",
+					"incidents")
 		HistoryEvent.EventType.DEATH:
 			if bool(e.payload.get("killed_in_battle", false)):
 				return _item(e, Weight.NOTABLE, "討死", Palette.DANGER, &"swords", "incidents")

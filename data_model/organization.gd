@@ -166,6 +166,11 @@ const STANDING_LABELS := {
 @export var blemishes: Array = []
 ## HOUSE (founder of a 氏): the house currently chief among that 氏 (氏の長者).
 @export var uji_chief_id: StringName = &""
+## HOUSE: how its quarrels at court have gone — won, lost, and when it was last
+## caught up in one. What the other houses remember of it. Written only by apply.
+@export var intrigue_won: int = 0
+@export var intrigue_lost: int = 0
+@export var last_intrigue_tick: int = -1
 
 
 func kind_name() -> String:
@@ -286,6 +291,8 @@ func to_dict() -> Dictionary:
 		d["blemishes"] = blemishes.duplicate(true)
 	if uji_chief_id != &"":
 		d["uji_chief_id"] = String(uji_chief_id)
+	if intrigue_won > 0 or intrigue_lost > 0 or last_intrigue_tick >= 0:
+		d["intrigue"] = [intrigue_won, intrigue_lost, last_intrigue_tick]
 	return d
 
 
@@ -362,6 +369,11 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.merits = _numbers_settled_list((d.get("merits", []) as Array).duplicate(true))
 	o.blemishes = _numbers_settled_list((d.get("blemishes", []) as Array).duplicate(true))
 	o.uji_chief_id = StringName(d.get("uji_chief_id", ""))
+	var quarrels: Array = d.get("intrigue", [0, 0, -1])
+	if quarrels.size() >= 3:
+		o.intrigue_won = int(quarrels[0])
+		o.intrigue_lost = int(quarrels[1])
+		o.last_intrigue_tick = int(quarrels[2])
 	return o
 
 

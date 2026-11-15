@@ -71,6 +71,8 @@ func _advance_one_tick() -> void:
 	Incidents.consider_all(current_tick)
 	# A war runs a campaign a year, once the season's ruptures are settled.
 	CivilWar.step(current_tick)
+	# Quarrels at court move a season on, and once a year a new one may start.
+	Intrigue.step(current_tick)
 	# And once a year, history weighs who is to be remembered.
 	Greatness.step(current_tick)
 	HousePartition.step(current_tick)

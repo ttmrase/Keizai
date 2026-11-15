@@ -21,6 +21,7 @@ const FILTERS := [
 	{"label": "継承", "types": [HistoryEvent.EventType.SUCCESSION,
 		HistoryEvent.EventType.POWER_TRANSFER, HistoryEvent.EventType.CONFLICT_RESOLVED,
 		HistoryEvent.EventType.OFFICE]},
+	{"label": "政争", "types": [HistoryEvent.EventType.INTRIGUE]},
 	{"label": "人物", "types": [HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.DEATH,
 		HistoryEvent.EventType.MARRIAGE]},
 	{"label": "災厄", "types": [HistoryEvent.EventType.DISASTER_OCCURRED,
@@ -521,6 +522,10 @@ func _look_of(e: HistoryEvent) -> Dictionary:
 			return {"glyph": &"laurel", "colour": Palette.ACCENT, "ink": Palette.TEXT}
 		HistoryEvent.EventType.OFFICE:
 			return {"glyph": &"seal", "colour": Palette.POLITY, "ink": Palette.TEXT_MUTED}
+		HistoryEvent.EventType.INTRIGUE:
+			var decided := String(e.payload.get("outcome", "")) in ["won", "backfired"]
+			return {"glyph": &"dagger", "colour": Palette.DANGER if decided else Palette.HOUSE,
+				"ink": Palette.TEXT if decided else Palette.TEXT_MUTED}
 		HistoryEvent.EventType.IDEOLOGY_SHIFT:
 			# A house's rank moving is written as a shift in what it stands for.
 			if e.payload.has("to_tier"):

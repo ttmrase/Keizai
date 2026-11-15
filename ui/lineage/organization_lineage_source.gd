@@ -161,6 +161,9 @@ func detail(id: StringName) -> String:
 		var grounds_text := grounds_lines(org)
 		if not grounds_text.is_empty():
 			lines.append(grounds_text)
+		var grudge_text := grudge_lines(org)
+		if not grudge_text.is_empty():
+			lines.append(grudge_text)
 		lines.append("[color=#9a9080]家格[/color]  %s・%s%s" % [
 			org.standing_label(),
 			HouseRank.tier_name(org.rank_tier) if org.is_noble() else "位なし",
@@ -234,6 +237,97 @@ static func grounds_lines(house: Organization) -> String:
 				entry["person"].given_name if entry["person"] != null else "?"])
 		text = "[color=#9a9080]要職[/color]  %s\n%s" % ["、".join(seats), text]
 	return text
+
+
+## 遺恨: whom a family resents and who resents it — why, and since when — and
+## how its quarrels at court have gone.
+static func grudge_lines(house: Organization) -> String:
+	if house == null or house.standing == Organization.Standing.COMMONER:
+		return ""
+	var out: Array[String] = []
+	# One line per family: the strongest grudge between them, and how many
+	# older ones lie under it.
+	var held := _strongest_per(Grudges.held_by(house.org_id), true)
+	if not held.is_empty():
+		var parts: Array[String] = []
+		for entry in held.slice(0, 4):
+			parts.append(_grudge_text(entry[0], StringName(entry[0]["target"]), "へ", int(entry[1])))
+		out.append("[color=#9a9080]遺恨[/color]  %s" % "\n　　".join(parts))
+	var against := _strongest_per(Grudges.against(house.org_id), false)
+	if not against.is_empty():
+		var parts: Array[String] = []
+		for entry in against.slice(0, 3):
+			parts.append(_grudge_text(entry[0], Grudges.holder_of(entry[0]), "から", int(entry[1])))
+		out.append("[color=#9a9080]恨まれて[/color]  %s" % "\n　　".join(parts))
+	if house.intrigue_won > 0 or house.intrigue_lost > 0:
+		out.append("[color=#9a9080]政争[/color]  %d勝%d敗" % [house.intrigue_won, house.intrigue_lost])
+	var quarrel := Intrigue.involving(house.org_id)
+	if not quarrel.is_empty():
+		var other := GameState.get_organization(StringName(quarrel["target"]
+			if StringName(quarrel["instigator"]) == house.org_id else quarrel["instigator"]))
+		out.append("[color=#c85a4a]政争中[/color]  %s%s（%s）" % [
+			other.formal_name() if other != null else "?",
+			"を狙う" if StringName(quarrel["instigator"]) == house.org_id else "に狙われている",
+			Intrigue.prize_label(quarrel)])
+	var falls := fall_lines(house)
+	if not falls.is_empty():
+		out.append(falls)
+	return "\n".join(out)
+
+
+## [grudge, how many others between the same two families], strongest first.
+static func _strongest_per(list: Array[Dictionary], by_target: bool) -> Array:
+	var seen := {}
+	var out: Array = []
+	for g in list:
+		var other := String(g["target"]) if by_target else String(Grudges.holder_of(g))
+		if seen.has(other):
+			out[int(seen[other])][1] += 1
+			continue
+		seen[other] = out.size()
+		out.append([g, 0])
+	return out
+
+
+static func _grudge_text(g: Dictionary, other_id: StringName, particle: String, more := 0) -> String:
+	var other := GameState.get_organization(other_id)
+	var strength := Grudges.strength_of(g)
+	var generations := int(g.get("generations", 0))
+	var colour := "c85a4a" if strength >= 0.55 else "9a9080"
+	return "[color=#%s]%s%s %s[/color]（%s%s。%s%s）" % [colour,
+		other.formal_name() if other != null else "絶えた家", particle,
+		Grudges.depth_label(strength), Grudges.why_label(g),
+		"、%d代前から" % generations if generations > 0 else "", String(g.get("why", "")),
+		"。ほかに%d件" % more if more > 0 else ""]
+
+
+## 降格・左遷: what quarrels at court have cost a family's people, newest first.
+static func fall_lines(house: Organization) -> String:
+	var entries: Array = []
+	for person in GameState.house_members(house.org_id, false):
+		for f in person.falls:
+			entries.append([int(f.get("tick", 0)), person, f])
+	if entries.is_empty():
+		return ""
+	entries.sort_custom(func(x, y) -> bool: return int(x[0]) > int(y[0]))
+	var parts: Array[String] = []
+	for entry in entries.slice(0, 4):
+		parts.append(fall_text(entry[1], entry[2]))
+	return "[color=#9a9080]失脚の経歴[/color]  %s" % "、".join(parts)
+
+
+static func fall_text(person: NotableIndividual, f: Dictionary, with_name := true) -> String:
+	var polity := GameState.get_organization(StringName(f.get("polity", "")))
+	var by := GameState.get_organization(StringName(f.get("by", "")))
+	var kind := String(f.get("kind", ""))
+	var what := Intrigue.fall_label(kind)
+	if String(f.get("office", "")) != "":
+		what = "%s——%sを解かれる" % [what, Offices.label_of(String(f["office"]), polity)]
+	var why := ""
+	if by != null:
+		why = "（%sとの政争）" % by.formal_name()
+	return "%d年 %s%s%s" % [int(int(f.get("tick", 0)) / SimConfig.TICKS_PER_YEAR),
+		person.short_name + " " if with_name and person != null else "", what, why]
 
 
 ## The 氏 a family belongs to and every other family of it: where it came from,

@@ -75,6 +75,7 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 	var incidents := {}
 	var wars: Array[String] = []
 	var greats: Array[String] = []
+	var quarrels: Array[String] = []
 	for e in HistoryLog.backbone:
 		match e.event_type:
 			HistoryEvent.EventType.INCIDENT:
@@ -107,6 +108,26 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 					counts["heirs_reordered"] = int(counts.get("heirs_reordered", 0)) + 1
 				elif action == "uji_chief":
 					counts["uji_chief"] = int(counts.get("uji_chief", 0)) + 1
+			HistoryEvent.EventType.INTRIGUE:
+				if String(e.payload.get("action", "")) == "resolve":
+					var outcome := String(e.payload.get("outcome", ""))
+					counts["intrigue_" + outcome] = int(counts.get("intrigue_" + outcome, 0)) + 1
+					var motive := String(e.payload.get("motive_kind", ""))
+					if motive == "":
+						motive = "ambition"
+					counts["motive_" + motive] = int(counts.get("motive_" + motive, 0)) + 1
+					var root := String(e.payload.get("motive_root_kind", ""))
+					if root == "":
+						root = "ambition"
+					counts["root_" + root] = int(counts.get("root_" + root, 0)) + 1
+					for fall in e.payload.get("falls", []):
+						var fk := String(fall.get("kind", ""))
+						counts["fall_" + fk] = int(counts.get("fall_" + fk, 0)) + 1
+					if int(e.payload.get("motive_generations", 0)) >= 2 and outcome == "won":
+						counts["revenge_3gen"] = int(counts.get("revenge_3gen", 0)) + 1
+					if bool(e.payload.get("major", false)):
+						counts["intrigue_major"] = int(counts.get("intrigue_major", 0)) + 1
+					quarrels.append("  ⚔%d年 %s" % [int(e.tick / 4), e.description])
 			HistoryEvent.EventType.CONFLICT_DECLARED:
 				if e.payload.has("war"):
 					var cause := String(e.payload["war"].get("cause", ""))
@@ -130,6 +151,12 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 			officers += 1
 	print("  偉人 %d人 / 役職経験者 %d人" % [greats.size(), officers])
 	for line in greats:
+		print(line)
+	var live := {}
+	for g in Grudges.live():
+		live[g["kind"]] = int(live.get(g["kind"], 0)) + 1
+	print("  政争 %d件 / 生きている遺恨 %s" % [quarrels.size(), live])
+	for line in quarrels.slice(0, 6):
 		print(line)
 	_report_rank()
 	for war in GameState.world.wars:

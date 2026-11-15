@@ -122,6 +122,8 @@ static func _empty_tally(index: int) -> Dictionary:
 		"greats": [],
 		"hereditary": [],
 		"regencies": 0,
+		"quarrels": 0,
+		"falls": [],
 		"war_ends": [],
 		"battles": 0,
 		"births": 0,
@@ -151,6 +153,17 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 				moment = String(e.payload.get("office", "")) == "regent"
 			elif action == "appoint" and String(e.payload.get("office", "")) == "regent":
 				t["regencies"] += 1
+		HistoryEvent.EventType.INTRIGUE:
+			if String(e.payload.get("action", "")) == "resolve" \
+					and String(e.payload.get("outcome", "")) != "faded":
+				t["quarrels"] += 1
+				var outcome := String(e.payload.get("outcome", ""))
+				if outcome == "won" or outcome == "backfired":
+					var loser := GameState.get_organization(StringName(e.payload.get(
+						"target" if outcome == "won" else "instigator", "")))
+					if loser != null:
+						t["falls"].append(loser.formal_name())
+				moment = bool(e.payload.get("major", false))
 		HistoryEvent.EventType.GREATNESS:
 			var who := GameState.get_person(e.subject_person_id)
 			t["greats"].append("%s「%s」" % [who.full_name if who != null else "ある者",
@@ -303,6 +316,10 @@ static func _lines(t: Dictionary) -> Array[String]:
 		lines.append("%sが家職となった" % _some(t["hereditary"], "座"))
 	elif int(t["regencies"]) > 0:
 		lines.append("摂政が%d度立った" % t["regencies"])
+	if int(t["quarrels"]) > 0:
+		lines.append("宮廷で政争が%d度あり%s" % [t["quarrels"],
+			"、%sが失脚した" % _some(t["falls"], "家") if not t["falls"].is_empty()
+				else "、いずれも痛み分けに終わった"])
 
 	if not t["incidents"].is_empty():
 		var parts: Array[String] = []

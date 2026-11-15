@@ -49,6 +49,18 @@ func _rebuild() -> void:
 			_rows.add_child(_war_card(war))
 		_rows.add_child(_spacer())
 
+	# Quarrels at court: the ones under way, who is ahead and why, and the last
+	# few to be settled.
+	var quarrels := Intrigue.active()
+	var settled := _recent_quarrels(4)
+	if not quarrels.is_empty() or not settled.is_empty():
+		_rows.add_child(_heading("政争", "宮廷での争い。数字は仕掛けた側から見た優劣の内訳"))
+		for state in quarrels:
+			_rows.add_child(_quarrel_card(state))
+		for e in settled:
+			_rows.add_child(_quarrel_row(e))
+		_rows.add_child(_spacer())
+
 	# What is brewing, of every kind, most pressing first — the same list the
 	# map shows a line of, here in full.
 	_rows.add_child(_heading("兆し", "いま起きそうなこと。タップするとそれを見に行ける"))
@@ -233,6 +245,144 @@ func _past_war_row(e: HistoryEvent) -> Control:
 	text.add_theme_color_override("font_color", Palette.TEXT)
 	text.add_theme_font_size_override("font_size", 16)
 	box.add_child(text)
+	row.add_child(box)
+	return row
+
+
+## A quarrel under way: who against whom, over what, why, and how it stands.
+func _quarrel_card(state: Dictionary) -> Control:
+	var a := GameState.get_organization(StringName(state["instigator"]))
+	var b := GameState.get_organization(StringName(state["target"]))
+	var polity := GameState.get_organization(StringName(state["polity"]))
+	var card := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Palette.PANEL_RAISED.lerp(Palette.HOUSE, 0.05)
+	box.border_color = Color(Palette.HOUSE, 0.8)
+	box.border_width_top = 3
+	box.set_corner_radius_all(10)
+	box.content_margin_left = 14
+	box.content_margin_right = 14
+	box.content_margin_top = 10
+	box.content_margin_bottom = 12
+	card.add_theme_stylebox_override("panel", box)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	card.add_child(rows)
+
+	var title := Label.new()
+	title.text = "%s　%sをめぐって（%s）" % [
+		"工作中" if int(state["stage"]) >= 2 else "仕掛け",
+		Intrigue.prize_label(state), Intrigue.motive_phrase(state)]
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_color_override("font_color", Palette.HOUSE.lightened(0.25))
+	title.add_theme_font_size_override("font_size", 15)
+	rows.add_child(title)
+
+	var sides := HBoxContainer.new()
+	sides.add_theme_constant_override("separation", 8)
+	sides.add_child(_party_label(a, StringName(state["instigator_person"]), HORIZONTAL_ALIGNMENT_LEFT))
+	var versus := GlyphIcon.make(&"dagger", Palette.TEXT_MUTED, 26)
+	versus.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sides.add_child(versus)
+	sides.add_child(_party_label(b, StringName(state["target_person"]), HORIZONTAL_ALIGNMENT_RIGHT))
+	rows.add_child(sides)
+
+	var factors := Intrigue.outlook(state)
+	var lead := 0.0
+	for key in factors:
+		lead += float(factors[key])
+	var verdict := Label.new()
+	verdict.text = "形勢　%s（%+.2f、ほかに運 ±%.1f）%s" % [
+		"仕掛けた側が優勢" if lead >= Intrigue.WIN_MARGIN else (
+			"守る側が優勢" if lead <= Intrigue.BACKFIRE_MARGIN else "五分"), lead, Intrigue.LUCK,
+		"　%s" % polity.formal_name() if polity != null else ""]
+	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	verdict.add_theme_color_override("font_color", Palette.TEXT)
+	verdict.add_theme_font_size_override("font_size", 14)
+	rows.add_child(verdict)
+	rows.add_child(_factor_label(factors, 6))
+	return card
+
+
+func _party_label(house: Organization, person_id: StringName, align: int) -> Control:
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 0)
+	var name := Label.new()
+	name.text = house.formal_name() if house != null else "?"
+	name.horizontal_alignment = align
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name.add_theme_color_override("font_color", Heraldry.of_org(house).lightened(0.25)
+		if house != null else Palette.TEXT)
+	name.add_theme_font_size_override("font_size", 17)
+	box.add_child(name)
+	var person := GameState.get_person(person_id)
+	var under := Label.new()
+	under.text = "%s　%s" % [person.short_name, HouseRank.title_of_house(house)] \
+		if person != null and house != null else ""
+	under.horizontal_alignment = align
+	under.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	under.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	under.add_theme_font_size_override("font_size", 13)
+	box.add_child(under)
+	return box
+
+
+## The biggest lines of a quarrel's reckoning, largest first.
+func _factor_label(factors: Dictionary, most: int) -> Control:
+	var keys: Array = factors.keys()
+	keys.sort_custom(func(x, y) -> bool:
+		return absf(float(factors[x])) > absf(float(factors[y])) if not is_equal_approx(
+			absf(float(factors[x])), absf(float(factors[y]))) else String(x) < String(y))
+	var parts: Array[String] = []
+	for key in keys.slice(0, most):
+		if absf(float(factors[key])) < 0.01:
+			continue
+		parts.append("%s %+.2f" % [Intrigue.FACTOR_LABELS.get(key, key), float(factors[key])])
+	var label := Label.new()
+	label.text = "　".join(parts) if not parts.is_empty() else "拮抗"
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	label.add_theme_font_size_override("font_size", 13)
+	return label
+
+
+func _recent_quarrels(count: int) -> Array[HistoryEvent]:
+	var out: Array[HistoryEvent] = []
+	for i in range(HistoryLog.backbone.size() - 1, -1, -1):
+		var e: HistoryEvent = HistoryLog.backbone[i]
+		if e.event_type == HistoryEvent.EventType.INTRIGUE \
+				and String(e.payload.get("action", "")) == "resolve" \
+				and String(e.payload.get("outcome", "")) != "faded":
+			out.append(e)
+			if out.size() >= count:
+				break
+	return out
+
+
+func _quarrel_row(e: HistoryEvent) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var outcome := String(e.payload.get("outcome", ""))
+	var icon := GlyphIcon.make(&"dagger", Palette.DANGER if outcome != "stalemate"
+		else Palette.TEXT_DIM, 22)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(icon)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 2)
+	var head := Label.new()
+	head.text = "%d年　%s" % [int(e.tick / SimConfig.TICKS_PER_YEAR), Intrigue.outcome_label(outcome)]
+	head.add_theme_color_override("font_color", Palette.ACCENT)
+	head.add_theme_font_size_override("font_size", 16)
+	box.add_child(head)
+	var text := Label.new()
+	text.text = e.description
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_theme_color_override("font_color", Palette.TEXT)
+	text.add_theme_font_size_override("font_size", 16)
+	box.add_child(text)
+	box.add_child(_factor_label(e.payload.get("factors", {}), 4))
 	row.add_child(box)
 	return row
 

@@ -249,7 +249,8 @@ static func _refresh(polity: Organization, realm_of: Dictionary, tick: int) -> v
 						or float(best["score"]) <= mine * RESHUFFLE_MARGIN + 0.2 \
 						or best["house"] == holder_house:
 					continue
-				_vacate(polity, key, "replaced", tick)
+				_vacate(polity, key, "replaced", tick,
+					{"successor_house": String(best["house"].org_id)})
 			else:
 				_vacate(polity, key, "unfit", tick)
 		if not best.is_empty():
@@ -380,6 +381,8 @@ static func _score(polity: Organization, key: String, house: Organization,
 		score += 0.35
 	if StringName(polity.hereditary_offices.get(key, "")) == house.org_id:
 		score += 2.0
+	# A family just put down at court is not soon given a seat there again.
+	score -= 2.0 * Intrigue.disgrace(house)
 	# A family already sitting beside the head is less likely to be given a
 	# second seat — the others would not stand for it.
 	for other in polity.offices:
@@ -495,7 +498,8 @@ static func _appoint(polity: Organization, key: String, person: NotableIndividua
 				lost.formal_name() if lost != null else "旧家"], lost.org_id if lost != null else &"")
 
 
-static func _vacate(polity: Organization, key: String, reason: String, tick: int) -> void:
+static func _vacate(polity: Organization, key: String, reason: String, tick: int,
+		extra: Dictionary = {}) -> void:
 	var entry: Dictionary = polity.offices.get(key, {})
 	if entry.is_empty():
 		return
@@ -507,9 +511,11 @@ static func _vacate(polity: Organization, key: String, reason: String, tick: int
 		"ended": "%sは%sを退き、国の長が自ら政を執ることとなった。" % [name, label],
 		"replaced": "%sは%sを解かれた。" % [name, label],
 		"unfit": "%sは%sの座にとどまれず、これを去った。" % [name, label],
+		"intrigue": "%sは政争に敗れ、%sを解かれた。" % [name, label],
 	}.get(reason, "%sは%sを去った。" % [name, label])
-	_emit(polity, "vacate", key, StringName(entry.get("person", "")), tick,
-		{"reason": reason, "house": String(entry.get("house", ""))}, text,
+	var payload := {"reason": reason, "house": String(entry.get("house", ""))}
+	payload.merge(extra)
+	_emit(polity, "vacate", key, StringName(entry.get("person", "")), tick, payload, text,
 		StringName(entry.get("house", "")))
 
 
@@ -546,6 +552,8 @@ static func _refresh_heirs(polity: Organization, houses: Array[Organization],
 		if in_laws.has(house.org_id):
 			score += 1.2
 		score += 0.4 * HouseRelations.relation(ruler_house.org_id, house.org_id)
+		# Nor named next in line, once it has been struck out of the order.
+		score -= 1.5 * Intrigue.disgrace(house)
 		if score >= HEIR_FLOOR:
 			ranked.append([score, house])
 	ranked.sort_custom(func(x, y):
