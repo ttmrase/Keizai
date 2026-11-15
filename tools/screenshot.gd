@@ -443,10 +443,11 @@ func _capture_war(shell: Control) -> void:
 	await _capture("%s/news_war.png" % _out_dir)
 	news._close_banner(0.0)
 	news._clear()
-	# A few years in, so there are battles to show.
-	for year in 30:
-		SimClock.advance_n_ticks_instant(SimConfig.TICKS_PER_YEAR)
-		if CivilWar.wars().is_empty() or CivilWar.wars()[0].battles.size() >= 3:
+	# A year or two in, so there is a battle to show — stopping a season early
+	# rather than letting a short war end before it is seen.
+	for season in 12:
+		SimClock.advance_n_ticks_instant(1)
+		if CivilWar.wars().is_empty() or CivilWar.wars()[0].battles.size() >= 2:
 			break
 	news._close_banner(0.0)
 	news._clear()
