@@ -52,19 +52,19 @@ static func resolve(org: Organization, tick: int) -> void:
 	if contested:
 		text = "%s%sの%sをめぐる争いの末、%sが座に就いた。%s" % [
 			"幼い直子を差し置いて、" if minority else "",
-			org.display_name, org.leadership_title, winner.full_name,
+			org.formal_name(), org.leadership_title, winner.full_name,
 			fallout.get("text", "")]
 	elif inherited:
-		text = "%sの%sを%sが継いだ。" % [org.display_name, org.leadership_title, winner.full_name]
+		text = "%sの%sを%sが継いだ。" % [org.formal_name(), org.leadership_title, winner.full_name]
 	elif winner.was_deposed_from(org.org_id):
 		# Rare and worth remarking on: the order that pulled somebody down could
 		# find nobody else to put in their place.
 		text = "%sは、かつて追われたはずの%sを改めて%sに戴いた。" % [
-			org.display_name, winner.full_name, org.leadership_title]
+			org.formal_name(), winner.full_name, org.leadership_title]
 	elif candidates.size() > 1:
-		text = "%sは%sに%sを選んだ。" % [org.display_name, org.leadership_title, winner.full_name]
+		text = "%sは%sに%sを選んだ。" % [org.formal_name(), org.leadership_title, winner.full_name]
 	else:
-		text = "%sの%sに%sが就いた。" % [org.display_name, org.leadership_title, winner.full_name]
+		text = "%sの%sに%sが就いた。" % [org.formal_name(), org.leadership_title, winner.full_name]
 
 	var payload := {
 		"previous_leader_id": String(previous_id),
@@ -491,9 +491,9 @@ static func _sides_text(winner: NotableIndividual, loser: NotableIndividual,
 		if house == null:
 			continue
 		if bool(backers[house_id]):
-			for_winner.append(house.display_name)
+			for_winner.append(house.formal_name())
 		else:
-			for_loser.append(house.display_name)
+			for_loser.append(house.formal_name())
 	if for_loser.is_empty():
 		return "%sはこぞって%sを推した。" % ["・".join(for_winner.slice(0, 2)), winner.full_name]
 	if for_winner.is_empty():

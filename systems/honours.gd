@@ -102,7 +102,7 @@ static func _elevate(royal: Organization, house: Organization, tick: int) -> voi
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
-		"%sは%sの功を賞し、その家格を引き上げた。" % [royal.display_name, house.display_name],
+		"%sは%sの功を賞し、その家格を引き上げた。" % [royal.formal_name(), house.formal_name()],
 		{"honour": true, "granted_by": String(royal.org_id), "legitimacy_cost": 0.0},
 		house.org_id,
 		house.leader_person_id,
@@ -115,7 +115,7 @@ static func _strip(royal: Organization, house: Organization, tick: int) -> void:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
-		"%sは%sの不遜を咎め、その家格を削った。" % [royal.display_name, house.display_name],
+		"%sは%sの不遜を咎め、その家格を削った。" % [royal.formal_name(), house.formal_name()],
 		{"honour": true, "stripped": true, "granted_by": String(royal.org_id),
 			"legitimacy_cost": 0.0},
 		house.org_id,
@@ -149,7 +149,7 @@ static func _liege_honours(tick: int) -> void:
 		HistoryLog.emit_event(
 			HistoryEvent.EventType.POWER_TRANSFER,
 			tick,
-			"%sは家中の%sを取り立て、位を授けた。" % [liege.display_name, best.display_name],
+			"%sは家中の%sを取り立て、位を授けた。" % [liege.formal_name(), best.formal_name()],
 			{"knighting": true, "granted_by": String(liege.org_id), "legitimacy_cost": 0.0},
 			best.org_id,
 			best.leader_person_id,

@@ -155,8 +155,8 @@ static func _try_excommunication(tick: int) -> bool:
 
 	_record(KIND_EXCOMMUNICATION, tick,
 		"%sは%sを破門した。%sの家中は主を失った信徒となり、その所領は騒然となった。" % [
-			faith.display_name, target.display_name,
-			head.full_name if head != null else target.display_name],
+			faith.display_name, target.formal_name(),
+			head.full_name if head != null else target.formal_name()],
 		{"faith_id": String(faith.org_id), "target_house_id": String(target.org_id)},
 		target.org_id, target.leader_person_id)
 	return true
@@ -208,7 +208,7 @@ static func _try_assassination(tick: int) -> bool:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.DEATH,
 		tick,
-		"%s%sの%sが凶刃に倒れた。" % [body.display_name, seat["title"], victim.full_name],
+		"%s%sの%sが凶刃に倒れた。" % [body.formal_name(), seat["title"], victim.full_name],
 		{"assassinated": true, "accused_house_id": String(killer_house.org_id)},
 		body.org_id,
 		victim.person_id,
@@ -225,7 +225,7 @@ static func _try_assassination(tick: int) -> bool:
 
 	_record(KIND_ASSASSINATION, tick,
 		"%sの%sが殺された。下手人は挙がらなかったが、誰もが%sを疑った。" % [
-			body.display_name, victim.full_name, killer_house.display_name],
+			body.formal_name(), victim.full_name, killer_house.formal_name()],
 		{"victim_person_id": String(victim.person_id),
 			"accused_house_id": String(killer_house.org_id),
 			"body_org_id": String(body.org_id)},
@@ -269,7 +269,7 @@ static func _try_capital_seizure(tick: int) -> bool:
 		seat.unrest = clampf(seat.unrest + 0.3, 0.0, 1.0)
 	_record(KIND_CAPITAL_SEIZURE, tick,
 		"%sが%sを制圧した。門は内から開かれ、誰も血を流さずに国の主が替わった。" % [
-			army.display_name, seat.display_name if seat != null else realm.display_name],
+			army.formal_name(), seat.display_name if seat != null else realm.formal_name()],
 		{"army_org_id": String(army.org_id)},
 		realm.org_id, realm.leader_person_id)
 
@@ -321,7 +321,7 @@ static func _try_uprising(tick: int) -> bool:
 
 	_record(KIND_UPRISING, tick,
 		"%sを筆頭に、国じゅうが立ち上がった。%sの威令はもはやどこにも届かない。" % [
-			worst.display_name if worst != null else "諸地方", realm.display_name],
+			worst.display_name if worst != null else "諸地方", realm.formal_name()],
 		{"worst_settlement": String(worst.id) if worst != null else "",
 			"burning_regions": burning},
 		realm.org_id, realm.leader_person_id)
@@ -334,7 +334,7 @@ static func _try_uprising(tick: int) -> bool:
 			"hold": 1.0,
 			"basis": PoliticalSystemAxes.LegitimacyBasis.ELECTED,
 			"structure": PoliticalSystemAxes.DecisionStructure.ASSEMBLY,
-		}, tick)
+			}, tick)
 	return true
 
 
@@ -399,7 +399,7 @@ static func _pressure_capital_seizure() -> Dictionary:
 				continue
 			if org.power_score > strongest:
 				strongest = org.power_score
-				name = org.display_name
+				name = org.formal_name()
 	var strength: float = strongest / maxf(1.0, realm.power_score * SEIZURE_STRENGTH)
 	var unrest: float = WorldStateQuery.get_value(&"org.governed.avg_unrest", realm) / SEIZURE_UNREST
 	var standing: float = SEIZURE_LEGITIMACY / maxf(0.01, realm.legitimacy)
@@ -412,7 +412,7 @@ static func _pressure_capital_seizure() -> Dictionary:
 	elif unrest <= standing:
 		missing = "民はまだ門を開かない"
 	else:
-		missing = "%sの威信がまだ残っている" % realm.display_name
+		missing = "%sの威信がまだ残っている" % realm.formal_name()
 	return _pressure(KIND_CAPITAL_SEIZURE, ready, missing)
 
 
@@ -451,6 +451,11 @@ static func _pressure(kind: StringName, ready: float, missing: String) -> Dictio
 ## for a memory that belongs to the country rather than to any government of it.
 static func _ledger() -> Organization:
 	return GameState.root_of_kind(Organization.OrgKind.POLITICAL_SYSTEM)
+
+
+## When a rupture of this kind last happened, or a long time ago.
+static func last_tick(kind: StringName) -> int:
+	return _last_of(kind)
 
 
 static func _last_of(kind: StringName) -> int:

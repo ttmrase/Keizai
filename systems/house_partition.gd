@@ -214,6 +214,6 @@ static func origin_story(org: Organization) -> Dictionary:
 		"label": reason_label(StringName(origin.payload.get("schism_kind", ""))),
 		"reason": String(origin.payload.get("reason", "")),
 		"text": origin.description,
-		"parent": parent.display_name if parent != null else "",
+		"parent": parent.formal_name() if parent != null else "",
 		"year": int(org.founding_tick / SimConfig.TICKS_PER_YEAR),
 	}

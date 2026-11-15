@@ -206,6 +206,12 @@ func apply(e: HistoryEvent) -> void:
 func _apply_org_created(e: HistoryEvent) -> void:
 	var org := Organization.from_dict(e.payload.get("organization", {}))
 	org.origin_event_id = e.event_id
+	# A family founded without a 氏 written down takes the one of the house it
+	# came out of — the rule every path that founds a house follows anyway.
+	if org.kind == Organization.OrgKind.HOUSE and org.uji_id == &"":
+		org.uji_id = HouseNaming.uji_for_branch(organizations.get(org.parent_org_id))
+		if org.uji_id == &"":
+			org.uji_id = org.org_id
 	if org.parent_org_id != &"":
 		var parent: Organization = organizations.get(org.parent_org_id)
 		if parent != null:

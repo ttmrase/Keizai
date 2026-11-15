@@ -132,7 +132,7 @@ static func _settle_patron(org: Organization, by_house: Dictionary, tick: int) -
 				HistoryEvent.EventType.IDEOLOGY_SHIFT,
 				tick,
 				"%sの座は%sのものとなり、世襲で受け継がれるようになった。"
-					% [org.display_name, GameState.get_organization(patron).display_name],
+					% [org.formal_name(), GameState.get_organization(patron).formal_name()],
 				{"patron_house": String(patron), "office_basis": "hereditary"},
 				org.org_id,
 				org.leader_person_id,

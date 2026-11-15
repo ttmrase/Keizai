@@ -16,8 +16,15 @@ extends Resource
 @export var family_name: String = ""
 @export var sex: String = "f"          # "f" / "m"
 
-## Cached "surname・given". Rebuilt whenever the surname changes.
+## The name in full, with the 氏: "ネシ氏コド・名" — or "ネシ・名" for somebody
+## of the house that founded the 氏. Read from the house each time, so a
+## renamed house or 氏 renames everyone in it. See HouseNaming.
 var full_name: String:
+	get:
+		return HouseNaming.person_formal_name(self)
+
+## The name without the 氏, "コド・名", for places too narrow for the whole of it.
+var short_name: String:
 	get:
 		return "%s・%s" % [family_name, given_name] if family_name != "" else given_name
 

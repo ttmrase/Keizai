@@ -243,7 +243,7 @@ static func _chronicle(house: Organization, previous: int, tick: int) -> void:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.IDEOLOGY_SHIFT,
 		tick,
-		"%sの家格は%sから%sへと%s。" % [house.display_name,
+		"%sの家格は%sから%sへと%s。" % [house.formal_name(),
 			tier_name(previous, house.standing), tier_name(house.rank_tier, house.standing),
 			"上がった" if risen else "下がった"],
 		{"from_tier": previous, "to_tier": house.rank_tier, "transient": true},

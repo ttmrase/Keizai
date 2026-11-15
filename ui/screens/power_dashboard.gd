@@ -124,7 +124,7 @@ func _government_banner(polity: Organization) -> Control:
 	panel.add_child(rows)
 
 	var heading := Label.new()
-	heading.text = "%s　—　%s" % [polity.display_name,
+	heading.text = "%s　—　%s" % [polity.formal_name(),
 		form.display_name if form != null else "統治のかたち不明"]
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.add_theme_font_size_override("font_size", 21)
@@ -157,7 +157,7 @@ func _government_banner(polity: Organization) -> Control:
 	if not seated.is_empty():
 		var parts: Array[String] = []
 		for faction in seated.slice(0, 4):
-			parts.append("%s %d" % [faction.display_name,
+			parts.append("%s %d" % [faction.formal_name(),
 				int(polity.faction_seats.get(faction.org_id, 0))])
 		var seats := Label.new()
 		seats.text = "%s（全%d議席）　%s" % [form.council_label if form != null else "議場",
@@ -175,7 +175,7 @@ func _government_banner(polity: Organization) -> Control:
 	else:
 		pressure.text = "正統性 %d%%　／　%sを背に%sが迫っている（掌握 %d%%）" % [
 			int(polity.legitimacy * 100.0), challenge.get("ground", ""),
-			challenge["org"].display_name, int(float(challenge.get("hold", 0.0)) * 100.0)]
+			challenge["org"].formal_name(), int(float(challenge.get("hold", 0.0)) * 100.0)]
 		pressure.add_theme_color_override("font_color", Palette.DANGER)
 	pressure.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pressure.add_theme_font_size_override("font_size", 15)
@@ -255,7 +255,7 @@ func _row(org: Organization, strongest: float, rank: int) -> Control:
 	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(words)
 	var name_label := Label.new()
-	name_label.text = org.display_name
+	name_label.text = org.formal_name()
 	name_label.clip_text = true
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_label.add_theme_font_size_override("font_size", 20)
@@ -323,7 +323,7 @@ func _house_note(org: Organization) -> String:
 		var liege := GameState.get_organization(org.liege_house_id)
 		return "（%s・%s%s）" % [org.standing_label(),
 			HouseCharacter.label(org.character_id),
-			"／%s" % liege.display_name if liege != null else ""]
+			"／%s" % liege.formal_name() if liege != null else ""]
 	return "（%s・%s）" % [HouseRank.tier_name(org.rank_tier),
 		HouseCharacter.label(org.character_id)]
 
@@ -336,7 +336,7 @@ func _kind_note(org: Organization) -> String:
 		return base
 	var patron := GameState.get_organization(org.patron_house_id)
 	if patron != null:
-		return "%s・%s(%s)" % [base, SocialTies.office_basis_label(org), patron.display_name]
+		return "%s・%s(%s)" % [base, SocialTies.office_basis_label(org), patron.formal_name()]
 	return "%s・%s" % [base, SocialTies.office_basis_label(org)]
 
 
@@ -408,7 +408,7 @@ func _breakdown(org: Organization) -> Control:
 	if not backers.is_empty():
 		var parts: Array[String] = []
 		for backer in backers.slice(0, 5):
-			parts.append("%s %d%%" % [backer.display_name,
+			parts.append("%s %d%%" % [backer.formal_name(),
 				int(float(org.support_base.get(backer.org_id, 0.0)) * 100.0)])
 		var support := Label.new()
 		support.text = "支持基盤：%s" % "　".join(parts)
@@ -450,7 +450,7 @@ func _breakdown(org: Organization) -> Control:
 		if not served.is_empty():
 			var parts: Array[String] = []
 			for r in served:
-				parts.append("%s %s" % [r.display_name, Retainers.describe_loyalty(r.loyalty)])
+				parts.append("%s %s" % [r.formal_name(), Retainers.describe_loyalty(r.loyalty)])
 			var vassals := Label.new()
 			vassals.text = "側近家：%s" % "　".join(parts)
 			vassals.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

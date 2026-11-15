@@ -349,8 +349,45 @@ func _ready() -> void:
 	await _settle()
 	await _capture("%s/map_detail.png" % _out_dir)
 
+	await _capture_uji(shell)
+
 	print("captured to %s" % _out_dir)
 	get_tree().quit(0)
+
+
+## 氏: the families screen narrowed to one, and the chronicle followed by it.
+func _capture_uji(shell: Control) -> void:
+	shell.show_tab("lineage")
+	await _settle()
+	var lineage: Control = shell._screens["lineage"]
+	lineage._show_houses()
+	await _settle()
+	var best := &""
+	var most := 0
+	for uji_id in HouseNaming.all_uji():
+		var n := HouseNaming.houses_of_uji(uji_id).size()
+		if n > most:
+			most = n
+			best = uji_id
+	lineage._set_uji_filter(best)
+	await _settle()
+	for house in HouseNaming.houses_of_uji(best):
+		if not HouseNaming.founded_uji(house) and house.is_active():
+			lineage._graph.selected_id = house.org_id
+			lineage._show_detail(house.org_id)
+			lineage._graph.center_on_node(house.org_id)
+			break
+	await _settle()
+	await _capture("%s/lineage_uji.png" % _out_dir)
+	lineage._set_uji_filter(&"")
+	shell.show_tab("chronicle")
+	await _settle()
+	var chronicle: Control = shell._screens["chronicle"]
+	chronicle._on_house_chosen(best, true)
+	await _settle()
+	await _capture("%s/chronicle_uji.png" % _out_dir)
+	chronicle._on_house_button()
+	await _settle()
 
 
 ## Somebody far enough down the record to have ancestors above them, siblings

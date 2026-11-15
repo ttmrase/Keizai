@@ -142,8 +142,8 @@ static func _offer_hegemony(rng: RandomNumberGenerator, tick: int) -> Dictionary
 	var org: Organization = ranked[place]
 	var gap := ranked[0].power_score - org.power_score
 	var reward := clampi(int(30 + place * 9 + gap * 0.5), 30, 120)
-	return _make(HEGEMONY, String(org.org_id), org.display_name, 0.0, tick, 30, reward,
-		"%d年のうちに、%sが世で最も力ある組織となる" % [30, org.display_name],
+	return _make(HEGEMONY, String(org.org_id), org.formal_name(), 0.0, tick, 30, reward,
+		"%d年のうちに、%sが世で最も力ある組織となる" % [30, org.formal_name()],
 		dial_hint(org))
 
 
@@ -163,9 +163,9 @@ static func _offer_throne(rng: RandomNumberGenerator, tick: int) -> Dictionary:
 	var place := rng.randi_range(0, mini(3, houses.size() - 1))
 	var house: Organization = houses[place]
 	var seat := realm.leadership_title if not realm.leadership_title.is_empty() else "国の長"
-	return _make(THRONE, String(house.org_id), house.display_name, 0.0, tick, 60,
+	return _make(THRONE, String(house.org_id), house.formal_name(), 0.0, tick, 60,
 		clampi(45 + place * 15, 45, 110),
-		"%d年のうちに、%sの者が%sの座に就く" % [60, house.display_name, seat],
+		"%d年のうちに、%sの者が%sの座に就く" % [60, house.formal_name(), seat],
 		"国の長を決めるのは人の側。家が力と家格を増し、いまの長の家が揺らげば道が開く")
 
 
@@ -180,9 +180,9 @@ static func _offer_extinction(rng: RandomNumberGenerator, tick: int) -> Dictiona
 		return {}
 	frail.sort_custom(func(a, b): return a.member_count < b.member_count)
 	var house: Organization = frail[rng.randi_range(0, mini(2, frail.size() - 1))]
-	return _make(EXTINCTION, String(house.org_id), house.display_name, 0.0, tick, 50,
+	return _make(EXTINCTION, String(house.org_id), house.formal_name(), 0.0, tick, 50,
 		clampi(30 + 60 / maxi(1, house.member_count), 35, 70),
-		"%d年のうちに、%sの血が絶える" % [50, house.display_name],
+		"%d年のうちに、%sの血が絶える" % [50, house.formal_name()],
 		"疫病と飢えが家を細らせる。子が生まれる前に")
 
 
@@ -207,9 +207,9 @@ static func _offer_branch(rng: RandomNumberGenerator, tick: int) -> Dictionary:
 	bodies.sort_custom(func(a, b): return a.power_score > b.power_score)
 	var org: Organization = bodies[rng.randi_range(0, mini(5, bodies.size() - 1))]
 	var house := org.kind == Organization.OrgKind.HOUSE
-	return _make(BRANCH, String(org.org_id), org.display_name, 0.0, tick, 40,
+	return _make(BRANCH, String(org.org_id), org.formal_name(), 0.0, tick, 40,
 		45 if house else 40,
-		"%d年のうちに、%sが割れて新たな%sが生まれる" % [40, org.display_name,
+		"%d年のうちに、%sが割れて新たな%sが生まれる" % [40, org.formal_name(),
 			"分家" if house else "一派"],
 		"家督争いや婚姻のもつれで家は割れる" if house
 			else "境遇が急に変わると、組織の中の考えが割れる。%s" % dial_hint(org))
@@ -296,9 +296,9 @@ static func _offer_ascent(rng: RandomNumberGenerator, tick: int) -> Dictionary:
 		return {}
 	var house: Organization = houses[rng.randi_range(0, houses.size() - 1)]
 	var goal := house.rank_tier + 1
-	return _make(ASCENT, String(house.org_id), house.display_name, float(goal), tick, 50,
+	return _make(ASCENT, String(house.org_id), house.formal_name(), float(goal), tick, 50,
 		40 + goal * 8,
-		"%d年のうちに、%sが%sに叙される" % [50, house.display_name, HouseRank.TIER_NAMES[goal]],
+		"%d年のうちに、%sが%sに叙される" % [50, house.formal_name(), HouseRank.TIER_NAMES[goal]],
 		"所領・力・官職、そして王家との近さが家格を上げる")
 
 
@@ -407,7 +407,7 @@ static func progress(p: Dictionary, tick: int) -> String:
 				if ranked[i].org_id == target:
 					if i == 0:
 						return "いま首位"
-					return "いま第%d位　首位の%sとの差 %d" % [i + 1, ranked[0].display_name,
+					return "いま第%d位　首位の%sとの差 %d" % [i + 1, ranked[0].formal_name(),
 						int(ranked[0].power_score - ranked[i].power_score)]
 			return "もう世にない"
 		THRONE:
@@ -416,7 +416,7 @@ static func progress(p: Dictionary, tick: int) -> String:
 			var house := GameState.get_organization(_ruling_house())
 			return "いまの%sは%s（%s）" % [realm.leadership_title if realm != null else "長",
 				ruler.full_name if ruler != null else "空位",
-				house.display_name if house != null else "家なし"]
+				house.formal_name() if house != null else "家なし"]
 		EXTINCTION:
 			var house := GameState.get_organization(target)
 			return "存命の者 %d人" % (house.member_count if house != null else 0)
@@ -446,7 +446,7 @@ static func progress(p: Dictionary, tick: int) -> String:
 			if challenge.is_empty():
 				return "正統性 %d%%　体制に挑む者なし" % int(realm.legitimacy * 100.0)
 			return "正統性 %d%%　%sが迫る（掌握 %d%%）" % [int(realm.legitimacy * 100.0),
-				challenge["org"].display_name, int(float(challenge.get("hold", 0.0)) * 100.0)]
+				challenge["org"].formal_name(), int(float(challenge.get("hold", 0.0)) * 100.0)]
 		NEW_FAITH:
 			return "いま世にある信仰 %d" % GameState.organizations_of_kind(
 				Organization.OrgKind.RELIGION).size()

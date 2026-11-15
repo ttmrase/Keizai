@@ -40,6 +40,9 @@ func rename_organization(org_id: StringName, new_name: String) -> bool:
 		return false
 
 	var previous := org.display_name
+	var previous_formal := org.formal_name()
+	var previous_uji := HouseNaming.uji_label(org.org_id) \
+		if HouseNaming.founded_uji(org) else ""
 	# A house's name is its members' surname, so keep the suffix that marks it
 	# as a house rather than letting the two conventions drift apart.
 	if org.kind == Organization.OrgKind.HOUSE and not clean.ends_with(HouseNaming.HOUSE_SUFFIX):
@@ -50,9 +53,17 @@ func rename_organization(org_id: StringName, new_name: String) -> bool:
 	if org.kind == Organization.OrgKind.HOUSE:
 		restyled = HouseNaming.restyle_members(org_id)
 
-	var text := "%sは%sと名を改めた。" % [previous, clean]
+	var text := "%sは%sと名を改めた。" % [previous_formal, org.formal_name()]
 	if restyled > 0:
-		text = "%sは%sと名を改め、%d名がその名を継いだ。" % [previous, clean, restyled]
+		text = "%sは%sと名を改め、%d名がその名を継いだ。" % [previous_formal,
+			org.formal_name(), restyled]
+	# The house a 氏 is named for takes the 氏 with it: every family of that
+	# 氏 goes by the new name from now on.
+	if previous_uji != "":
+		var kin := HouseNaming.houses_of_uji(org.org_id, true).size() - 1
+		if kin > 0:
+			text += "%sの諸家%d家も、以後は%sを名乗る。" % [previous_uji, kin,
+				HouseNaming.uji_label(org.org_id)]
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.RENAMED,
 		SimClock.current_tick,

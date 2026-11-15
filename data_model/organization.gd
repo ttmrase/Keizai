@@ -130,6 +130,13 @@ const STANDING_LABELS := {
 ## POLITICAL_SYSTEM: the form of government currently derived from the balance
 ## between houses, guilds and factions. Recomputed each power epoch.
 @export var polity_form_id: StringName = &""
+## HOUSE: 氏 — the founding great house this family's line comes out of. Only the
+## houses that held a region when the world began found a 氏, and theirs is
+## their own id; every other family carries the 氏 of the house it split from,
+## for good. Unlike `parent_org_id` this is not the lineage tree (which has one
+## root per kind): it is the name a family goes by, so that where a house came
+## from is written on it. See HouseNaming.
+@export var uji_id: StringName = &""
 
 
 func kind_name() -> String:
@@ -142,6 +149,19 @@ func standing_label() -> String:
 
 func is_noble() -> bool:
 	return kind == OrgKind.HOUSE and standing == Standing.NOBLE
+
+
+## The name this organization is known by in full: for a house, its 氏 and
+## its own name (ネシ氏コド家), or just its name if it founded the 氏 (ネシ家).
+func formal_name() -> String:
+	if kind == OrgKind.HOUSE:
+		return HouseNaming.house_label(self)
+	return display_name
+
+
+## The short name for narrow places: a house's own name without its 氏.
+func short_name() -> String:
+	return display_name
 
 
 func is_root() -> bool:
@@ -208,6 +228,8 @@ func to_dict() -> Dictionary:
 		d["standing"] = STANDING_NAMES[standing]
 	if liege_house_id != &"":
 		d["liege_house_id"] = String(liege_house_id)
+	if uji_id != &"":
+		d["uji_id"] = String(uji_id)
 	if character_id != &"":
 		d["character_id"] = String(character_id)
 	if faith_id != &"":
@@ -278,6 +300,7 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.patron_house_id = StringName(d.get("patron_house_id", ""))
 	o.standing = _standing_from_name(d.get("standing", "NOBLE"))
 	o.liege_house_id = StringName(d.get("liege_house_id", ""))
+	o.uji_id = StringName(d.get("uji_id", ""))
 	o.character_id = StringName(d.get("character_id", ""))
 	o.faith_id = StringName(d.get("faith_id", ""))
 	o.loyalty = float(d.get("loyalty", 0.75))

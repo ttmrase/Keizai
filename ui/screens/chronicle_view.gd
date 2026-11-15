@@ -38,6 +38,9 @@ var _shown := PAGE
 ## world is the point of the screen and also the reason one family's story is
 ## impossible to follow in it.
 var _house_filter: StringName = &""
+## When true, _house_filter names the house a 氏 is named for, and everything
+## that happened to any family of that 氏 is shown.
+var _uji_mode := false
 
 @onready var _tabs: HBoxContainer = $Rows/Filters
 @onready var _list: VBoxContainer = $Rows/Scroll/List
@@ -90,6 +93,7 @@ func on_shown() -> void:
 func _on_house_button() -> void:
 	if _house_filter != &"":
 		_house_filter = &""
+		_uji_mode = false
 		_sync_house_button()
 		_shown = PAGE
 		_rebuild()
@@ -105,19 +109,32 @@ func _open_picker() -> void:
 		var pa := HouseRank.precedence(a)
 		var pb := HouseRank.precedence(b)
 		return pa > pb if not is_equal_approx(pa, pb) else String(a.org_id) < String(b.org_id))
-	for house in houses:
+	# A 氏 first: every family that came out of one great house of the first
+	# day, followed as one story.
+	for uji_id in HouseNaming.all_uji():
 		var button := Button.new()
-		button.text = "%s　%s" % [house.display_name, HouseRank.title_of_house(house)]
+		button.text = "%s　（現存%d家）" % [HouseNaming.uji_label(uji_id),
+			HouseNaming.houses_of_uji(uji_id, true).size()]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.custom_minimum_size = Vector2(0, 48)
 		button.add_theme_font_size_override("font_size", 17)
-		button.pressed.connect(_on_house_chosen.bind(house.org_id))
+		button.add_theme_color_override("font_color", Palette.ACCENT)
+		button.pressed.connect(_on_house_chosen.bind(uji_id, true))
+		_picker_list.add_child(button)
+	for house in houses:
+		var button := Button.new()
+		button.text = "%s　%s" % [house.formal_name(), HouseRank.title_of_house(house)]
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.custom_minimum_size = Vector2(0, 48)
+		button.add_theme_font_size_override("font_size", 17)
+		button.pressed.connect(_on_house_chosen.bind(house.org_id, false))
 		_picker_list.add_child(button)
 	_picker.visible = true
 
 
-func _on_house_chosen(house_id: StringName) -> void:
+func _on_house_chosen(house_id: StringName, by_uji: bool = false) -> void:
 	_house_filter = house_id
+	_uji_mode = by_uji
 	_picker.visible = false
 	_shown = PAGE
 	_sync_house_button()
@@ -127,15 +144,20 @@ func _on_house_chosen(house_id: StringName) -> void:
 
 func _sync_house_button() -> void:
 	var house := GameState.get_organization(_house_filter)
-	_house_button.text = "家で絞る" if house == null else "%sの記事のみ　✕" % house.display_name
+	if house == null:
+		_house_button.text = "家・氏で絞る"
+	elif _uji_mode:
+		_house_button.text = "%sの記事のみ　✕" % HouseNaming.uji_label(house.org_id)
+	else:
+		_house_button.text = "%sの記事のみ　✕" % house.formal_name()
 	_house_button.add_theme_color_override("font_color",
 		Palette.TEXT_MUTED if house == null else Palette.ACCENT)
 
 
 ## Whether this is news about a particular family: something that happened to the
-## house itself, or to somebody who belongs to it.
+## house itself, or to somebody who belongs to it. In 氏 mode, any family of it.
 func _concerns_house(e: HistoryEvent, house_id: StringName) -> bool:
-	if e.subject_org_id == house_id:
+	if _is_followed(e.subject_org_id, house_id):
 		return true
 	if _belongs(e.subject_person_id, house_id):
 		return true
@@ -143,16 +165,25 @@ func _concerns_house(e: HistoryEvent, house_id: StringName) -> bool:
 		if _belongs(id, house_id):
 			return true
 	for key in ["from_house_id", "to_house_id", "granted_by", "liege_house_id"]:
-		if StringName(e.payload.get(key, "")) == house_id:
+		if _is_followed(StringName(e.payload.get(key, "")), house_id):
 			return true
 	# A cadet house leaving is news for the family it left.
 	var born: Dictionary = e.payload.get("organization", {})
-	return StringName(born.get("parent_org_id", "")) == house_id
+	return _is_followed(StringName(born.get("parent_org_id", "")), house_id)
+
+
+func _is_followed(org_id: StringName, house_id: StringName) -> bool:
+	if org_id == &"":
+		return false
+	if not _uji_mode:
+		return org_id == house_id
+	var org := GameState.get_organization(org_id)
+	return org != null and org.kind == Organization.OrgKind.HOUSE and org.uji_id == house_id
 
 
 func _belongs(person_id: StringName, house_id: StringName) -> bool:
 	var p := GameState.get_person(person_id)
-	return p != null and p.house_org_id == house_id
+	return p != null and _is_followed(p.house_org_id, house_id)
 
 
 func _on_filter(index: int) -> void:
@@ -217,7 +248,9 @@ func _rebuild() -> void:
 		var e: HistoryEvent = HistoryLog.buffer[i]
 		if not wanted.is_empty() and not wanted.has(e.event_type):
 			continue
-		if Retainers.is_service_household_event(e) != only_service:
+		# Following one family or one 氏 is its own page: the households in
+		# service are part of it rather than set aside.
+		if _house_filter == &"" and Retainers.is_service_household_event(e) != only_service:
 			continue
 		if _house_filter != &"" and not _concerns_house(e, _house_filter):
 			continue
@@ -236,7 +269,8 @@ func _rebuild() -> void:
 	if matched == 0:
 		var empty := Label.new()
 		if _house_filter != &"":
-			empty.text = "この家に伝えるべきことはまだない。"
+			empty.text = "この氏に伝えるべきことはまだない。" if _uji_mode \
+				else "この家に伝えるべきことはまだない。"
 		else:
 			empty.text = "側近家の家中に目立った動きはない。" if only_service else "まだ何も起きていない。"
 		empty.add_theme_color_override("font_color", Palette.TEXT_DIM)

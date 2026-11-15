@@ -151,14 +151,14 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 				_:
 					var org := GameState.get_organization(e.subject_org_id)
 					if org != null and org.is_noble():
-						t["house_branches"].append(org.display_name)
+						t["house_branches"].append(org.formal_name())
 						moment = true
 					elif org != null and org.kind != Organization.OrgKind.HOUSE:
-						t["other_branches"].append(org.display_name)
+						t["other_branches"].append(org.formal_name())
 		HistoryEvent.EventType.DISSOLVED:
 			var org := GameState.get_organization(e.subject_org_id)
 			if org != null and org.is_noble():
-				t["extinctions"].append(org.display_name)
+				t["extinctions"].append(org.formal_name())
 				moment = true
 		HistoryEvent.EventType.DISASTER_OCCURRED:
 			var id := String(e.payload.get("definition_id", ""))

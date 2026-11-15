@@ -18,8 +18,16 @@ var root_kinds: Array[int] = [
 ]
 
 
+## When set, only the families of this 氏 are drawn, hanging from the house it
+## is named for.
+var uji_filter: StringName = &""
+
+
 func roots() -> Array[StringName]:
 	var out: Array[StringName] = []
+	if uji_filter != &"" and GameState.get_organization(uji_filter) != null:
+		out.append(uji_filter)
+		return out
 	for kind in root_kinds:
 		var root := GameState.root_of_kind(kind)
 		if root != null:
@@ -44,7 +52,10 @@ func children(id: StringName) -> Array[StringName]:
 		var child := GameState.get_organization(child_id)
 		if child == null:
 			continue
-		if not include_retainers and child.standing == Organization.Standing.RETAINER:
+		if uji_filter != &"":
+			if child.uji_id != uji_filter:
+				continue
+		elif not include_retainers and child.standing == Organization.Standing.RETAINER:
 			continue
 		out.append(child_id)
 	return out
@@ -60,6 +71,15 @@ func parents(id: StringName) -> Array[StringName]:
 func label(id: StringName) -> String:
 	var org := GameState.get_organization(id)
 	return org.display_name if org != null else String(id)
+
+
+## A family's 氏, small, before its own name — unless it is the house the 氏
+## is named for, whose name already says it.
+func overline(id: StringName) -> String:
+	var org := GameState.get_organization(id)
+	if org == null or org.kind != Organization.OrgKind.HOUSE or HouseNaming.founded_uji(org):
+		return ""
+	return HouseNaming.uji_label(org.uji_id)
 
 
 func sublabel(id: StringName) -> String:
@@ -105,15 +125,18 @@ func detail(id: StringName) -> String:
 		% (leader.full_name if leader != null else "不在"))
 	lines.append("[color=#9a9080]興り[/color]  %d年%s" % [
 		int(org.founding_tick / SimConfig.TICKS_PER_YEAR),
-		"" if parent == null else "（%sより分派）" % parent.display_name])
+		"（建国の家）" if HouseNaming.founded_uji(org) else
+			("" if parent == null else "（%sより分派）" % parent.formal_name())])
 	var why := _why_it_branched(org)
 	if not why.is_empty():
 		lines.append(why)
 	if not org.is_active():
 		lines.append("[color=#c85a4a]断絶[/color]  %d年"
 			% int(org.dissolved_tick / SimConfig.TICKS_PER_YEAR))
-	if root != null:
-		lines.append("[color=#9a9080]源流[/color]  %s（%d代前）" % [root.display_name, org.branch_depth])
+	# A family's origin is its 氏, shown below; the root of the house tree is
+	# only the first family in it and says nothing about this one.
+	if root != null and org.kind != Organization.OrgKind.HOUSE:
+		lines.append("[color=#9a9080]源流[/color]  %s（%d代前）" % [root.formal_name(), org.branch_depth])
 	if org.ideology != null:
 		lines.append("[color=#9a9080]思想[/color]  %s"
 			% PoliticalSystemGenerator.ideology_summary(org.ideology))
@@ -125,6 +148,9 @@ func detail(id: StringName) -> String:
 				% [form.display_name, form.description])
 
 	if org.kind == Organization.OrgKind.HOUSE:
+		var uji_text := uji_lines(org)
+		if not uji_text.is_empty():
+			lines.append(uji_text)
 		lines.append("[color=#9a9080]家格[/color]  %s・%s%s" % [
 			org.standing_label(),
 			HouseRank.tier_name(org.rank_tier) if org.is_noble() else "位なし",
@@ -132,14 +158,14 @@ func detail(id: StringName) -> String:
 		if org.standing == Organization.Standing.RETAINER:
 			var liege := GameState.get_organization(org.liege_house_id)
 			lines.append("[color=#9a9080]仕える先[/color]  %s（%s）" % [
-				liege.display_name if liege != null else "なし",
+				liege.formal_name() if liege != null else "なし",
 				Retainers.describe_loyalty(org.loyalty)])
 		else:
 			var served := Retainers.retainers_of(org.org_id)
 			if not served.is_empty():
 				var names: Array[String] = []
 				for r in served:
-					names.append("%s（%s）" % [r.display_name, Retainers.describe_loyalty(r.loyalty)])
+					names.append("%s（%s）" % [r.formal_name(), Retainers.describe_loyalty(r.loyalty)])
 				lines.append("[color=#9a9080]側近家[/color]  %s" % "、".join(names))
 		var faith := GameState.get_organization(org.faith_id)
 		if faith != null:
@@ -158,7 +184,7 @@ func detail(id: StringName) -> String:
 			for seat in offices:
 				var held: Organization = seat["org"]
 				var holder: NotableIndividual = seat["person"]
-				seats.append("%s%s（%s）" % [held.display_name, seat["title"], holder.given_name])
+				seats.append("%s%s（%s）" % [held.formal_name(), seat["title"], holder.given_name])
 			lines.append("[color=#9a9080]現任の役[/color]  %s" % "、".join(seats))
 		var honour := Honours.honour_label(org)
 		if not honour.is_empty():
@@ -172,6 +198,24 @@ func detail(id: StringName) -> String:
 		lines.append("[color=#9a9080]歴代の%s[/color]\n%s" % [org.leadership_title, roll])
 
 	return "\n".join(lines)
+
+
+## The 氏 a family belongs to and every other family of it: where it came from,
+## and who else came from the same place.
+static func uji_lines(house: Organization) -> String:
+	if house == null or house.uji_id == &"":
+		return ""
+	var kin: Array[String] = []
+	for other in HouseNaming.houses_of_uji(house.uji_id):
+		if other.org_id == house.org_id:
+			continue
+		var name := other.display_name if other.org_id != house.uji_id \
+			else "%s（宗家）" % other.display_name
+		kin.append(name if other.is_active() else "[color=#6a6357]%s・絶[/color]" % name)
+	var text := "[color=#9a9080]氏[/color]  %s" % HouseNaming.uji_summary(house.uji_id)
+	if not kin.is_empty():
+		text += "\n[color=#9a9080]同じ氏の家[/color]  %s" % "、".join(kin)
+	return text
 
 
 ## Why this body exists at all, read back off the event that created it.
@@ -239,9 +283,9 @@ func _relations_text(house: Organization) -> String:
 			continue
 		var value: float = house.house_relations[other_id]
 		if value > 0.2:
-			warm.append("%s（%s）" % [other.display_name, HouseRelations.describe(value)])
+			warm.append("%s（%s）" % [other.formal_name(), HouseRelations.describe(value)])
 		elif value < -0.2:
-			cold.append("%s（%s）" % [other.display_name, HouseRelations.describe(value)])
+			cold.append("%s（%s）" % [other.formal_name(), HouseRelations.describe(value)])
 	var parts: Array[String] = []
 	if not warm.is_empty():
 		parts.append("[color=#7ab87a]%s[/color]" % "、".join(warm))

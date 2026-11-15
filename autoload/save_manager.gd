@@ -100,6 +100,8 @@ func load_game(slot: int) -> bool:
 	HistoryLog.buffer = _read_segments(history_dir, manifest.get("segments", []))
 	HistoryLog.backbone = _read_backbone(history_dir)
 	HistoryLog.total_recorded = int(manifest.get("total_events_recorded", HistoryLog.buffer.size()))
+	# Saves written before families carried a 氏 are given one, from the record.
+	HouseNaming.migrate_uji()
 
 	SimClock.start(int(snapshot.get("tick", 0)))
 	# The god's prophecies and might travel with the world they were spoken in.

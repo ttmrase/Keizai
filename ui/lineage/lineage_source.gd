@@ -31,6 +31,13 @@ func sublabel(_id: StringName) -> String:
 	return ""
 
 
+## A small heading set before the label, smaller and muted — for a family or a
+## person, the 氏 they come from ("ネシ氏"), so a card can carry it without
+## the whole name running off the edge. Empty for none.
+func overline(_id: StringName) -> String:
+	return ""
+
+
 func colour(_id: StringName) -> Color:
 	return Palette.TEXT
 

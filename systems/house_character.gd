@@ -153,7 +153,7 @@ static func refresh_all(tick: int) -> void:
 				HistoryEvent.EventType.IDEOLOGY_SHIFT,
 				tick,
 				"%sは代を重ねるうちに%sから%sへと性格を変えた。"
-					% [house.display_name, label(previous), label(key)],
+					% [house.formal_name(), label(previous), label(key)],
 				{"from_character": String(previous), "to_character": String(key),
 					"transient": true},
 				house.org_id,

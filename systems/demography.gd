@@ -71,7 +71,7 @@ static func _record_death(p: NotableIndividual, tick: int, age: int) -> void:
 	if tenure != null:
 		var org := GameState.get_organization(tenure.org_id)
 		if org != null:
-			role = "%s%sの" % [org.display_name, tenure.title]
+			role = "%s%sの" % [org.formal_name(), tenure.title]
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.DEATH,
 		tick,

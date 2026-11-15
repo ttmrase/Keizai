@@ -113,8 +113,8 @@ func _shift_power(rule: TriggerRule, org: Organization, tick: int) -> bool:
 	var text := rule.chronicle_template
 	if text.is_empty():
 		text = "{reason}により、{place}は{from}の手を離れ{to}に従った。"
-	text = text.replace("{place}", place).replace("{from}", org.display_name) \
-		.replace("{to}", rival.display_name).replace("{reason}", reason)
+	text = text.replace("{place}", place).replace("{from}", org.formal_name()) \
+		.replace("{to}", rival.formal_name()).replace("{reason}", reason)
 
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
@@ -140,7 +140,7 @@ func _declare_conflict(rule: TriggerRule, org: Organization, tick: int) -> bool:
 	var text := rule.chronicle_template
 	if text.is_empty():
 		text = "{reason}をめぐり、{a}と{b}が公然と対立した。"
-	text = text.replace("{a}", org.display_name).replace("{b}", rival.display_name) \
+	text = text.replace("{a}", org.formal_name()).replace("{b}", rival.formal_name()) \
 		.replace("{reason}", reason)
 
 	# Resolved immediately by relative strength; the interesting consequence is
@@ -152,7 +152,7 @@ func _declare_conflict(rule: TriggerRule, org: Organization, tick: int) -> bool:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.CONFLICT_RESOLVED,
 		tick,
-		"%s %sが退いた。" % [text, loser.display_name],
+		"%s %sが退いた。" % [text, loser.formal_name()],
 		{"loser_org_id": String(loser.org_id), "rule_id": String(rule.rule_id)},
 		org.org_id, &"", org.origin_event_id)
 

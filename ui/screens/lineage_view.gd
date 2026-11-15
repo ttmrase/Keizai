@@ -39,10 +39,20 @@ var _spine_only := true
 @onready var _house_tree_button: Button = $Detail/Margin/Rows/Actions/HouseTree
 
 var _rename_dialog: RenameDialog
+## Families screen only: narrows the chart to one 氏.
+var _uji_button: Button
 
 
 func _ready() -> void:
 	_house_source.root_kinds = [Organization.OrgKind.HOUSE]
+	_uji_button = Button.new()
+	_uji_button.custom_minimum_size = Vector2(80, 44)
+	_uji_button.add_theme_font_size_override("font_size", 15)
+	_uji_button.focus_mode = Control.FOCUS_NONE
+	_uji_button.text = "氏"
+	_uji_button.pressed.connect(_open_uji_picker)
+	_scope_button.get_parent().add_child(_uji_button)
+	_scope_button.get_parent().move_child(_uji_button, _scope_button.get_index())
 	_org_button.pressed.connect(_show_institutions)
 	_house_button.pressed.connect(_show_houses)
 	_people_button.pressed.connect(_show_all_people)
@@ -172,7 +182,12 @@ func _sync_modes() -> void:
 			[_people_button, Mode.PEOPLE]]:
 		Palette.style_pill(entry[0], _mode == entry[1])
 
-	_scope_button.visible = _mode != Mode.INSTITUTIONS
+	_scope_button.visible = _mode != Mode.INSTITUTIONS \
+		and not (_mode == Mode.HOUSES and _house_source.uji_filter != &"")
+	_uji_button.visible = _mode == Mode.HOUSES
+	_uji_button.text = "氏" if _house_source.uji_filter == &"" \
+		else "%s ✕" % HouseNaming.uji_label(_house_source.uji_filter)
+	Palette.style_pill(_uji_button, _house_source.uji_filter != &"")
 	_clear_house_button.visible = _mode == Mode.PEOPLE and _focus_house != &""
 	match _mode:
 		Mode.HOUSES:
@@ -205,11 +220,14 @@ func _update_focus_note() -> void:
 	elif _mode == Mode.PEOPLE and _focus_house != &"":
 		var house := GameState.get_organization(_focus_house)
 		_focus_note.text = "%sの家系図：嫁いできた配偶者を含み、他家へ出た人は除いています" \
-			% (house.display_name if house != null else "この家")
+			% (house.formal_name() if house != null else "この家")
 	elif _mode == Mode.PEOPLE and _spine_only:
 		_focus_note.text = "当主のみ表示中：長押しでその人の系図が開きます"
 	elif _mode == Mode.PEOPLE:
 		_focus_note.text = "長押しでその人の系図が開きます"
+	elif _mode == Mode.HOUSES and _house_source.uji_filter != &"":
+		_focus_note.text = "%s：宗家と、そこから出たすべての家（側近家を含む）" \
+			% HouseNaming.uji_summary(_house_source.uji_filter)
 	elif _mode == Mode.HOUSES and not _house_source.include_retainers:
 		_focus_note.text = "主家のみ表示中：側近家は「側近家も」で開きます"
 	else:
@@ -272,6 +290,8 @@ func reveal(id: StringName) -> void:
 		if org == null:
 			return
 		if org.kind == Organization.OrgKind.HOUSE:
+			if _house_source.uji_filter != &"" and org.uji_id != _house_source.uji_filter:
+				_house_source.uji_filter = &""
 			if org.standing == Organization.Standing.RETAINER:
 				_house_source.include_retainers = true
 			_show_houses()
@@ -281,6 +301,34 @@ func reveal(id: StringName) -> void:
 	_graph.selected_id = id
 	_update_focus_note()
 	_show_detail(id)
+
+
+## The families screen narrowed to one 氏, or widened back out. Lists the 氏 in
+## the same panel search results use, so it reads the same and closes the same.
+func _open_uji_picker() -> void:
+	if _house_source.uji_filter != &"":
+		_set_uji_filter(&"")
+		return
+	for child in _results_list.get_children():
+		child.queue_free()
+	for uji_id in HouseNaming.all_uji():
+		var button := Button.new()
+		button.text = HouseNaming.uji_summary(uji_id)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.custom_minimum_size = Vector2(0, 48)
+		button.add_theme_font_size_override("font_size", 17)
+		button.pressed.connect(_set_uji_filter.bind(uji_id))
+		_results_list.add_child(button)
+	_results.visible = true
+
+
+func _set_uji_filter(uji_id: StringName) -> void:
+	_results.visible = false
+	_house_source.uji_filter = uji_id
+	_graph.clear_focus()
+	_graph.selected_id = &""
+	_sync_modes()
+	_rebuild()
 
 
 ## Walks up to where this lineage began — the point of the whole design, so it
@@ -351,7 +399,10 @@ func _show_detail(id: StringName) -> void:
 	if not source.exists(id):
 		_detail.visible = false
 		return
-	_detail_title.text = source.label(id)
+	var person := GameState.get_person(id)
+	var org := GameState.get_organization(id)
+	_detail_title.text = person.full_name if person != null \
+		else (org.formal_name() if org != null else source.label(id))
 	_detail_body.text = source.detail(id)
 	_rename_button.visible = _mode != Mode.PEOPLE
 	_house_tree_button.visible = _mode == Mode.HOUSES

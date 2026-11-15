@@ -323,7 +323,7 @@ static func _refound(polity: Organization, winner: Organization, basis: int,
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.SCHISM,
 		tick,
-		"%sは倒れ、%sが%sに代わって国を継いだ。" % [polity.display_name,
+		"%sは倒れ、%sが%sに代わって国を継いだ。" % [polity.formal_name(),
 			heir.display_name, "その座" if ruler == null else ruler.full_name],
 		{
 			"organization": heir.to_dict(),
@@ -341,7 +341,7 @@ static func _refound(polity: Organization, winner: Organization, basis: int,
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.DISSOLVED,
 		tick,
-		"%sはここに終わった。" % polity.display_name,
+		"%sはここに終わった。" % polity.formal_name(),
 		{"succeeded_by": String(heir.org_id), "depose_ruler": true},
 		polity.org_id,
 		polity.leader_person_id,
@@ -370,7 +370,7 @@ static func _chronicle_text(polity: Organization, winner: Organization, ground: 
 	var fate := "%sは座を追われた。" % ruler.full_name if deposed and ruler != null \
 		else "王座はかろうじて残された。"
 	return "%sで政変が起きた。%s%sが国の形を書き換え、%s" \
-		% [polity.display_name, how, winner.display_name, fate]
+		% [polity.formal_name(), how, winner.formal_name(), fate]
 
 
 ## Whether the regime is currently being outweighed, and by whom — for the

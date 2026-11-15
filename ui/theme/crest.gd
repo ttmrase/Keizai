@@ -5,10 +5,11 @@ extends RefCounted
 ## the device of the line it springs from.
 ##
 ## Colour alone told families apart on the map and left them anonymous. A shield
-## gives each a face — and says something true about it: a cadet house keeps the
-## device of the house it left and changes only the colour, so on any screen two
-## shields with the same chevron are kin, whatever they are called now and
-## however long ago they parted. The founding houses each have their own.
+## gives each a face — and says something true about it: the device is the 氏's,
+## so a cadet house keeps the device of the house it left and changes only the
+## colour, and on any screen two shields with the same chevron are of one 氏,
+## whatever they are called now and however long ago they parted. Each great
+## house of the first day has its own.
 ##
 ## Drawn, not stored: the shape is a handful of polygons in a unit box, clipped
 ## to the shield once and reused at whatever size is asked for.
@@ -79,9 +80,13 @@ static func metal_of(house: Organization) -> Color:
 	return METALS[(_number(stem_of(house)) / Device.size()) % METALS.size()]
 
 
-## The house a family's arms come from: itself, if it stood at the founding, or
-## else the founding house at the head of the line of cadets it descends by.
+## The house a family's arms come from: the one that founded its 氏. Same
+## device, same 氏 — the households in service at the start bear their master's
+## device as they bear its 氏, and so does every cadet line however far down.
 static func stem_of(house: Organization) -> Organization:
+	var uji := HouseNaming.uji_house(house)
+	if uji != null:
+		return uji
 	var walk := house
 	var guard := 0
 	while walk.founding_tick > 0 and walk.parent_org_id != &"" and guard < 64:

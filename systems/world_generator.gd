@@ -144,6 +144,9 @@ static func _create_houses() -> Array[Organization]:
 		house.ideology = PoliticalSystemGenerator.generate_root_axes()
 		house.ideology_baseline = house.ideology.clone()
 		house.standing = Organization.Standing.NOBLE
+		# Every great house of the first day founds a 氏 of its own, whatever
+		# the lineage tree below says about which of them is its root.
+		house.uji_id = house_id
 		# Only the first house is a root; the others descend from it in the
 		# lineage tree, because the invariant is one root per kind. They are
 		# founded at the same moment, as branches of the same original line.
@@ -182,7 +185,7 @@ static func _create_houses() -> Array[Organization]:
 		HistoryLog.emit_event(
 			HistoryEvent.EventType.FOUNDING,
 			0,
-			"%sが%sに拠を構えた。" % [house.display_name, settlement.display_name],
+			"%sが%sに拠を構えた。" % [house.formal_name(), settlement.display_name],
 			{"organization": house.to_dict()},
 			house.org_id, patriarch.person_id)
 		houses.append(GameState.get_organization(house_id))
@@ -205,6 +208,8 @@ static func _create_retainers(nobles: Array[Organization]) -> void:
 			house.parent_org_id = liege.org_id
 			house.standing = Organization.Standing.RETAINER
 			house.liege_house_id = liege.org_id
+			# The households in service go by their master's 氏.
+			house.uji_id = HouseNaming.uji_for_branch(liege)
 			house.loyalty = rng.randf_range(0.55, 0.9)
 			house.dynasty_seat_settlement_id = liege.dynasty_seat_settlement_id
 			house.leadership_title = "家長"
@@ -217,14 +222,17 @@ static func _create_retainers(nobles: Array[Organization]) -> void:
 			house.description = named["description"]
 
 			var surname := HouseNaming.surname_of_name(house.display_name)
+			# The house is not in the record yet while its first people are, so
+			# their full names are written out here with the 氏 they will carry.
+			var uji := HouseNaming.uji_label(house.uji_id)
 			var head := _make_founder(surname, "m", rng.randi_range(30, 42), house.org_id, rng)
 			var consort := _make_founder(surname, "f", rng.randi_range(28, 39), house.org_id, rng)
-			_record_founder_birth(head)
-			_record_founder_birth(consort)
+			_record_founder_birth(head, uji)
+			_record_founder_birth(consort, uji)
 			HistoryLog.emit_event(
 				HistoryEvent.EventType.MARRIAGE,
 				-4,
-				"%sと%sが婚姻を結んだ。" % [head.full_name, consort.full_name],
+				"%s%sと%s%sが婚姻を結んだ。" % [uji, head.short_name, uji, consort.short_name],
 				{}, &"", &"", &"",
 				[head.person_id, consort.person_id] as Array[StringName])
 			# Two children rather than one: a three-person household whose only
@@ -236,7 +244,7 @@ static func _create_retainers(nobles: Array[Organization]) -> void:
 				child.is_founder_generation = false
 				child.father_id = head.person_id
 				child.mother_id = consort.person_id
-				_record_founder_birth(child)
+				_record_founder_birth(child, uji)
 
 			house.leader_person_id = head.person_id
 			HouseCharacter.assign_at_founding(house, rng)
@@ -244,7 +252,7 @@ static func _create_retainers(nobles: Array[Organization]) -> void:
 			HistoryLog.emit_event(
 				HistoryEvent.EventType.FOUNDING,
 				0,
-				"%sは%sに仕える家として立った。" % [house.display_name, liege.display_name],
+				"%sは%sに仕える家として立った。" % [house.formal_name(), liege.formal_name()],
 				{"organization": house.to_dict()},
 				house.org_id, head.person_id)
 
@@ -273,7 +281,7 @@ static func _create_polity(houses: Array[Organization]) -> StringName:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.FOUNDING,
 		0,
-		"%sのもと、諸家が%sとしてひとつに束ねられた。" % [seat_house.display_name, polity.display_name],
+		"%sのもと、諸家が%sとしてひとつに束ねられた。" % [seat_house.formal_name(), polity.formal_name()],
 		{"organization": polity.to_dict()},
 		polity.org_id, polity.leader_person_id)
 	return polity.org_id
@@ -368,10 +376,10 @@ static func _make_founder(surname: String, sex: String, age_years: int,
 	return p
 
 
-static func _record_founder_birth(p: NotableIndividual) -> void:
+static func _record_founder_birth(p: NotableIndividual, uji := "") -> void:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.BIRTH,
 		p.birth_tick,
-		"%sが生まれた。" % p.full_name,
+		"%s%sが生まれた。" % [uji, p.short_name],
 		{"person": p.to_dict()},
 		&"", p.person_id)

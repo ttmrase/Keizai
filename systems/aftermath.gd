@@ -182,7 +182,7 @@ static func _shelter(person: NotableIndividual, from_house: Organization,
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
 		"%sは%sに引き取られ、その名を名乗ることとなった。"
-			% [person.full_name, best.display_name],
+			% [person.full_name, best.formal_name()],
 		{"shelter": true, "person_fate": String(TAKEN_IN)},
 		best.org_id,
 		person.person_id,
@@ -224,7 +224,7 @@ static func settle_deposed(ruler: NotableIndividual, polity: Organization,
 			HistoryEvent.EventType.POWER_TRANSFER,
 			tick,
 			"%sは%sの座を退き、%sに戻った。"
-				% [ruler.full_name, polity.display_name, house.display_name],
+				% [ruler.full_name, polity.formal_name(), house.formal_name()],
 			{"deposed_home": true, "person_fate": String(RETIRED_HOME)},
 			house.org_id,
 			ruler.person_id,
@@ -259,8 +259,8 @@ static func settle_masterless(house: Organization, tick: int) -> StringName:
 			HistoryEvent.EventType.POWER_TRANSFER,
 			tick,
 			"%sを頂く家は絶えた。%sは%sの下に移り、その家中に加わった。" % [
-				liege.display_name if liege != null else "旧主",
-				house.display_name, successor.display_name],
+				liege.formal_name() if liege != null else "旧主",
+				house.formal_name(), successor.formal_name()],
 			{"changed_liege": true, "to_house_id": String(successor.org_id),
 				"house_fate": String(CHANGED_LIEGE)},
 			house.org_id,
@@ -275,7 +275,7 @@ static func settle_masterless(house: Organization, tick: int) -> StringName:
 	HistoryLog.emit_event(
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
-		"仕えるべき家はどこにもなく、%sは士分を退いて民の列に戻った。" % house.display_name,
+		"仕えるべき家はどこにもなく、%sは士分を退いて民の列に戻った。" % house.formal_name(),
 		{"lost_standing": true, "house_fate": String(MASTERLESS)},
 		house.org_id,
 		house.leader_person_id,
@@ -369,4 +369,4 @@ static func _take_the_household(person: NotableIndividual, into: Organization) -
 
 static func _house_name(house_org_id: StringName) -> String:
 	var house := GameState.get_organization(house_org_id)
-	return house.display_name if house != null else "他家"
+	return house.formal_name() if house != null else "他家"

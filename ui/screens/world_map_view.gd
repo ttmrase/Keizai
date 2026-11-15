@@ -425,7 +425,7 @@ func _legend_entries() -> Array:
 			var org := GameState.get_organization(key)
 			if org == null:
 				continue
-			label = org.display_name
+			label = org.formal_name()
 			colour = Heraldry.of_org(org)
 		var entry := {"label": "%s　%d" % [label, counts[key]], "colour": colour,
 			"n": counts[key]}
@@ -785,14 +785,14 @@ func _show_detail(id: StringName) -> void:
 			% [lord.get("title", "領主"),
 				person.full_name if person != null else "空位",
 				Heraldry.of_org(lord["house"]).to_html(false),
-				lord["house"].display_name])
+				lord["house"].formal_name()])
 	lines.append("[color=#9a9080]属する国[/color]  %s"
-		% (holder.display_name if holder != null else "なし"))
+		% (holder.formal_name() if holder != null else "なし"))
 	# A region is not only governed, it leans. Its trade and the family holding it
 	# put it behind some faction in the capital, which is how land counts there.
 	var lean := GameState.get_organization(s.faction_lean_id)
 	lines.append("[color=#9a9080]この地の声[/color]  %s"
-		% (lean.display_name if lean != null else "定まらず"))
+		% (lean.formal_name() if lean != null else "定まらず"))
 	var faith := GameState.get_organization(s.religion_id)
 	lines.append("[color=#9a9080]信仰[/color]  %s"
 		% ("[color=#%s]%s[/color]" % [Heraldry.of_org(faith).to_html(false), faith.display_name]

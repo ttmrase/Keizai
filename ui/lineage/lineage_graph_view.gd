@@ -930,8 +930,18 @@ func _draw_node(id: StringName) -> void:
 			rect.position + Vector2(pad + shield * 0.42, rect.size.y * 0.5), shield, faded)
 		pad += shield * 0.95
 
-	draw_string(font, rect.position + Vector2(pad, 24.0 * view_zoom), source.label(id),
-		HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - pad * 2.0 - CHEVRON_WIDTH * view_zoom,
+	# The 氏 goes first, small and muted, so the name itself keeps its size.
+	var name_x := pad
+	var heading: String = source.overline(id)
+	if not heading.is_empty():
+		var heading_size := maxi(8, int(14 * view_zoom))
+		draw_string(font, rect.position + Vector2(name_x, 24.0 * view_zoom), heading,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, heading_size,
+			Palette.TEXT_DIM if faded else Palette.ACCENT_SOFT)
+		name_x += font.get_string_size(heading, HORIZONTAL_ALIGNMENT_LEFT, -1, heading_size).x \
+			+ 4.0 * view_zoom
+	draw_string(font, rect.position + Vector2(name_x, 24.0 * view_zoom), source.label(id),
+		HORIZONTAL_ALIGNMENT_LEFT, maxf(8.0, rect.size.x - name_x - pad - CHEVRON_WIDTH * view_zoom),
 		name_size, Palette.TEXT_DIM if faded else Palette.TEXT)
 	draw_string(font, rect.position + Vector2(pad, 46.0 * view_zoom), source.sublabel(id),
 		HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - pad * 2.0, sub_size, Palette.TEXT_MUTED)

@@ -35,6 +35,8 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 	branch.character_id = parent.character_id
 	branch.faith_id = parent.faith_id
 	if parent.kind == Organization.OrgKind.HOUSE:
+		# A family carries the 氏 of the house it came out of, for good.
+		branch.uji_id = HouseNaming.uji_for_branch(parent)
 		branch.standing = parent.standing
 		branch.liege_house_id = parent.liege_house_id
 		branch.loyalty = parent.loyalty
@@ -108,8 +110,9 @@ static func create_branch(parent: Organization, rule: TriggerRule, tick: int,
 	var text := rule.chronicle_template
 	if text.is_empty():
 		text = "{parent}から{branch}が分かれ出た。"
-	text = text.replace("{parent}", parent.display_name) \
-		.replace("{branch}", branch.display_name) \
+	text = text.replace("{parent}", parent.formal_name()) \
+		.replace("{branch}", HouseNaming.house_label(branch) if branch.kind == Organization.OrgKind.HOUSE \
+			else branch.display_name) \
 		.replace("{leader}", leader.full_name) \
 		.replace("{reason}", reason)
 

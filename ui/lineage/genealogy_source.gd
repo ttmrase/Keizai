@@ -108,9 +108,15 @@ func spouses(id: StringName) -> Array[StringName]:
 	return out
 
 
+## The card carries the name without its 氏, and the 氏 as a small heading in
+## front of it: the whole of "ネシ氏コド・名" in one size does not fit a card.
 func label(id: StringName) -> String:
 	var p := GameState.get_person(id)
-	return p.full_name if p != null else String(id)
+	return p.short_name if p != null else String(id)
+
+
+func overline(id: StringName) -> String:
+	return HouseNaming.person_uji_line(GameState.get_person(id))
 
 
 func sublabel(id: StringName) -> String:
@@ -126,7 +132,7 @@ func sublabel(id: StringName) -> String:
 	if tenure != null:
 		var org := GameState.get_organization(tenure.org_id)
 		if org != null:
-			return "%s・%s%s" % [span, org.display_name, tenure.title]
+			return "%s・%s%s" % [span, org.formal_name(), tenure.title]
 	return span
 
 
@@ -199,7 +205,7 @@ func detail(id: StringName) -> String:
 				continue
 			var years := "%d年〜%s" % [int(t.start_tick / SimConfig.TICKS_PER_YEAR),
 				"現在" if t.is_current() else "%d年" % int(t.end_tick / SimConfig.TICKS_PER_YEAR)]
-			roles.append("%s%s（%s）" % [org.display_name, t.title, years])
+			roles.append("%s%s（%s）" % [org.formal_name(), t.title, years])
 		lines.append("[color=#9a9080]履歴[/color]  %s" % "\n　　　".join(roles))
 
 	if not p.personality_tags.is_empty():
@@ -216,7 +222,7 @@ func detail(id: StringName) -> String:
 		for org_id in p.deposed_from:
 			var seat := GameState.get_organization(org_id)
 			if seat != null:
-				lost.append(seat.display_name)
+				lost.append(seat.formal_name())
 		if not lost.is_empty():
 			lines.append("[color=#c85a4a]追われた座[/color]  %s" % "、".join(lost))
 	# What became of them after the house around them fell. The chronicle said it
@@ -234,7 +240,7 @@ func detail(id: StringName) -> String:
 		var born := GameState.get_organization(p.birth_house_org_id)
 		if home != null and not HouseNaming.is_of_the_blood(p, home):
 			lines.append("[color=#9a9080]家との関係[/color]  %sへ入った身（血筋は%s）" % [
-				home.display_name, born.display_name if born != null else "他家"])
+				home.formal_name(), born.formal_name() if born != null else "他家"])
 
 	var founder := GenealogyValidator.founder_of(id)
 	if founder != null and founder.person_id != id:

@@ -110,7 +110,7 @@ static func _raise_holders_for_unheld_land(retainers: Array[Organization], tick:
 			HistoryEvent.EventType.POWER_TRANSFER,
 			tick,
 			"%sを頂く家は絶えた。仕えていた%sが跡を継ぎ、貴族の列に加わった。"
-				% [settlement.display_name, claimant.display_name],
+				% [settlement.display_name, claimant.formal_name()],
 			{
 				"house_rising": true,
 				"seized_settlement": String(settlement.id),
@@ -153,7 +153,7 @@ static func _keep_a_nobility(tick: int) -> void:
 		HistoryLog.emit_event(
 			HistoryEvent.EventType.POWER_TRANSFER,
 			tick,
-			"諸家は数を減らしすぎた。%sが引き上げられ、貴族の列に加えられた。" % risen.display_name,
+			"諸家は数を減らしすぎた。%sが引き上げられ、貴族の列に加えられた。" % risen.formal_name(),
 			{"house_rising": true, "reason": "thin_nobility", "legitimacy_cost": 0.0},
 			risen.org_id,
 			risen.leader_person_id,
@@ -257,10 +257,10 @@ static func _try_revolt(house: Organization, tick: int) -> bool:
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
 		"%sは%sへの忠義を捨て、%sを実力で奪った。%s"
-			% [house.display_name, liege.display_name,
+			% [house.formal_name(), liege.formal_name(),
 				settlement.display_name if settlement != null else "その領",
 				"領を失った%sは家格を落とし、いまや%sの家中に列なる。"
-					% [liege.display_name, house.display_name] if ruined else ""],
+					% [liege.formal_name(), house.formal_name()] if ruined else ""],
 		{
 			"house_rising": true,
 			"seized_settlement": String(seized),
@@ -342,7 +342,7 @@ static func _try_inheritance(house: Organization, descent: Dictionary, tick: int
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
 		"%sの血はすでに%sのものだった。家督は争いもなく移り、%sが貴族の座に就いた。"
-			% [liege.display_name, house.display_name, house.display_name],
+			% [liege.formal_name(), house.formal_name(), house.formal_name()],
 		{
 			"house_rising": true,
 			"from_house_id": String(liege.org_id),
@@ -375,9 +375,9 @@ static func reward_and_punish(winner_house: Organization, tick: int) -> void:
 		HistoryEvent.EventType.POWER_TRANSFER,
 		tick,
 		"%sは%sから%sを取り上げて位を落とし、腹心の%sを貴族に列した。"
-			% [winner_house.display_name, rival.display_name,
+			% [winner_house.formal_name(), rival.formal_name(),
 				settlement.display_name if settlement != null else "その領",
-				favourite.display_name],
+				favourite.formal_name()],
 		{
 			"house_rising": true,
 			"seized_settlement": String(taken),

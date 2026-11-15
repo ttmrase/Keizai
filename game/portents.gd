@@ -131,7 +131,7 @@ static func _thin_blood(out: Array[Dictionary]) -> void:
 			return a.member_count < b.member_count
 		return a.power_score > b.power_score)
 	for house in frail.slice(0, 2):
-		out.append(_item("兆し", "%sの血を継ぐ者は、あと%d人" % [house.display_name, house.member_count],
+		out.append(_item("兆し", "%sの血を継ぐ者は、あと%d人" % [house.formal_name(), house.member_count],
 			"子が生まれなければ、この家は絶える",
 			&"candle", Palette.HOUSE, 0.5 if house.member_count <= 1 else 0.34, "lineage",
 			house.org_id))

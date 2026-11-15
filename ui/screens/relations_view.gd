@@ -313,8 +313,8 @@ func _draw_house(house: Organization, font: Font) -> void:
 			Palette.TEXT, 2.0)
 
 	var size := maxi(11, int((16 if noble else 12) * _canvas.view_zoom))
-	var label := "%s　%s" % [house.display_name, HouseRank.title_of_house(house)] if noble \
-		else house.display_name
+	var label := "%s　%s" % [house.formal_name(), HouseRank.title_of_house(house)] if noble \
+		else house.formal_name()
 	var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	_canvas.draw_string(font, centre + Vector2(-width * 0.5, radius + 20.0 * _canvas.view_zoom),
 		label, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
@@ -371,6 +371,9 @@ func _show_detail(id: StringName) -> void:
 		HouseRank.title_of_house(house), HouseCharacter.label(house.character_id)])
 	lines.append("[color=#9a9080]当主[/color]  %s"
 		% (head.full_name if head != null else "不在"))
+	var uji := OrganizationLineageSource.uji_lines(house)
+	if not uji.is_empty():
+		lines.append(uji)
 
 	# Why this family exists at all, for every family that was not simply always
 	# here. The founding houses came out of nothing and have nothing to say.
@@ -386,7 +389,7 @@ func _show_detail(id: StringName) -> void:
 		var seats: Array[String] = []
 		for seat in offices:
 			var held: Organization = seat["org"]
-			seats.append("%s%s" % [held.display_name, seat["title"]])
+			seats.append("%s%s" % [held.formal_name(), seat["title"]])
 		lines.append("[color=#9a9080]現任の役[/color]  %s" % "、".join(seats))
 
 	var honour := Honours.honour_label(house)
@@ -408,7 +411,7 @@ func _show_detail(id: StringName) -> void:
 	if house.standing == Organization.Standing.RETAINER:
 		var liege := GameState.get_organization(house.liege_house_id)
 		lines.append("[color=#9a9080]仕える先[/color]  %s（%s・忠誠%d%%）" % [
-			liege.display_name if liege != null else "なし",
+			liege.formal_name() if liege != null else "なし",
 			Retainers.describe_loyalty(house.loyalty), int(house.loyalty * 100.0)])
 	else:
 		var served := Retainers.retainers_of(id)
@@ -417,7 +420,7 @@ func _show_detail(id: StringName) -> void:
 		else:
 			var parts: Array[String] = []
 			for r in served:
-				parts.append("%s（%s %d%%）" % [r.display_name,
+				parts.append("%s（%s %d%%）" % [r.formal_name(),
 					Retainers.describe_loyalty(r.loyalty), int(r.loyalty * 100.0)])
 			lines.append("[color=#9a9080]側近家[/color]  %s" % "、".join(parts))
 
@@ -428,10 +431,10 @@ func _show_detail(id: StringName) -> void:
 			var value := HouseRelations.relation(id, other.org_id)
 			if absf(value) < RELATION_FLOOR:
 				continue
-			standings.append("%s:%s" % [other.display_name, HouseRelations.describe(value)])
+			standings.append("%s:%s" % [other.formal_name(), HouseRelations.describe(value)])
 		if not standings.is_empty():
 			lines.append("[color=#9a9080]他家との関係[/color]  %s" % "　".join(standings))
 
-	_detail_title.text = house.display_name
+	_detail_title.text = house.formal_name()
 	_detail_body.text = "\n".join(lines)
 	_detail.visible = true
