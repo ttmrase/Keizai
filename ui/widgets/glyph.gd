@@ -195,6 +195,27 @@ static func draw(ci: CanvasItem, glyph: StringName, centre: Vector2, size: float
 				Vector2(0.45, -0.1), Vector2(0.2, 0.12), Vector2(0.28, 0.45),
 				Vector2(0, 0.27), Vector2(-0.28, 0.45), Vector2(-0.2, 0.12),
 				Vector2(-0.45, -0.1), Vector2(-0.13, -0.13)], colour)
+		&"swords":
+			# Two blades crossed: war.
+			for flip: float in [1.0, -1.0]:
+				_fill(ci, centre, r, [Vector2(-0.78 * flip, -0.92), Vector2(-0.62 * flip, -0.92),
+					Vector2(0.55 * flip, 0.28), Vector2(0.43 * flip, 0.4)], colour)
+				_line(ci, centre, r, Vector2(0.28 * flip, 0.48), Vector2(0.66 * flip, 0.1),
+					colour, w * 1.1)
+				_line(ci, centre, r, Vector2(0.55 * flip, 0.42), Vector2(0.8 * flip, 0.7),
+					colour, w * 1.3)
+				ci.draw_circle(_p(centre, r, Vector2(0.86 * flip, 0.78)), r * 0.1, colour)
+		&"laurel":
+			# A wreath open at the top: a name the histories keep.
+			for flip: float in [1.0, -1.0]:
+				ci.draw_arc(centre + Vector2(0, 0.05) * r, r * 0.72,
+					PI * 0.5 - flip * 0.15, PI * 0.5 + flip * 2.3, 14, colour, w * 0.8)
+				for i in 5:
+					var angle := PI * 0.5 + flip * (0.35 + 0.42 * i)
+					var at := Vector2(cos(angle), sin(angle)) * 0.72 + Vector2(0, 0.05)
+					var out := at + Vector2(cos(angle + flip * 1.2), sin(angle + flip * 1.2)) * 0.32
+					_leaf(ci, centre, r, at, out, colour)
+			ci.draw_circle(centre + Vector2(0, -0.05) * r, r * 0.16, colour)
 		_:
 			ci.draw_circle(centre, r * 0.5, colour)
 

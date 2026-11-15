@@ -165,6 +165,8 @@ static func classify(e: HistoryEvent) -> Dictionary:
 			var kind := String(e.payload.get("schism_kind", ""))
 			if kind == "refounding":
 				return _item(e, Weight.MAJOR, "国の興亡", Palette.POLITY, &"crown", "lineage")
+			if kind == "civil_war":
+				return _item(e, Weight.MAJOR, "国が割れた", Palette.DANGER, &"split", "incidents")
 			var org := GameState.get_organization(e.subject_org_id)
 			if org == null:
 				return none
@@ -176,7 +178,36 @@ static func classify(e: HistoryEvent) -> Dictionary:
 			if org.kind == Organization.OrgKind.RELIGION:
 				return _item(e, Weight.NOTABLE, "新たな信仰", Palette.RELIGION, &"altar", "lineage")
 			return _item(e, Weight.NOTABLE, "分派", Palette.ACCENT, &"tree", "lineage")
+		HistoryEvent.EventType.CONFLICT_DECLARED:
+			if e.payload.has("war"):
+				var renewal: bool = String(e.payload["war"].get("cause", "")) == "renewal"
+				return _item(e, Weight.MAJOR, "再戦" if renewal else "開戦", Palette.DANGER,
+					&"swords", "incidents")
+		HistoryEvent.EventType.CONFLICT_RESOLVED:
+			if e.payload.has("war_id"):
+				var item := _item(e, Weight.MAJOR,
+					CivilWar.outcome_label(String(e.payload.get("outcome", ""))),
+					Palette.ACCENT, &"swords", "incidents")
+				var lines: Array = e.payload.get("aftermath", [])
+				if not lines.is_empty():
+					var listed: Array[String] = []
+					for line in lines:
+						listed.append("・" + String(line))
+					item["text"] = "%s\n%s" % [e.description, "\n".join(listed)]
+				return item
+		HistoryEvent.EventType.DEATH:
+			if bool(e.payload.get("killed_in_battle", false)):
+				return _item(e, Weight.NOTABLE, "討死", Palette.DANGER, &"swords", "incidents")
+			if bool(e.payload.get("executed", false)):
+				return _item(e, Weight.NOTABLE, "処刑", Palette.DANGER, &"swords", "incidents")
 		HistoryEvent.EventType.POWER_TRANSFER:
+			if e.payload.has("war_id"):
+				# The aftermath of a war is listed on the banner that ends it.
+				if e.payload.has("battle"):
+					return _item(e, Weight.NOTABLE, "合戦", Palette.DANGER, &"swords", "incidents")
+				if e.payload.has("defector_house_id"):
+					return _item(e, Weight.NOTABLE, "寝返り", Palette.HOUSE, &"banner", "incidents")
+				return none
 			if bool(e.payload.get("regime_change", false)):
 				return _item(e, Weight.MAJOR, "政変", Palette.POLITY, &"crown", "power")
 			if bool(e.payload.get("house_rising", false)):

@@ -68,6 +68,16 @@ const ALL := [
 		"text": "事件も政変も国の興亡もない百年が続く"},
 	{"id": "many_worlds", "title": "幾つもの世界", "glyph": &"map",
 		"text": "三つ目の世界を興す"},
+	{"id": "civil_war", "title": "内戦", "glyph": &"swords",
+		"text": "体制の交代に国の半ばが従わず、国が割れて戦になる"},
+	{"id": "restoration", "title": "復古", "glyph": &"crown",
+		"text": "内戦で旧き秩序が勝ち、国を取り戻す"},
+	{"id": "revolution", "title": "革命の成就", "glyph": &"banner",
+		"text": "内戦で新しき秩序が勝ち、旧体制を滅ぼす"},
+	{"id": "partition", "title": "分裂", "glyph": &"split",
+		"text": "戦が講和に終わり、国が二つのまま残る"},
+	{"id": "reunification", "title": "再統一", "glyph": &"keep",
+		"text": "分かれた国が戦の末にふたたび一つになる"},
 ]
 
 ## What a god is called, by how much it has witnessed. A name and nothing more:

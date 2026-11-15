@@ -110,6 +110,17 @@ func _refresh() -> void:
 	_realm.text = "%s　・　人口 %s" % [
 		form.display_name if form != null else (realm.display_name if realm != null else "国なき世"),
 		_compact(w.global_population)]
+	# A country at war says so before anything else; a divided one at peace says
+	# how many states it has become.
+	var polities := GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM).size()
+	if not CivilWar.wars().is_empty():
+		var war: WarState = CivilWar.wars()[0]
+		_realm.text = "交戦中 %d年目　・　%s" % [war.years(SimClock.current_tick) + 1, _realm.text]
+		_realm.add_theme_color_override("font_color", Palette.DANGER.lightened(0.25))
+	else:
+		if polities > 1:
+			_realm.text = "%d国分立　・　%s" % [polities, _realm.text]
+		_realm.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 
 	_set_gauge(0, "魔物", &"claw", w.global_monster_threat_level,
 		Palette.severity(w.global_monster_threat_level))

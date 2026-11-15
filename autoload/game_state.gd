@@ -197,6 +197,10 @@ func apply(e: HistoryEvent) -> void:
 			_apply_disaster(e)
 		HistoryEvent.EventType.DISSOLVED:
 			_apply_dissolution(e)
+		HistoryEvent.EventType.CONFLICT_DECLARED:
+			_apply_war_declared(e)
+		HistoryEvent.EventType.CONFLICT_RESOLVED:
+			_apply_war_resolved(e)
 		_:
 			# IDEOLOGY_SHIFT, CONFLICT_*, RESOURCE_SHOCK and EPOCH_SUMMARY are
 			# chronicle markers for values their owning system already changed.
@@ -353,6 +357,9 @@ func _apply_power_transfer(e: HistoryEvent) -> void:
 	var settlement_id := StringName(e.payload.get("settlement_id", ""))
 	if to_org == null:
 		return
+	if e.payload.has("war_id"):
+		_apply_war_transfer(to_org, e)
+		return
 	if bool(e.payload.get("regime_change", false)):
 		_apply_regime_change(to_org, e)
 		return
@@ -480,8 +487,13 @@ func _apply_dissolution(e: HistoryEvent) -> void:
 				and not leader.deposed_from.has(org.org_id):
 			leader.deposed_from.append(org.org_id)
 	org.leader_person_id = &""
-	# Whatever it still held reverts to the parent it broke away from.
+	# Whatever it still held reverts to the parent it broke away from — or, if
+	# that state is gone too, to whoever it names as its successor, the nearest
+	# living state it descends from, or failing all of those the largest state
+	# there is. A region is never left belonging to a state that has ended.
 	var parent: Organization = organizations.get(org.parent_org_id)
+	if org.kind == Organization.OrgKind.POLITICAL_SYSTEM and not org.governs_settlement_ids.is_empty():
+		parent = _heir_state_for(org, StringName(e.payload.get("succeeded_by", "")))
 	if parent != null and parent.is_active():
 		for settlement_id in org.governs_settlement_ids:
 			if not parent.governs_settlement_ids.has(settlement_id):
@@ -490,6 +502,117 @@ func _apply_dissolution(e: HistoryEvent) -> void:
 			if s != null:
 				s.controlling_org_id = parent.org_id
 	org.governs_settlement_ids.clear()
+
+
+func _heir_state_for(org: Organization, named: StringName) -> Organization:
+	var heir: Organization = organizations.get(named)
+	if heir != null and heir.is_active() and heir.org_id != org.org_id:
+		return heir
+	var walk: Organization = organizations.get(org.parent_org_id)
+	var guard := 0
+	while walk != null and guard < 64:
+		if walk.is_active():
+			return walk
+		walk = organizations.get(walk.parent_org_id)
+		guard += 1
+	var best: Organization = null
+	for id in organizations:
+		var o: Organization = organizations[id]
+		if o.kind != Organization.OrgKind.POLITICAL_SYSTEM or not o.is_active() or o.org_id == org.org_id:
+			continue
+		if best == null or o.governs_settlement_ids.size() > best.governs_settlement_ids.size() \
+				or (o.governs_settlement_ids.size() == best.governs_settlement_ids.size()
+					and String(o.org_id) < String(best.org_id)):
+			best = o
+	return best
+
+
+# ------------------------------------------------------------------- war
+
+## A country splits and the two halves go to war. The war is a fact like a
+## founding: it exists from this event until the one that ends it.
+func _apply_war_declared(e: HistoryEvent) -> void:
+	var data: Dictionary = e.payload.get("war", {})
+	if data.is_empty():
+		return    # an older kind of quarrel, settled in the same breath
+	var war := WarState.from_dict(data)
+	war.war_id = e.event_id
+	war.start_tick = e.tick
+	world.wars.append(war)
+
+
+func _apply_war_resolved(e: HistoryEvent) -> void:
+	var war_id := StringName(e.payload.get("war_id", ""))
+	if war_id == &"":
+		return
+	var still: Array[WarState] = []
+	for war in world.wars:
+		if war.war_id != war_id:
+			still.append(war)
+	world.wars = still
+
+
+func war_by_id(war_id: StringName) -> WarState:
+	for war in world.wars:
+		if war.war_id == war_id:
+			return war
+	return null
+
+
+## Everything a war moves: regions changing sides after a battle or because the
+## family holding them went over, and — once it is over — land taken from the
+## families who lost it and given to the ones who won.
+func _apply_war_transfer(to_org: Organization, e: HistoryEvent) -> void:
+	var war := war_by_id(StringName(e.payload.get("war_id", "")))
+	var ids: Array = e.payload.get("settlement_ids", [])
+
+	if bool(e.payload.get("estate", false)):
+		# Land within a country, from one family to another.
+		var source: Organization = organizations.get(StringName(e.payload.get("from_house_id", "")))
+		for raw_id in ids:
+			var settlement_id := StringName(raw_id)
+			var s: SettlementState = world.settlements.get(settlement_id)
+			if s != null:
+				s.ruling_house_id = to_org.org_id
+			if source != null:
+				source.held_settlement_ids.erase(settlement_id)
+			if not to_org.held_settlement_ids.has(settlement_id):
+				to_org.held_settlement_ids.append(settlement_id)
+		if source != null and bool(e.payload.get("demote_source", false)) \
+				and source.held_settlement_ids.is_empty():
+			# Attainted: no land left, and placed in the service of a victor.
+			source.standing = Organization.Standing.RETAINER
+			source.liege_house_id = to_org.org_id
+			source.loyalty = 0.25
+			source.rank_tier = 0
+			source.favour = 0.0
+		return
+
+	# Regions changing which state they answer to.
+	for raw_id in ids:
+		var settlement_id := StringName(raw_id)
+		var s: SettlementState = world.settlements.get(settlement_id)
+		if s == null:
+			continue
+		var previous: Organization = organizations.get(s.controlling_org_id)
+		if previous != null:
+			previous.governs_settlement_ids.erase(settlement_id)
+		s.controlling_org_id = to_org.org_id
+		if not to_org.governs_settlement_ids.has(settlement_id):
+			to_org.governs_settlement_ids.append(settlement_id)
+	if war == null:
+		return
+	if e.payload.has("battle"):
+		var fought: Dictionary = e.payload["battle"]
+		war.battles.append({
+			"tick": e.tick,
+			"settlement_id": String(fought.get("settlement_id", "")),
+			"winner": String(fought.get("winner", "")),
+			"taken": bool(fought.get("taken", false)),
+		})
+	var defector := StringName(e.payload.get("defector_house_id", ""))
+	if defector != &"" and not war.defectors.has(defector):
+		war.defectors.append(defector)
 
 
 func _apply_disaster(e: HistoryEvent) -> void:

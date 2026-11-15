@@ -18,6 +18,7 @@ const MAX_MOMENTS := 6
 const TITLES := {
 	"dawn": ["建国の時代", "始まりの半世紀"],
 	"fall": ["興亡の時代", "国が改まる時代", "王冠の落ちる半世紀"],
+	"war": ["戦乱の時代", "国割れの半世紀", "内戦の時代", "二つの旗の時代"],
 	"turmoil": ["大乱の時代", "動乱の半世紀", "剣と叛旗の時代"],
 	"division": ["分かれゆく時代", "枝分かれの半世紀", "家々の分かれる時代", "新しき家々の時代"],
 	"faith": ["信仰の時代", "神々の目覚め", "祈りの分かれ目"],
@@ -117,6 +118,9 @@ static func _empty_tally(index: int) -> Dictionary:
 		"extinctions": [],
 		"calamities": {},
 		"blessings": {},
+		"wars": [],
+		"war_ends": [],
+		"battles": 0,
 		"births": 0,
 		"deaths": 0,
 		"moments": [],
@@ -134,7 +138,19 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 			t["incidents"].append([Incidents.label_of(StringName(e.payload.get("incident_kind", ""))),
 				int(e.tick / SimConfig.TICKS_PER_YEAR)])
 			moment = true
+		HistoryEvent.EventType.CONFLICT_DECLARED:
+			if e.payload.has("war"):
+				t["wars"].append([String(e.payload["war"].get("cause", "split")),
+					int(e.tick / SimConfig.TICKS_PER_YEAR)])
+				moment = true
+		HistoryEvent.EventType.CONFLICT_RESOLVED:
+			if e.payload.has("war_id"):
+				t["war_ends"].append([String(e.payload.get("outcome", "")),
+					int(e.tick / SimConfig.TICKS_PER_YEAR), int(e.payload.get("years", 0))])
+				moment = true
 		HistoryEvent.EventType.POWER_TRANSFER:
+			if e.payload.has("battle"):
+				t["battles"] += 1
 			if bool(e.payload.get("regime_change", false)):
 				t["regimes"] += 1
 				moment = true
@@ -148,6 +164,8 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 				"revelation":
 					t["faiths"].append(name)
 					moment = true
+				"civil_war":
+					pass    # told by the war it began
 				_:
 					var org := GameState.get_organization(e.subject_org_id)
 					if org != null and org.is_noble():
@@ -215,6 +233,7 @@ static func _theme(t: Dictionary) -> String:
 		bounty += int(t["blessings"][id])
 
 	var scores := {
+		"war": t["wars"].size() * 8 + t["war_ends"].size() * 5 + int(t["battles"]),
 		"fall": t["refoundings"].size() * 6,
 		"turmoil": t["incidents"].size() * 3 + int(t["regimes"]) * 3,
 		"division": t["house_branches"].size() + t["other_branches"].size(),
@@ -227,7 +246,7 @@ static func _theme(t: Dictionary) -> String:
 	# is the more interesting half of the story.
 	var best := "peace"
 	var best_score := 1
-	for key in ["fall", "turmoil", "faith", "calamity", "division", "decline", "bounty"]:
+	for key in ["war", "fall", "turmoil", "faith", "calamity", "division", "decline", "bounty"]:
 		if int(scores[key]) > best_score:
 			best = key
 			best_score = int(scores[key])
@@ -252,6 +271,13 @@ static func _lines(t: Dictionary) -> Array[String]:
 		lines.append("国が倒れ、%sが興った" % "、".join(t["refoundings"]))
 	elif int(t["regimes"]) > 0:
 		lines.append("統治のかたちが%d度覆った" % t["regimes"])
+
+	for entry in t["wars"]:
+		lines.append("%s（%d年）" % ["休戦が破れ、ふたたび戦が起きた" if entry[0] == "renewal"
+			else "国が二つに割れ、内戦が始まった", entry[1]])
+	for entry in t["war_ends"]:
+		lines.append("%d年の戦が%sに終わった（%d年）" % [entry[2],
+			CivilWar.outcome_label(entry[0]), entry[1]])
 
 	if not t["incidents"].is_empty():
 		var parts: Array[String] = []

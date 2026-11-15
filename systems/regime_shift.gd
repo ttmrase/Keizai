@@ -62,6 +62,10 @@ static func _consider(polity: Organization, tick: int) -> void:
 	var claimant := _claimant(polity)
 	var hold: float = claimant.get("hold", 0.0)
 	_erode_legitimacy(polity, hold)
+	# A state at war is not overturned from within while the war lasts: the
+	# war is how its future is being decided.
+	if CivilWar.is_at_war(polity.org_id):
+		return
 
 	var last: int = int(polity.last_fired_tick.get(&"regime_shift", -999999))
 	if tick - last < COOLDOWN_TICKS or claimant.is_empty():
@@ -229,6 +233,12 @@ static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> 
 		for a in PoliticalSystemAxes.AXIS_NAMES:
 			axis_shift[String(a)] = winner.ideology.get_axis(a)
 
+	# Where enough of the country still stands by the old order — or the change
+	# was taken by force — the country does not fall, it divides, and the two
+	# halves go to war. See CivilWar.
+	if CivilWar.try_split(polity, claimant, basis, structure, axis_shift, tick):
+		return
+
 	# Blood keeps the throne only where the new order still runs on blood.
 	var deposed := basis != PoliticalSystemAxes.LegitimacyBasis.HEREDITARY
 	var ruler := GameState.get_person(polity.leader_person_id)
@@ -332,6 +342,9 @@ static func _refound(polity: Organization, winner: Organization, basis: int,
 			"seceded_settlements": Organization._names_to_strings(
 				polity.governs_settlement_ids),
 			"claimant_org_id": String(winner.org_id),
+			# Who led the side that brought the old state down, for the
+			# histories to weigh once they know whether what replaced it lasted.
+			"claimant_leader_id": String(winner.leader_person_id),
 			"founder_married_in": false,
 		},
 		heir.org_id,

@@ -73,6 +73,7 @@ func _run(ticks: int) -> void:
 func _report(world_seed: int, ms: int, ticks: int) -> void:
 	var counts := {}
 	var incidents := {}
+	var wars: Array[String] = []
 	for e in HistoryLog.backbone:
 		match e.event_type:
 			HistoryEvent.EventType.INCIDENT:
@@ -85,9 +86,26 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 			HistoryEvent.EventType.POWER_TRANSFER:
 				if bool(e.payload.get("regime_change", false)):
 					counts["regime_change"] = int(counts.get("regime_change", 0)) + 1
+				if e.payload.has("battle"):
+					counts["battles"] = int(counts.get("battles", 0)) + 1
+				if e.payload.has("defector_house_id"):
+					counts["defections"] = int(counts.get("defections", 0)) + 1
+			HistoryEvent.EventType.CONFLICT_DECLARED:
+				if e.payload.has("war"):
+					var cause := String(e.payload["war"].get("cause", ""))
+					counts["war_" + cause] = int(counts.get("war_" + cause, 0)) + 1
+			HistoryEvent.EventType.CONFLICT_RESOLVED:
+				if e.payload.has("war_id"):
+					var outcome := String(e.payload.get("outcome", ""))
+					counts["end_" + outcome] = int(counts.get("end_" + outcome, 0)) + 1
+					wars.append("  %d年 %s %d年間 戦%d %s" % [int(e.tick / 4), outcome,
+						int(e.payload.get("years", 0)), int(e.payload.get("battles", 0)),
+						" / ".join(e.payload.get("aftermath", []))])
 	print("seed %d: %.3f ms/tick  polities now %d  %s  incidents %s" % [world_seed,
 		float(ms) / float(ticks),
 		GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM).size(),
 		counts, incidents])
-
-
+	for line in wars:
+		print(line)
+	for war in GameState.world.wars:
+		print("  (進行中) %d年〜 front %.2f" % [int(war.start_tick / 4), war.front])

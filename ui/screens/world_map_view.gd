@@ -444,12 +444,49 @@ func _draw_map() -> void:
 	var zoom := _canvas.view_zoom
 	_draw_roads(zoom)
 	_draw_terrain(zoom)
-	var capital := _capital_id()
+	var capitals := _capital_ids()
+	var fields := _battlefields()
 	for id in _order:
 		var s: SettlementState = GameState.world.settlements.get(id)
 		if s != null:
-			_draw_town(s, font, zoom, id == capital)
+			_draw_town(s, font, zoom, capitals.has(id))
+			if fields.has(id):
+				_draw_battlefield(s, zoom, float(fields[id]))
 	_draw_pings(font, zoom)
+
+
+## Every state's seat, not only the largest one's: a divided country has two.
+func _capital_ids() -> Dictionary:
+	var out := {}
+	for realm in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		var seat := CivilWar.capital_of(realm)
+		if seat != null:
+			out[seat.id] = true
+	return out
+
+
+## Where the wars under way have fought lately: settlement id -> how recent, 0..1.
+func _battlefields() -> Dictionary:
+	var out := {}
+	var now := SimClock.current_tick
+	for war in CivilWar.wars():
+		for fought in war.battles:
+			var age := float(now - int(fought["tick"])) / float(SimConfig.TICKS_PER_YEAR * 4)
+			if age < 1.0:
+				var id := StringName(fought["settlement_id"])
+				out[id] = maxf(float(out.get(id, 0.0)), 1.0 - age)
+	return out
+
+
+## Crossed swords over a town that has seen a battle, brighter the more recent.
+func _draw_battlefield(s: SettlementState, zoom: float, fresh: float) -> void:
+	var centre := _canvas.to_screen(s.position * MAP_SIZE)
+	var scale: float = (34.0 + 26.0 * clampf(s.population / 2500.0, 0.0, 1.0)) * zoom
+	var pulse := 0.7 + 0.3 * sin(_clock * 5.0)
+	var at := centre + Vector2(-scale * 0.75, scale * 0.05)
+	_canvas.draw_circle(at, scale * 0.34, Color(0.05, 0.02, 0.02, 0.75 * (0.4 + 0.6 * fresh)))
+	Glyph.draw(_canvas, &"swords", at, scale * 0.5,
+		Color(Palette.DANGER.lightened(0.2), (0.45 + 0.55 * fresh) * pulse))
 
 
 ## Roads to each town's two nearest neighbours: what makes eight dots a country.
@@ -475,8 +512,20 @@ func _draw_roads(zoom: float) -> void:
 				continue
 			drawn[key] = true
 			var o: SettlementState = GameState.world.settlements[other_id]
+			# A road that crosses from one state into another is a border; one that
+			# crosses into a state at war with this one is the front.
+			var colour := road
+			var width := maxf(1.0, 2.2 * zoom)
+			if s.controlling_org_id != o.controlling_org_id:
+				var war := CivilWar.war_of(s.controlling_org_id)
+				if war != null and war.involves(o.controlling_org_id):
+					colour = Color(Palette.DANGER, 0.85)
+					width = maxf(2.0, 4.0 * zoom)
+				else:
+					colour = Color(Palette.POLITY.darkened(0.2), 0.8)
+					width = maxf(1.5, 3.0 * zoom)
 			_dashed(_canvas.to_screen(s.position * MAP_SIZE),
-				_canvas.to_screen(o.position * MAP_SIZE), road, maxf(1.0, 2.2 * zoom),
+				_canvas.to_screen(o.position * MAP_SIZE), colour, width,
 				14.0 * zoom)
 
 
@@ -607,7 +656,17 @@ func _ping_kind(e: HistoryEvent) -> Dictionary:
 			if String(e.payload.get("schism_kind", "")) == "refounding":
 				return {"label": "建国", "colour": Palette.POLITY, "glyph": &"crown", "big": true}
 			return {"label": "分派", "colour": Palette.ACCENT, "glyph": &"tree"}
+		HistoryEvent.EventType.CONFLICT_DECLARED:
+			if e.payload.has("war"):
+				return {"label": "開戦", "colour": Palette.DANGER, "glyph": &"swords", "big": true}
+		HistoryEvent.EventType.CONFLICT_RESOLVED:
+			if e.payload.has("war_id"):
+				return {"label": "終戦", "colour": Palette.ACCENT, "glyph": &"swords", "big": true}
 		HistoryEvent.EventType.POWER_TRANSFER:
+			if e.payload.has("battle"):
+				return {"label": "合戦", "colour": Palette.DANGER, "glyph": &"swords"}
+			if e.payload.has("defector_house_id"):
+				return {"label": "寝返り", "colour": Palette.HOUSE, "glyph": &"banner"}
 			if bool(e.payload.get("regime_change", false)):
 				return {"label": "政変", "colour": Palette.POLITY, "glyph": &"crown", "big": true}
 			if bool(e.payload.get("house_rising", false)):
@@ -647,6 +706,10 @@ func _locate(e: HistoryEvent) -> Vector2:
 		var sid := StringName(e.payload.get(key, ""))
 		if sid != &"" and world.settlements.has(sid):
 			return world.settlements[sid].position
+	if e.payload.get("battle") is Dictionary:
+		var field := StringName(e.payload["battle"].get("settlement_id", ""))
+		if world.settlements.has(field):
+			return world.settlements[field].position
 	if e.event_type == HistoryEvent.EventType.DISASTER_OCCURRED:
 		return Vector2(0.5, 0.5)
 	var org := GameState.get_organization(e.subject_org_id)
@@ -657,7 +720,7 @@ func _locate(e: HistoryEvent) -> Vector2:
 				if seat != null:
 					return seat.position
 			Organization.OrgKind.POLITICAL_SYSTEM:
-				var capital: SettlementState = world.settlements.get(_capital_id())
+				var capital: SettlementState = CivilWar.capital_of(org)
 				if capital != null:
 					return capital.position
 		var head := GameState.get_current_leader(org.org_id)

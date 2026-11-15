@@ -69,6 +69,10 @@ func _applies(rule: TriggerRule, org: Organization) -> bool:
 		return false          # handled by _fill_empty_seats
 	if rule.applies_to_kind != org.kind:
 		return false
+	# A state at war is settled by the war: no splinter, no lost province, no
+	# quarrel on the side while it lasts.
+	if org.kind == Organization.OrgKind.POLITICAL_SYSTEM and CivilWar.is_at_war(org.org_id):
+		return false
 	if not rule.applies_to_archetypes.is_empty() \
 			and not rule.applies_to_archetypes.has(org.archetype_id):
 		return false
@@ -100,7 +104,10 @@ func _fire(rule: TriggerRule, org: Organization, tick: int) -> bool:
 func _shift_power(rule: TriggerRule, org: Organization, tick: int) -> bool:
 	if org.governs_settlement_ids.is_empty():
 		return false
-	var rival := _strongest_rival(org)
+	# A region always belongs to a state. One slipping out of a weakened state's
+	# hands goes to another state, never to a guild or a family.
+	var rival := _strongest_rival(org, Organization.OrgKind.POLITICAL_SYSTEM) \
+		if org.kind == Organization.OrgKind.POLITICAL_SYSTEM else _strongest_rival(org)
 	if rival == null or rival.power_score <= org.power_score:
 		return false
 
@@ -163,10 +170,12 @@ func _declare_conflict(rule: TriggerRule, org: Organization, tick: int) -> bool:
 	return true
 
 
-func _strongest_rival(org: Organization) -> Organization:
+func _strongest_rival(org: Organization, only_kind: int = -1) -> Organization:
 	var best: Organization = null
 	for other in GameState.active_organizations():
 		if other.org_id == org.org_id:
+			continue
+		if only_kind >= 0 and other.kind != only_kind:
 			continue
 		if best == null or other.power_score > best.power_score:
 			best = other

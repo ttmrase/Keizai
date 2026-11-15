@@ -68,7 +68,18 @@ static func _decay(tick: int) -> void:
 ## two depends on what the crown has more of — friends worth confirming, or
 ## enemies worth answering.
 static func _crown_honours(tick: int) -> void:
-	var royal := GameState.get_organization(HouseRank.royal_house_id())
+	# Every crown in the world, each over its own nobility: a country divided
+	# between two kings has two courts, and neither stops granting.
+	var royals := HouseRank.royal_house_ids()
+	var divided := GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM).size() > 1
+	var ids := royals.keys()
+	ids.sort_custom(func(x, y): return String(x) < String(y))
+	for royal_id in ids:
+		_crown_honours_for(GameState.get_organization(royal_id),
+			StringName(royals[royal_id]) if divided else &"", tick)
+
+
+static func _crown_honours_for(royal: Organization, realm_id: StringName, tick: int) -> void:
 	if royal == null:
 		return
 
@@ -78,6 +89,8 @@ static func _crown_honours(tick: int) -> void:
 	var worst := STRIP_RELATION
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if house.org_id == royal.org_id or house.standing != Organization.Standing.NOBLE:
+			continue
+		if realm_id != &"" and CivilWar.realm_of_house(house) != realm_id:
 			continue
 		if tick - int(house.last_fired_tick.get(&"honour", -999999)) < HOUSE_COOLDOWN:
 			continue

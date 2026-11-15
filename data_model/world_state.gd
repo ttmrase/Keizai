@@ -51,6 +51,9 @@ extends Resource
 ## Share of the world held by its single largest faith, 0..1. A country that all
 ## prays the same way is a different country from one that does not.
 @export var faith_concentration: float = 0.0
+## Wars in progress. Opened and closed only through the record (see WarState);
+## how each is going is cached on it.
+@export var wars: Array[WarState] = []
 
 
 func get_settlement(id: StringName) -> SettlementState:
@@ -64,7 +67,11 @@ func to_dict() -> Dictionary:
 	var disasters: Array = []
 	for d in active_disasters:
 		disasters.append(d.to_dict())
+	var fighting: Array = []
+	for w in wars:
+		fighting.append(w.to_dict())
 	return {
+		"wars": fighting,
 		"tick": tick,
 		"seed": seed,
 		"settlements": settle,
@@ -120,4 +127,8 @@ static func from_dict(d: Dictionary) -> WorldState:
 	w.peak_disaster_magnitude = float(d.get("peak_disaster_magnitude", 0.0))
 	w.monster_suppression = float(d.get("monster_suppression", 0.0))
 	w.faith_concentration = float(d.get("faith_concentration", 0.0))
+	var fighting: Array[WarState] = []
+	for entry in d.get("wars", []):
+		fighting.append(WarState.from_dict(entry))
+	w.wars = fighting
 	return w

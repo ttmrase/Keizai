@@ -58,10 +58,10 @@ static func refresh_all(tick: int) -> void:
 	# of precedence, which is not what a crown is. While a family wears it they
 	# hold no county title at all, and the duke's place they vacate goes to
 	# somebody else — one of the things a dynasty actually loses on the way up.
-	var royal := royal_house_id()
+	var royals := royal_house_ids()
 	var houses: Array[Organization] = []
 	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
-		if house.org_id == royal:
+		if royals.has(house.org_id):
 			# Held no title means holds no title. Leaving the old tier standing in
 			# the field while the name reads 王家 puts a third marquess in a
 			# country with room for two, and takes his place out of the quota
@@ -275,7 +275,23 @@ const ROYAL_TITLE := "王家"
 ## blood. A republic's president heads no royal house, however grand his family:
 ## what makes a house royal is a crown that is inherited.
 static func royal_house_id() -> StringName:
-	var realm := dominant_realm()
+	return royal_house_of(dominant_realm())
+
+
+## Every family wearing a hereditary crown. Usually one; two while a divided
+## country has a king on each side of the line, and each of them stands outside
+## the peerage of the whole world, not only of their own half.
+static func royal_house_ids() -> Dictionary:
+	var out := {}
+	for realm in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		var house_id := royal_house_of(realm)
+		if house_id != &"":
+			out[house_id] = realm.org_id
+	return out
+
+
+## The family wearing this realm's crown, if its crown is inherited.
+static func royal_house_of(realm: Organization) -> StringName:
 	if realm == null or realm.ideology == null:
 		return &""
 	if realm.ideology.legitimacy_basis != PoliticalSystemAxes.LegitimacyBasis.HEREDITARY:
@@ -288,7 +304,7 @@ static func royal_house_id() -> StringName:
 
 
 static func is_royal(house: Organization) -> bool:
-	return house != null and house.org_id != &"" and house.org_id == royal_house_id()
+	return house != null and house.org_id != &"" and royal_house_ids().has(house.org_id)
 
 
 ## What a house is called, from the house itself.
@@ -379,3 +395,9 @@ static func dominant_realm() -> Organization:
 		if best == null or p.governs_settlement_ids.size() > best.governs_settlement_ids.size():
 			best = p
 	return best
+
+
+## The realm a family lives under: the one governing its land, or its liege's.
+## With a single state in the world that is always the same answer.
+static func realm_of(house: Organization) -> Organization:
+	return GameState.get_organization(CivilWar.realm_of_house(house))

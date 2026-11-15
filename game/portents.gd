@@ -30,6 +30,7 @@ static func current(tick: int) -> Array[Dictionary]:
 	if GameState.world == null:
 		return out
 	_prophecies(out, tick)
+	_war(out, tick)
 	_ruptures(out)
 	_challenge(out)
 	_old_ruler(out, tick)
@@ -78,6 +79,23 @@ static func _prophecies(out: Array[Dictionary], tick: int) -> void:
 
 # ------------------------------------------------------------ what is building
 
+## A war under way is the most pressing thing in the world, after the god's own
+## words: which side is winning, and how worn out they both are.
+static func _war(out: Array[Dictionary], tick: int) -> void:
+	for war in CivilWar.wars():
+		var a := GameState.get_organization(war.side_a)
+		var b := GameState.get_organization(war.side_b)
+		if a == null or b == null:
+			continue
+		var leading := a if war.front > 0.0 else b
+		var state := "互角" if absf(war.front) < 0.2 else ("%s優勢" % leading.short_name())
+		out.append(_item("戦", "%s 対 %s　%d年目" % [a.short_name(), b.short_name(),
+				war.years(tick) + 1],
+			"戦況：%s　・　疲弊 %d%% ／ %d%%" % [state,
+				int(minf(war.exhaustion_a, 1.0) * 100.0), int(minf(war.exhaustion_b, 1.0) * 100.0)],
+			&"swords", Palette.DANGER, 0.95, "incidents"))
+
+
 static func _ruptures(out: Array[Dictionary]) -> void:
 	for entry in Incidents.pressures():
 		var pressure := float(entry["pressure"])
@@ -98,9 +116,24 @@ static func _challenge(out: Array[Dictionary]) -> void:
 		return
 	var hold := float(challenge.get("hold", 0.0))
 	var challenger: Organization = challenge["org"]
-	out.append(_item("兆し", "%sが体制に迫っている" % challenger.display_name,
+	out.append(_item("兆し", "%sが体制に迫っている" % challenger.formal_name(),
 		"掌握 %d%%　・　いまの体制の正統性 %d%%" % [int(hold * 100.0), int(realm.legitimacy * 100.0)],
 		&"banner", Palette.POLITY, 0.35 + 0.5 * hold, "power", challenger.org_id))
+	# And whether, if it fell, it would fall whole — or half the country would
+	# stand by it and fight.
+	if CivilWar.is_at_war(realm.org_id):
+		return
+	var outlook := CivilWar.split_outlook(realm)
+	if outlook.is_empty():
+		return
+	var share := float(outlook.get("share", 0.0))
+	var needed := float(outlook.get("needed", 1.0))
+	if share >= needed * 0.8 and (outlook["loyal"] as Array).size() >= CivilWar.MIN_SIDE_REGIONS \
+			and (outlook["rebel"] as Array).size() >= CivilWar.MIN_SIDE_REGIONS:
+		out.append(_item("兆し", "国が割れかねない",
+			"体制が倒れれば、%d地方が旧体制に付く（民の%d%%）。割れれば内戦になる" % [
+				(outlook["loyal"] as Array).size(), int(share * 100.0)],
+			&"split", Palette.DANGER, 0.4 + 0.4 * hold, "incidents"))
 
 
 static func _old_ruler(out: Array[Dictionary], tick: int) -> void:
@@ -174,3 +207,4 @@ static func _monsters(out: Array[Dictionary]) -> void:
 	out.append(_item("兆し", "魔物が跋扈している",
 		"武を頼む者が力を増す。討伐の者たちが国を動かしはじめる",
 		&"claw", Palette.DANGER, 0.25 + 0.3 * threat, "power"))
+

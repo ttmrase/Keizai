@@ -368,6 +368,22 @@ func _feats_from_event(e: HistoryEvent) -> void:
 			if bool(e.payload.get("regime_change", false)):
 				last_turmoil_tick = e.tick
 				_unlock("regime")
+		HistoryEvent.EventType.CONFLICT_DECLARED:
+			if e.payload.has("war"):
+				last_turmoil_tick = e.tick
+				if String(e.payload["war"].get("cause", "")) == "split":
+					_unlock("civil_war")
+		HistoryEvent.EventType.CONFLICT_RESOLVED:
+			if e.payload.has("war_id"):
+				match String(e.payload.get("outcome", "")):
+					"restoration":
+						_unlock("restoration")
+					"revolution":
+						_unlock("revolution")
+					"reunification":
+						_unlock("reunification")
+					"peace":
+						_unlock("partition")
 		HistoryEvent.EventType.DISSOLVED:
 			var org := GameState.get_organization(e.subject_org_id)
 			if org != null and org.is_noble():

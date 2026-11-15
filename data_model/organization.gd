@@ -137,6 +137,10 @@ const STANDING_LABELS := {
 ## root per kind): it is the name a family goes by, so that where a house came
 ## from is written on it. See HouseNaming.
 @export var uji_id: StringName = &""
+## GUILD/FACTION/RELIGION: what the last war did to this body — the side it
+## backed won or lost, or a war that swelled it is over. Feeds its power score
+## as one more driver and fades over a couple of generations. Cached.
+@export var fortune: float = 0.0
 
 
 func kind_name() -> String:
@@ -239,6 +243,8 @@ func to_dict() -> Dictionary:
 		d["favour"] = favour
 	if not is_zero_approx(honour):
 		d["honour"] = honour
+	if not is_zero_approx(fortune):
+		d["fortune"] = fortune
 	return d
 
 
@@ -306,6 +312,7 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.loyalty = float(d.get("loyalty", 0.75))
 	o.favour = float(d.get("favour", 0.0))
 	o.honour = float(d.get("honour", 0.0))
+	o.fortune = float(d.get("fortune", 0.0))
 	return o
 
 

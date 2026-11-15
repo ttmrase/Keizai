@@ -242,7 +242,7 @@ static func _try_capital_seizure(tick: int) -> bool:
 	if not _kind_ready(KIND_CAPITAL_SEIZURE, tick):
 		return false
 	var realm := HouseRank.dominant_realm()
-	if realm == null or realm.ideology == null:
+	if realm == null or realm.ideology == null or CivilWar.is_at_war(realm.org_id):
 		return false
 	if realm.legitimacy > SEIZURE_LEGITIMACY:
 		return false
@@ -281,6 +281,7 @@ static func _try_capital_seizure(tick: int) -> bool:
 		"hold": 1.0,
 		"basis": PoliticalSystemAxes.LegitimacyBasis.MILITARY_STRENGTH,
 		"structure": PoliticalSystemAxes.DecisionStructure.AUTOCRATIC,
+		"forced": true,
 	}, tick)
 	return true
 
@@ -292,7 +293,7 @@ static func _try_uprising(tick: int) -> bool:
 	if not _kind_ready(KIND_UPRISING, tick):
 		return false
 	var realm := HouseRank.dominant_realm()
-	if realm == null or realm.ideology == null:
+	if realm == null or realm.ideology == null or CivilWar.is_at_war(realm.org_id):
 		return false
 	if realm.ideology.legitimacy_basis == PoliticalSystemAxes.LegitimacyBasis.ELECTED:
 		return false
@@ -334,7 +335,8 @@ static func _try_uprising(tick: int) -> bool:
 			"hold": 1.0,
 			"basis": PoliticalSystemAxes.LegitimacyBasis.ELECTED,
 			"structure": PoliticalSystemAxes.DecisionStructure.ASSEMBLY,
-			}, tick)
+			"forced": true,
+		}, tick)
 	return true
 
 

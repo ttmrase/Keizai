@@ -26,7 +26,10 @@ const KIND_FILTERS := [
 	{"label": "派閥", "kind": Organization.OrgKind.FACTION},
 	{"label": "家", "kind": Organization.OrgKind.HOUSE},
 	{"label": "信仰", "kind": Organization.OrgKind.RELIGION},
+	# Not a kind of organization: every family of one 氏, added up.
+	{"label": "氏", "kind": UJI_FILTER},
 ]
+const UJI_FILTER := -2
 
 var _filter := -1
 var _expanded: StringName = &""
@@ -78,6 +81,10 @@ func _rebuild() -> void:
 	for child in _list.get_children():
 		child.queue_free()
 
+	if _filter == UJI_FILTER:
+		_build_uji_table()
+		return
+
 	var ranked := PowerCalculator.ranked(_filter)
 	if ranked.is_empty():
 		var empty := Label.new()
@@ -98,6 +105,96 @@ func _rebuild() -> void:
 		_list.add_child(_row(org, strongest, i + 1))
 		if org.org_id == _expanded:
 			_list.add_child(_breakdown(org))
+
+
+## The families added up by 氏: how much of the world each great house of the
+## first day still stands behind, through every line that came out of it.
+func _build_uji_table() -> void:
+	var rows: Array = []
+	for uji_id in HouseNaming.all_uji():
+		var power := 0.0
+		var living := 0
+		var land := 0
+		var seats := 0
+		var strongest: Organization = null
+		for house in HouseNaming.houses_of_uji(uji_id, true):
+			living += 1
+			power += house.power_score
+			land += house.held_settlement_ids.size()
+			seats += GameState.offices_of_house(house.org_id).size()
+			if strongest == null or house.power_score > strongest.power_score:
+				strongest = house
+		rows.append({"uji": uji_id, "power": power, "living": living, "land": land,
+			"seats": seats, "strongest": strongest})
+	rows.sort_custom(func(a, b):
+		if not is_equal_approx(float(a["power"]), float(b["power"])):
+			return float(a["power"]) > float(b["power"])
+		return String(a["uji"]) < String(b["uji"]))
+	var top := 1.0
+	for row in rows:
+		top = maxf(top, float(row["power"]))
+	for i in rows.size():
+		_list.add_child(_uji_row(rows[i], top, i + 1))
+
+
+func _uji_row(row: Dictionary, top: float, rank: int) -> Control:
+	var uji_id: StringName = row["uji"]
+	var founder := GameState.get_organization(uji_id)
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Palette.PANEL_RAISED if int(row["living"]) > 0 else Palette.PANEL
+	style.border_color = Heraldry.of_org(founder) if founder != null else Palette.HOUSE
+	style.border_width_left = 4
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	panel.add_theme_stylebox_override("panel", style)
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 10)
+	panel.add_child(line)
+	var place := Label.new()
+	place.text = str(rank)
+	place.custom_minimum_size = Vector2(28, 0)
+	place.add_theme_font_size_override("font_size", 18)
+	place.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	line.add_child(place)
+	line.add_child(CrestIcon.make(uji_id, 36))
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 0)
+	line.add_child(words)
+	var name := Label.new()
+	name.text = HouseNaming.uji_label(uji_id)
+	name.add_theme_font_size_override("font_size", 20)
+	name.add_theme_color_override("font_color", Palette.TEXT if int(row["living"]) > 0 else Palette.TEXT_DIM)
+	words.add_child(name)
+	var sub := Label.new()
+	var strongest: Organization = row["strongest"]
+	sub.text = "現存%d家・所領%d・役%d%s" % [int(row["living"]), int(row["land"]), int(row["seats"]),
+		"　筆頭 %s" % strongest.formal_name() if strongest != null else "　すべて絶えた"]
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.add_theme_font_size_override("font_size", 14)
+	sub.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	words.add_child(sub)
+	var score := Label.new()
+	score.text = str(int(row["power"]))
+	score.add_theme_font_size_override("font_size", 22)
+	score.add_theme_color_override("font_color", Palette.ACCENT if rank == 1 else Palette.TEXT)
+	line.add_child(score)
+	var holder := VBoxContainer.new()
+	holder.add_theme_constant_override("separation", 4)
+	panel.remove_child(line)
+	holder.add_child(line)
+	var track := Control.new()
+	track.custom_minimum_size = Vector2(0, 3)
+	track.draw.connect(func():
+		track.draw_rect(Rect2(Vector2.ZERO, Vector2(track.size.x * float(row["power"]) / top, 3)),
+			Color(style.border_color, 0.7)))
+	holder.add_child(track)
+	panel.add_child(holder)
+	return panel
 
 
 ## What this country currently is, in its own words — read off the balance of
@@ -371,6 +468,7 @@ func _breakdown(org: Organization) -> Control:
 	labels[PowerCalculator.PEDIGREE_KEY] = "家格の重み"
 	labels[PowerCalculator.CHARACTER_KEY] = "家風"
 	labels[PowerCalculator.REALM_SUPPORT_KEY] = "諸家の支え"
+	labels[PowerCalculator.WAR_KEY] = "戦の明暗"
 
 	var entries: Array = []
 	for key in org.power_drivers:

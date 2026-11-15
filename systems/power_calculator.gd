@@ -18,6 +18,9 @@ const LEADERSHIP_KEY := &"leadership"
 const PEDIGREE_KEY := &"pedigree"
 const CHARACTER_KEY := &"character"
 const REALM_SUPPORT_KEY := &"realm_support"
+const WAR_KEY := &"war_fortune"
+## Points of power a body's whole fortune in war is worth.
+const WAR_FORTUNE_POINTS := 40.0
 
 ## What each trait is worth to the organization a person leads. Two guilds with
 ## identical world conditions would otherwise always score identically; who is
@@ -91,7 +94,7 @@ static func _settle_membership(active: Array[Organization], tick: int) -> void:
 			HistoryLog.emit_event(
 				HistoryEvent.EventType.DISSOLVED,
 				tick,
-				"%sは人を失い、絶えた。" % org.display_name,
+				"%sは人を失い、絶えた。" % org.formal_name(),
 				{},
 				org.org_id,
 				org.leader_person_id,
@@ -137,6 +140,12 @@ static func calculate(org: Organization, profile: PowerProfile) -> float:
 		if support_term != 0.0:
 			drivers[REALM_SUPPORT_KEY] = support_term
 			score += support_term
+
+	# The side it backed in the last war, won or lost.
+	if not is_zero_approx(org.fortune):
+		var war_term := org.fortune * WAR_FORTUNE_POINTS
+		drivers[WAR_KEY] = war_term
+		score += war_term
 
 	org.power_drivers = drivers
 	org.power_score = clampf(score, 0.0, profile.max_score)

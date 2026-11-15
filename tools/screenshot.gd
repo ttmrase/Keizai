@@ -350,6 +350,7 @@ func _ready() -> void:
 	await _capture("%s/map_detail.png" % _out_dir)
 
 	await _capture_uji(shell)
+	await _capture_war(shell)
 
 	print("captured to %s" % _out_dir)
 	get_tree().quit(0)
@@ -388,6 +389,92 @@ func _capture_uji(shell: Control) -> void:
 	await _capture("%s/chronicle_uji.png" % _out_dir)
 	chronicle._on_house_button()
 	await _settle()
+	shell.show_tab("power")
+	await _settle()
+	var power: Control = shell._screens["power"]
+	power._on_filter(power.KIND_FILTERS.size() - 1)
+	await _settle()
+	await _capture("%s/power_uji.png" % _out_dir)
+	power._on_filter(0)
+	await _settle()
+
+
+## 戦: a country divided down the middle so the war screens have something to
+## show — the war section, the front on the map, the status strip — and the
+## banners that open and close one.
+func _capture_war(shell: Control) -> void:
+	var news: NewsFeed = shell._news
+	news._clear()
+	var polity := HouseRank.dominant_realm()
+	var claimant_org: Organization = null
+	for faction in GameState.organizations_of_kind(Organization.OrgKind.FACTION):
+		if claimant_org == null or faction.power_score > claimant_org.power_score:
+			claimant_org = faction
+	if polity == null or claimant_org == null or polity.governs_settlement_ids.size() < 4:
+		return
+	var plan := CivilWar.plan_split(polity, {"org": claimant_org, "ground": "議会"},
+		SimClock.current_tick)
+	if not bool(plan.get("splits", false)):
+		var ids := polity.governs_settlement_ids.duplicate()
+		plan = {"loyal": ids.slice(0, ids.size() / 2), "rebel": ids.slice(ids.size() / 2),
+			"share": 0.5, "forced": false}
+	var axis := {}
+	for a in PoliticalSystemAxes.AXIS_NAMES:
+		axis[String(a)] = claimant_org.ideology.get_axis(a)
+	CivilWar.split_country(polity, {"org": claimant_org, "ground": "議会"}, plan,
+		PoliticalSystemAxes.LegitimacyBasis.ELECTED, PoliticalSystemAxes.DecisionStructure.ASSEMBLY,
+		axis, SimClock.current_tick)
+	for i in 40:
+		await get_tree().process_frame
+	await _capture("%s/news_war.png" % _out_dir)
+	news._close_banner(0.0)
+	news._clear()
+	# A few years in, so there are battles to show.
+	for year in 30:
+		SimClock.advance_n_ticks_instant(SimConfig.TICKS_PER_YEAR)
+		if CivilWar.wars().is_empty() or CivilWar.wars()[0].battles.size() >= 3:
+			break
+	news._close_banner(0.0)
+	news._clear()
+	if CivilWar.wars().is_empty():
+		return
+	shell._fx._effects.clear()
+	shell.show_tab("incidents")
+	await _settle()
+	await _capture("%s/incidents_war.png" % _out_dir)
+	shell.show_tab("map")
+	await _settle()
+	var atlas: Control = shell._screens["map"]
+	atlas._selected_id = &""
+	atlas._detail.visible = false
+	atlas._on_overlay(2)
+	atlas._refresh()
+	await _settle()
+	await _capture("%s/map_war.png" % _out_dir)
+	atlas._on_overlay(0)
+	# And to its end, with the aftermath on the banner.
+	var guard := 0
+	while not CivilWar.wars().is_empty() and guard < 200:
+		news._close_banner(0.0)
+		news._clear()
+		SimClock.advance_n_ticks_instant(SimConfig.TICKS_PER_YEAR)
+		guard += 1
+	for e in CivilWar.past_wars(1):
+		news._close_banner(0.0)
+		news._clear()
+		news._show_banner(NewsFeed.classify(e))
+	for i in 40:
+		await get_tree().process_frame
+	await _capture("%s/news_war_end.png" % _out_dir)
+	news._close_banner(0.0)
+	news._clear()
+	shell.show_tab("incidents")
+	await _settle()
+	var incidents: Control = shell._screens["incidents"]
+	var scroll: ScrollContainer = incidents.get_node("Scroll")
+	scroll.scroll_vertical = 100000
+	await _settle()
+	await _capture("%s/incidents_past_war.png" % _out_dir)
 
 
 ## Somebody far enough down the record to have ancestors above them, siblings

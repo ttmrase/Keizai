@@ -41,6 +41,14 @@ func _rebuild() -> void:
 	for child in _rows.get_children():
 		child.queue_free()
 
+	# A war under way comes before everything else: it is what is happening.
+	var fighting := CivilWar.wars()
+	if not fighting.is_empty():
+		_rows.add_child(_heading("戦", "割れた国が戦っている。棒は戦況、中央の線が開戦時"))
+		for war in fighting:
+			_rows.add_child(_war_card(war))
+		_rows.add_child(_spacer())
+
 	# What is brewing, of every kind, most pressing first — the same list the
 	# map shows a line of, here in full.
 	_rows.add_child(_heading("兆し", "いま起きそうなこと。タップするとそれを見に行ける"))
@@ -72,6 +80,161 @@ func _rebuild() -> void:
 		empty.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		empty.add_theme_font_size_override("font_size", 18)
 		_rows.add_child(empty)
+
+	# Wars that have ended, and how.
+	var past := CivilWar.past_wars()
+	if not past.is_empty():
+		_rows.add_child(_spacer())
+		_rows.add_child(_heading("過ぎた戦", "どう終わり、誰が何を失ったか"))
+		for e in past:
+			_rows.add_child(_past_war_row(e))
+
+
+## A war under way: who against whom, the tug of the line, what each side is
+## made of, how long it has gone on, and the latest battles.
+func _war_card(war: WarState) -> Control:
+	var a := GameState.get_organization(war.side_a)
+	var b := GameState.get_organization(war.side_b)
+	var colour_a := Heraldry.of_org(a) if a != null else Palette.POLITY
+	var colour_b := Heraldry.of_org(b) if b != null else Palette.DANGER
+	var card := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Palette.PANEL_RAISED.lerp(Palette.DANGER, 0.06)
+	box.border_color = Color(Palette.DANGER, 0.8)
+	box.border_width_top = 3
+	box.set_corner_radius_all(10)
+	box.content_margin_left = 14
+	box.content_margin_right = 14
+	box.content_margin_top = 10
+	box.content_margin_bottom = 12
+	card.add_theme_stylebox_override("panel", box)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	card.add_child(rows)
+
+	var title := Label.new()
+	title.text = "%s年目の%s" % [war.years(SimClock.current_tick) + 1,
+		"再戦" if war.cause == "renewal" else "内戦"]
+	title.add_theme_color_override("font_color", Palette.DANGER.lightened(0.2))
+	title.add_theme_font_size_override("font_size", 15)
+	rows.add_child(title)
+
+	var sides := HBoxContainer.new()
+	sides.add_theme_constant_override("separation", 8)
+	sides.add_child(_side_label(a, colour_a, HORIZONTAL_ALIGNMENT_LEFT))
+	var versus := GlyphIcon.make(&"swords", Palette.TEXT_MUTED, 26)
+	versus.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sides.add_child(versus)
+	sides.add_child(_side_label(b, colour_b, HORIZONTAL_ALIGNMENT_RIGHT))
+	rows.add_child(sides)
+
+	rows.add_child(WarBar.new().setup(colour_a, colour_b, war.front))
+
+	if a != null and b != null:
+		var sa := CivilWar.strength(a, war)
+		var sb := CivilWar.strength(b, war)
+		rows.add_child(_strength_line(sa, sb, a.short_name(), b.short_name()))
+		var tired := Label.new()
+		tired.text = "疲弊　%d%% ／ %d%%　　地域　%d ／ %d" % [
+			int(minf(war.exhaustion_a, 1.0) * 100.0), int(minf(war.exhaustion_b, 1.0) * 100.0),
+			a.governs_settlement_ids.size(), b.governs_settlement_ids.size()]
+		tired.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		tired.add_theme_font_size_override("font_size", 14)
+		rows.add_child(tired)
+
+	var recent: Array[String] = []
+	for i in range(war.battles.size() - 1, maxi(-1, war.battles.size() - 4), -1):
+		var fought: Dictionary = war.battles[i]
+		var victor := a if String(fought["winner"]) == "a" else b
+		recent.append("%d年 %s（%s%s）" % [int(int(fought["tick"]) / SimConfig.TICKS_PER_YEAR),
+			CivilWar.battle_name(StringName(fought["settlement_id"])),
+			victor.short_name() if victor != null else "?",
+			"・奪取" if bool(fought.get("taken", false)) else "の勝ち"])
+	var log := Label.new()
+	log.text = "最近の戦い　" + ("、".join(recent) if not recent.is_empty() else "まだない")
+	if not war.defectors.is_empty():
+		var names: Array[String] = []
+		for id in war.defectors:
+			var house := GameState.get_organization(id)
+			if house != null:
+				names.append(house.formal_name())
+		log.text += "\n寝返り　" + "、".join(names)
+	log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	log.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	log.add_theme_font_size_override("font_size", 14)
+	rows.add_child(log)
+	return card
+
+
+func _side_label(polity: Organization, colour: Color, align: int) -> Control:
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 0)
+	var name := Label.new()
+	name.text = polity.formal_name() if polity != null else "?"
+	name.horizontal_alignment = align
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name.add_theme_color_override("font_color", colour.lightened(0.25))
+	name.add_theme_font_size_override("font_size", 17)
+	box.add_child(name)
+	var house := CivilWar.ruling_house_of(polity)
+	var under := Label.new()
+	under.text = "%s方" % house.formal_name() if house != null else "長は空位"
+	under.horizontal_alignment = align
+	under.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	under.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	under.add_theme_font_size_override("font_size", 13)
+	box.add_child(under)
+	return box
+
+
+## What each side's strength is made of: land and people, the families behind
+## it, the guilds and factions behind it, and what is dragging it down.
+func _strength_line(sa: Dictionary, sb: Dictionary, name_a: String, name_b: String) -> Control:
+	var label := Label.new()
+	var parts: Array[String] = []
+	for entry in [["土地と民", "land"], ["諸家", "houses"], ["ギルド・派閥", "bodies"]]:
+		parts.append("%s %.1f／%.1f" % [entry[0], float(sa[entry[1]]), float(sb[entry[1]])])
+	var drag: Array[String] = []
+	for entry in [["飢え", "food"], ["威信", "standing"], ["不満", "calm"], ["魔物", "monsters"]]:
+		var x: float = sa[entry[1]]
+		var y: float = sb[entry[1]]
+		if absf(x - y) >= 0.05:
+			drag.append("%sが%sの足を引く" % [entry[0], name_a if x < y else name_b])
+	label.text = "力 %.1f ／ %.1f\n%s%s" % [float(sa["total"]), float(sb["total"]),
+		"　".join(parts), "\n" + "、".join(drag) if not drag.is_empty() else ""]
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", Palette.TEXT)
+	label.add_theme_font_size_override("font_size", 14)
+	return label
+
+
+func _past_war_row(e: HistoryEvent) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var icon := GlyphIcon.make(&"swords", Palette.ACCENT_SOFT, 22)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(icon)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 2)
+	var head := Label.new()
+	var years := int(e.payload.get("years", 0))
+	head.text = "%d年　%s（%d年・%d戦）" % [int(e.tick / SimConfig.TICKS_PER_YEAR),
+		CivilWar.outcome_label(String(e.payload.get("outcome", ""))), years,
+		int(e.payload.get("battles", 0))]
+	head.add_theme_color_override("font_color", Palette.ACCENT)
+	head.add_theme_font_size_override("font_size", 16)
+	box.add_child(head)
+	var text := Label.new()
+	var lines: Array = e.payload.get("aftermath", [])
+	text.text = e.description + ("\n" + "、".join(lines) if not lines.is_empty() else "")
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_theme_color_override("font_color", Palette.TEXT)
+	text.add_theme_font_size_override("font_size", 16)
+	box.add_child(text)
+	row.add_child(box)
+	return row
 
 
 func _heading(text: String, note: String) -> Control:

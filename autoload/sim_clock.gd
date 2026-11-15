@@ -66,6 +66,8 @@ func _advance_one_tick() -> void:
 	# Ruptures are considered after everything that could have caused one has been
 	# read for this season, and before the rules that react to the world it leaves.
 	Incidents.consider_all(current_tick)
+	# A war runs a campaign a year, once the season's ruptures are settled.
+	CivilWar.step(current_tick)
 	HousePartition.step(current_tick)
 	RulesEngine.evaluate_tick(current_tick)
 	EventBus.tick_advanced.emit(current_tick)
