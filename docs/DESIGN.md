@@ -1421,3 +1421,54 @@ In a civil war the breakaway marches under its claimant's doctrine and lords
 side by belief; at court, those who think alike count as allies and those who
 do not are easier to move against; history can now remember a doctrine's
 founder in a seventh field, 思想.
+
+Design decisions worth keeping:
+
+- *Rank is a list before it is a number.* `grounds_of` returns labelled terms
+  and `standing_from` only adds them up, so the screen and the simulation can
+  never disagree about why a family stands where it does. Old saves have no
+  office records; their grounds are read from what there is, and the seats fill
+  within a year of running.
+- *Grudges change only through the record.* They are derived inside
+  `GameState.apply` from events that already exist (a contested SUCCESSION, an
+  OFFICE vacancy or reordering, an estate POWER_TRANSFER, an INCIDENT, an
+  assassination DEATH, an INTRIGUE ending), so they need no random draws and no
+  new write path, and every one points at its cause. Decay is a reading, not a
+  rewrite.
+- *What a quarrel costs goes through the systems that own it.* A seat lost is an
+  OFFICE vacancy, an honour lost a POWER_TRANSFER, a blemish an OFFICE blemish, a
+  head made to stand down an end of tenure that the ordinary succession then
+  fills; the INTRIGUE event is the account of the quarrel itself, with its
+  breakdown.
+- *A doctrine is not an organization.* It would have had to pretend to members,
+  a treasury and a head; as its own record it keeps exactly what the brief asks
+  and joins the lineage invariant on its own terms.
+- *One bug worth recording.* Courts were visited in the order `Array.sort()`
+  gave a list of StringNames — which compares where each name lives in memory.
+  Within one world that was stable, but after enough worlds had been built and
+  freed in one process the order changed and so did history; the determinism
+  check in `test_intrigue` (run after five other worlds) caught it. Courts are
+  now sorted by name.
+
+Measured with `tools/Census.tscn` (five seeds, 1,000 years each, left alone):
+
+| | per world per 1,000 years | over all five |
+|---|---|---|
+| appointments to the great offices | 190–310 | treasurer 323, marshal 318, aides 508, regent 22, high priest 7, general 6, strategist 7 |
+| average tenure | 17–25 years | seats becoming a family's by right: 125; heir orders changed: 11 |
+| quarrels at court (settled) | 29–45 (3–4.5 a century) | 191 against 3 wars; won 80, found out 62, drawn 49, faded 13 |
+| what started them | | a disputed succession (house or seat) 81%, ambition alone 18%; revenge across three heads 12; a fall from the very top 4 |
+| doctrines born | 5–15 (mean 10) | first at 123–333 years; 2–3 alive on average, 4–6 at most; a revision every 31–39 years |
+| how they were born | | development 20, revival 9, schism 8, reaction 5, synthesis 2, from a reign 1, roots 5; 14 adoptions as a creed; 6 founders remembered under 思想 |
+
+What the top of the peerage rests on, summed over the five highest houses of
+each world: presence 13.5, offices held before 13.4, offices held now 11.1,
+age 8.7, land 8.5, heading an organization 5.4, honours 3.9, seats by right
+3.9, the crown 3.5, chief of a 氏 3.3, blemishes −1.7. The great houses are the
+ones that sit in the seats and have sat in them before.
+
+Left out: guilds and faiths as arenas of their own for 政争 — a quarrel is
+fought at a state's court, and sharing a guild, faction or faith counts only as
+an opening; a demoted family is not moved to a remote estate (左遷 here means
+losing the seat); doctrines do not travel with emigrating people, only with
+their homes; support is kept per great family and faction, not per town.

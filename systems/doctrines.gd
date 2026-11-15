@@ -38,6 +38,7 @@ const LONG_REIGN_YEARS := 22
 const CROWDED := 6
 ## Years between revisions of a living doctrine, on average.
 const REVISION_YEARS := 45.0
+const REVISION_GAP_YEARS := 15
 ## How far revisions may carry a doctrine from where it began before the next
 ## one splits off instead.
 const SPLIT_DRIFT := 0.12
@@ -727,6 +728,10 @@ static func _stem(name: String) -> String:
 static func _consider_revisions(tick: int, rng: RandomNumberGenerator) -> void:
 	for d in living():
 		if rng.randf() >= 1.0 / REVISION_YEARS:
+			continue
+		# Nobody rewrites a book the year after the last one came out.
+		if not d.thinkers.is_empty() and tick - int(d.thinkers.back().get("tick", 0)) \
+				< REVISION_GAP_YEARS * SimConfig.TICKS_PER_YEAR:
 			continue
 		var home := GameState.get_organization(d.home_polity_id)
 		if home == null or not home.is_active():
