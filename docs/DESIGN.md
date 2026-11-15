@@ -1450,22 +1450,55 @@ Design decisions worth keeping:
   check in `test_intrigue` (run after five other worlds) caught it. Courts are
   now sorted by name.
 
-Measured with `tools/Census.tscn` (five seeds, 1,000 years each, left alone):
+Measured with `tools/Census.tscn` (five seeds, 1,000 years each, in each mode):
 
-| | per world per 1,000 years | over all five |
+| | quiet (left alone) | eventful (the harness's hard world, repeated) |
 |---|---|---|
-| appointments to the great offices | 190–310 | treasurer 323, marshal 318, aides 508, regent 22, high priest 7, general 6, strategist 7 |
-| average tenure | 17–25 years | seats becoming a family's by right: 125; heir orders changed: 11 |
-| quarrels at court (settled) | 29–45 (3–4.5 a century) | 191 against 3 wars; won 80, found out 62, drawn 49, faded 13 |
-| what started them | | a disputed succession (house or seat) 81%, ambition alone 18%; revenge across three heads 12; a fall from the very top 4 |
-| doctrines born | 5–15 (mean 10) | first at 123–333 years; 2–3 alive on average, 4–6 at most; a revision every 31–39 years |
-| how they were born | | development 20, revival 9, schism 8, reaction 5, synthesis 2, from a reign 1, roots 5; 14 adoptions as a creed; 6 founders remembered under 思想 |
+| appointments to the great offices, per world | 196–305 | 190–244 |
+| average tenure | 17–25 years (regents 2–15) | 13–20 years |
+| seats becoming a family's by right / heir orders changed | 122 / 11 | 107 / 22 |
+| quarrels at court, per world | 32–40 (3–4 a century) | 18–42 |
+| against wars, over all five | 177 against 5 | 149 against 4 |
+| how they ended | won 76, found out 58, drawn 43, faded 18 | won 63, found out 37, drawn 49, faded 14 |
+| what started them | a disputed succession 77%, ambition alone 21% | a disputed succession 79%, ambition 17%, an assassination 4, an excommunication 1 |
+| revenge across three heads / a fall from the very top | 12 / 3 | 13 / 3 |
+| doctrines born, per world | 5–12 (mean 8.4), first at 123–333 years | 0–8, first at 261–904 years, one world none |
+| alive at once / spacing of revisions | 1.8–3.4 on average, 3–6 at most / 46–56 years | 0–1.2 on average |
+| how they were born (quiet) | development 15, schism 12, revival 5, synthesis 3, reaction 1, from a reign 1, roots 5; 12 adoptions as a creed | |
+| founders remembered under 思想 | 6 | 2 |
 
 What the top of the peerage rests on, summed over the five highest houses of
-each world: presence 13.5, offices held before 13.4, offices held now 11.1,
-age 8.7, land 8.5, heading an organization 5.4, honours 3.9, seats by right
-3.9, the crown 3.5, chief of a 氏 3.3, blemishes −1.7. The great houses are the
-ones that sit in the seats and have sat in them before.
+each world (quiet): presence 13.0, offices held before 11.9, offices held now
+11.1, land 8.7, age 7.3, honours 4.1, heading an organization 3.6, chief of a
+氏 2.8, seats by right 2.7, the crown 1.2, blemishes −0.9. The great houses are
+the ones that sit in the seats and have sat in them before. A hard world
+breeds fewer doctrines because it pushes regimes toward a single ruler and the
+sword; that is the brief's "rarely, or never, under despotism".
+
+Two faults the censuses found and that are fixed: a doctrine revised three
+times in six years (revisions now wait fifteen years), and a state taking up and
+dropping the same creed every year, carried past its own threshold by a
+ruler's or faction's backing (a creed is now taken up only well within it, and
+not again for twenty years after being let go).
+
+*Cost.* As first written the three systems made a season about 50% dearer
+(two seeds × 300 quiet years: 10.0 ms before, 16.0 after). Profiling the tick
+by phase showed the new code was mostly paying for old habits: every reading of
+a family's precedence asked which families wear crowns, which scanned every
+organization in the world; every succession, match and seat asked for a
+house's members, which scanned everybody who ever lived; and the yearly seat
+appointments weighed every family for every seat even when the sitting holder
+was inside the fifteen years in which nobody is weighed against them. Now
+`GameState` keeps the active organizations of each kind, each house's members
+and the living as indexes rebuilt only when somebody is founded, dissolved,
+born, dies or changes house (and filters on reading, so a record marked by hand
+still reads true); grudges, sympathies and guild wealth are read once a season;
+a seat is only contested when it can change hands; and each court is read once
+a year rather than once for every pair of families in it. Results are
+unchanged — the census over five seeds and a thousand years is identical before
+and after — and a season now costs less than it did before this iteration:
+quiet 9.6 ms before, 8.7 after; eventful (two seeds × 800 years) 18.3 before,
+14.0 after.
 
 Left out: guilds and faiths as arenas of their own for 政争 — a quarrel is
 fought at a state's court, and sharing a guild, faction or faith counts only as
