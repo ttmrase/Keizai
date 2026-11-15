@@ -130,7 +130,7 @@ static func _candidate(kind: String, rng: RandomNumberGenerator, tick: int) -> D
 ## A family that will give the crown its regent.
 static func _offer_regent(rng: RandomNumberGenerator, tick: int) -> Dictionary:
 	var realm := HouseRank.dominant_realm()
-	if realm == null or realm.ideology == null or not Offices.seats_for(realm).has("regent"):
+	if realm == null or not is_instance_valid(realm.ideology) or not Offices.seats_for(realm).has("regent"):
 		return {}
 	var sitting := StringName(realm.offices.get("regent", {}).get("house", ""))
 	var houses: Array[Organization] = []
@@ -152,7 +152,7 @@ static func _offer_regent(rng: RandomNumberGenerator, tick: int) -> Dictionary:
 ## A family that will stand first among the houses next in line to the crown.
 static func _offer_heir(rng: RandomNumberGenerator, tick: int) -> Dictionary:
 	var realm := HouseRank.dominant_realm()
-	if realm == null or realm.ideology == null or realm.ideology.legitimacy_basis \
+	if realm == null or not is_instance_valid(realm.ideology) or realm.ideology.legitimacy_basis \
 			!= PoliticalSystemAxes.LegitimacyBasis.HEREDITARY:
 		return {}
 	var first := realm.heir_houses[0] if not realm.heir_houses.is_empty() else &""

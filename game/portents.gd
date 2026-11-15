@@ -197,7 +197,7 @@ static func _quarrels(out: Array[Dictionary], tick: int) -> void:
 ## 思想: a doctrine close to becoming a country's creed, and one about to die.
 static func _doctrines(out: Array[Dictionary], tick: int) -> void:
 	var realm := HouseRank.dominant_realm()
-	if realm == null or realm.ideology == null:
+	if realm == null or not is_instance_valid(realm.ideology):
 		return
 	if realm.doctrine_id == &"":
 		var best: Doctrine = null
