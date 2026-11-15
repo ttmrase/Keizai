@@ -46,6 +46,8 @@ const SPLIT_DRIFT := 0.12
 ## how far they may fall before it lets it go.
 const ADOPT_CLOSENESS := 0.55
 const ABANDON_CLOSENESS := 0.3
+## Years before a country takes up a creed again after letting one go.
+const READOPT_YEARS := 20
 ## How fast a creed pulls a country's ideals toward its picture, per year.
 const CREED_PULL := 0.012
 const CREED_LEGITIMACY := 0.012
@@ -833,13 +835,22 @@ static func _consider_creed(polity: Organization, tick: int, rng: RandomNumberGe
 			polity.legitimacy = clampf(polity.legitimacy
 				+ CREED_LEGITIMACY * (creed.support - 0.45) * 2.0, 0.05, 1.0)
 			return
+	# A creed just let go is not taken up again at once: the country that
+	# dropped it has to drift back to it first.
+	if tick - int(polity.last_fired_tick.get(&"creed_dropped", -100000)) \
+			< READOPT_YEARS * SimConfig.TICKS_PER_YEAR:
+		return
 	var reason := _occasion(polity, tick)
 	var best: Doctrine = null
 	var most := ADOPT_CLOSENESS
 	for d in living():
 		if d.state == "underground" and freedom_of(polity) < FREE_FLOOR:
 			continue
-		var c := closeness(d, polity.ideology) + 0.25 * d.prestige
+		var near := closeness(d, polity.ideology)
+		# Never one the country would let go of again the next year.
+		if near < ABANDON_CLOSENESS + 0.15:
+			continue
+		var c := near + 0.25 * d.prestige
 		if reason.has("doctrine") and StringName(reason["doctrine"]) == d.doctrine_id:
 			c += 0.4
 		if c > most:
@@ -906,6 +917,7 @@ static func _abandon(polity: Organization, d: Doctrine, tick: int, reason: Strin
 		polity_id: StringName = &"") -> void:
 	if polity != null:
 		polity_id = polity.org_id
+		polity.last_fired_tick[&"creed_dropped"] = tick
 	var text: String = {
 		"drift": "%sは%sを国是から外した。国の向きはもはやその教えと合わない。",
 		"faded": "%sは廃れた%sを国是から外した。",
