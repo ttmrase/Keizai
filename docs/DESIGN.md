@@ -11,7 +11,7 @@ Two requirements from the original spec are non-negotiable and drive every archi
 
 A third, later-added requirement: **political systems (and guild/faction ideology) must be procedurally generated from composable components**, not picked from a fixed hand-authored list like {Monarchy, Republic, Theocracy}.
 
-This plan defines a Godot 4.x architecture that satisfies all three by construction (event-sourced history log for traceability; a data-driven, file-authored power-scoring system for genericity; a composable-axis generator for political systems), broken into 8 build phases of equal, execute-ready detail, for a separate implementation pass (Opus 5) to build incrementally. Each phase is independently runnable and verifiable inside the Godot editor.
+This plan defines a Godot 4.x architecture that satisfies all three by construction (event-sourced history log for traceability; a data-driven, file-authored power-scoring system for genericity; a composable-axis generator for political systems), broken into 8 build phases of equal, execute-ready detail, for a separate implementation pass to build incrementally. Each phase is independently runnable and verifiable inside the Godot editor.
 
 ### Locked-in decisions (confirmed with user before writing this plan)
 
