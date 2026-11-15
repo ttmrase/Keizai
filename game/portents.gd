@@ -36,6 +36,7 @@ static func current(tick: int) -> Array[Dictionary]:
 	_old_ruler(out, tick)
 	_offices(out, tick)
 	_quarrels(out, tick)
+	_doctrines(out, tick)
 	_thin_blood(out)
 	_restless_land(out)
 	_divided_faith(out)
@@ -191,6 +192,32 @@ static func _quarrels(out: Array[Dictionary], tick: int) -> void:
 			out.append(_item("兆し", "%sは%sに遺恨を抱く" % [holder.short_name(), target.short_name()],
 				"%s。%s" % [Grudges.why_label(deepest), String(deepest.get("why", ""))],
 				&"dagger", Palette.HOUSE, 0.3 + 0.1 * minf(most, 1.5), "relations", holder.org_id))
+
+
+## 思想: a doctrine close to becoming a country's creed, and one about to die.
+static func _doctrines(out: Array[Dictionary], tick: int) -> void:
+	var realm := HouseRank.dominant_realm()
+	if realm == null or realm.ideology == null:
+		return
+	if realm.doctrine_id == &"":
+		var best: Doctrine = null
+		var most := Doctrines.ADOPT_CLOSENESS - 0.1
+		for d in Doctrines.living():
+			var c := Doctrines.closeness(d, realm.ideology) + 0.25 * d.prestige
+			if c > most:
+				most = c
+				best = d
+		if best != null:
+			out.append(_item("思想", "%sが国是に近づく" % best.name,
+				"%sの向きは%sの説く姿に近い。新しい体制か、綱領に掲げる派閥が議場を握れば" % [
+					realm.formal_name(), best.name],
+				&"scroll", Palette.RELIGION, 0.32, "lineage"))
+	for d in Doctrines.living():
+		if d.adopted_by().is_empty() and d.prestige < Doctrines.FADE_PRESTIGE + 0.05 \
+				and float(tick - d.born_tick) / SimConfig.TICKS_PER_YEAR >= Doctrines.FADE_MIN_YEARS:
+			out.append(_item("思想", "%sが廃れかけている" % d.name,
+				"掲げる国も派閥もなく、声望は地に落ちた", &"scroll", Palette.TEXT_MUTED, 0.22, "lineage"))
+			break
 
 
 static func _old_ruler(out: Array[Dictionary], tick: int) -> void:

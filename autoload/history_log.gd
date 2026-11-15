@@ -35,6 +35,8 @@ const _LINEAGE_CRITICAL_TYPES := [
 	HistoryEvent.EventType.OFFICE,
 	# And the quarrels at court: a grudge three generations old points back here.
 	HistoryEvent.EventType.INTRIGUE,
+	# And the lineage of thought, which has to be followable to its first root.
+	HistoryEvent.EventType.DOCTRINE,
 ]
 
 

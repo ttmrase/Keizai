@@ -44,6 +44,10 @@ const FORBIDDEN := [
 	"Intrigue._carry_out(",
 	"Grudges.observe(",
 	"Grudges._add(",
+	"Doctrines.step(",
+	"Doctrines._birth(",
+	"Doctrines._adopt(",
+	"Doctrines._abandon(",
 ]
 
 ## Anything on GodPowerAPI naming one of these would be a way to command society

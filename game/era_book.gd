@@ -29,6 +29,7 @@ const TITLES := {
 	"bounty": ["実りの時代", "黄金の半世紀", "恵みの時代"],
 	"decline": ["黄昏の時代", "絶えゆく家々の時代", "血の細る半世紀"],
 	"peace": ["泰平の世", "静かな半世紀", "凪の時代", "穏やかな半世紀"],
+	"thought": ["思想の時代", "百家の半世紀", "論争の時代"],
 }
 
 static var _cache: Dictionary = {}
@@ -124,6 +125,8 @@ static func _empty_tally(index: int) -> Dictionary:
 		"regencies": 0,
 		"quarrels": 0,
 		"falls": [],
+		"doctrines": [],
+		"creeds": [],
 		"war_ends": [],
 		"battles": 0,
 		"births": 0,
@@ -153,6 +156,18 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 				moment = String(e.payload.get("office", "")) == "regent"
 			elif action == "appoint" and String(e.payload.get("office", "")) == "regent":
 				t["regencies"] += 1
+		HistoryEvent.EventType.DOCTRINE:
+			var d := Doctrines.get_doctrine(StringName(e.payload.get("doctrine_id", "")))
+			match String(e.payload.get("action", "")):
+				"born":
+					if d != null:
+						t["doctrines"].append(d.name)
+					moment = GameState.doctrines.size() <= 1
+				"adopted":
+					var polity := GameState.get_organization(StringName(e.payload.get("polity", "")))
+					if d != null:
+						t["creeds"].append([d.name, polity.formal_name() if polity != null else "ある国"])
+					moment = true
 		HistoryEvent.EventType.INTRIGUE:
 			if String(e.payload.get("action", "")) == "resolve" \
 					and String(e.payload.get("outcome", "")) != "faded":
@@ -233,6 +248,12 @@ static func _write(t: Dictionary, world_seed: int) -> Dictionary:
 	# Stepping through the names chapter by chapter, so two quiet ages in a row
 	# are not both called the same thing.
 	var title: String = names[(absi(hash([world_seed, theme])) + index) % names.size()]
+	# An age of thought is named for the doctrine it belonged to.
+	if theme == "thought":
+		if not t["creeds"].is_empty():
+			title = "%sの時代" % String(t["creeds"].back()[0])
+		elif not t["doctrines"].is_empty():
+			title = "%sの時代" % String(t["doctrines"].back())
 	return {
 		"index": index,
 		"number": index + 1,
@@ -272,12 +293,14 @@ static func _theme(t: Dictionary) -> String:
 		"calamity": harsh * 2,
 		"bounty": bounty * 2,
 		"decline": int(t["extinctions"].size() * 1.5),
+		"thought": t["doctrines"].size() * 3 + t["creeds"].size() * 3,
 	}
 	# Ties go to whichever comes first here: a split that matched the deaths
 	# is the more interesting half of the story.
 	var best := "peace"
 	var best_score := 1
-	for key in ["war", "fall", "turmoil", "faith", "calamity", "division", "decline", "bounty"]:
+	for key in ["war", "fall", "turmoil", "faith", "thought", "calamity", "division", "decline",
+			"bounty"]:
 		if int(scores[key]) > best_score:
 			best = key
 			best_score = int(scores[key])
@@ -316,6 +339,10 @@ static func _lines(t: Dictionary) -> Array[String]:
 		lines.append("%sが家職となった" % _some(t["hereditary"], "座"))
 	elif int(t["regencies"]) > 0:
 		lines.append("摂政が%d度立った" % t["regencies"])
+	if not t["doctrines"].is_empty():
+		lines.append("%sが説かれた" % _some(t["doctrines"], "の思想"))
+	for entry in t["creeds"].slice(0, 2):
+		lines.append("%sが%sを国是とした" % [entry[1], entry[0]])
 	if int(t["quarrels"]) > 0:
 		lines.append("宮廷で政争が%d度あり%s" % [t["quarrels"],
 			"、%sが失脚した" % _some(t["falls"], "家") if not t["falls"].is_empty()

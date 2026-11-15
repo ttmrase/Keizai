@@ -351,6 +351,7 @@ func _ready() -> void:
 
 	await _capture_uji(shell)
 	await _capture_greats(shell)
+	await _capture_offices_quarrels_doctrines(shell)
 	await _capture_war(shell)
 
 	print("captured to %s" % _out_dir)
@@ -411,6 +412,78 @@ func _capture_greats(shell: Control) -> void:
 	await _capture("%s/lineage_greats.png" % _out_dir)
 	lineage._show_institutions()
 	await _settle()
+
+
+## 要職・政争・思想: the doctrine tree with one opened, a family's grudges and
+## grounds of rank, a quarrel under way on the incidents tab, and a person's
+## record of seats, falls and books.
+func _capture_offices_quarrels_doctrines(shell: Control) -> void:
+	var polity := HouseRank.dominant_realm()
+	# A doctrine to show, if this world has not written one yet.
+	if Doctrines.all().is_empty() and polity != null:
+		var writer := Doctrines._thinker(polity, SimClock.current_tick,
+			RngService.stream(&"doctrine"), true)
+		if writer != null:
+			Doctrines._birth(polity, writer, SimClock.current_tick, RngService.stream(&"doctrine"), {})
+	shell.show_tab("lineage")
+	await _settle()
+	var lineage: Control = shell._screens["lineage"]
+	lineage._show_doctrines()
+	await _settle()
+	var shown: Doctrine = null
+	for d in Doctrines.all():
+		if shown == null or d.adoptions.size() + d.thinkers.size() > shown.adoptions.size() \
+				+ shown.thinkers.size():
+			shown = d
+	if shown != null:
+		lineage._graph.selected_id = shown.doctrine_id
+		lineage._show_detail(shown.doctrine_id)
+	await _settle()
+	await _capture("%s/lineage_doctrines.png" % _out_dir)
+
+	# Somebody whose record has seats, falls or books in it.
+	var subject: NotableIndividual = null
+	var best := 0
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		var score := p.office_history.size() + 3 * p.falls.size() + 3 * Doctrines.works_of(p.person_id).size()
+		if score > best:
+			best = score
+			subject = p
+	if subject != null:
+		lineage.reveal(subject.person_id)
+		await _settle()
+		await _capture("%s/lineage_person_record.png" % _out_dir)
+	lineage._show_institutions()
+	await _settle()
+
+	# A family that holds a grudge, picked out on the relations field.
+	shell.show_tab("relations")
+	await _settle()
+	var relations: Control = shell._screens["relations"]
+	for g in Grudges.live():
+		var holder := Grudges.holder_of(g)
+		if relations._spots.has(holder):
+			relations._on_tapped(relations._spots[holder])
+			break
+	await _settle()
+	await _capture("%s/relations_grudge.png" % _out_dir)
+
+	# A quarrel under way on the incidents tab.
+	if Intrigue.active().is_empty() and polity != null:
+		for g in Grudges.live():
+			var a := GameState.get_organization(Grudges.holder_of(g))
+			var b := GameState.get_organization(StringName(g["target"]))
+			if a == null or b == null or CivilWar.realm_of_house(a) != polity.org_id \
+					or CivilWar.realm_of_house(b) != polity.org_id:
+				continue
+			var actor := GameState.get_current_leader(a.org_id)
+			if actor != null and actor.is_adult(SimClock.current_tick):
+				Intrigue._begin(polity, a, b, actor, SimClock.current_tick, RngService.stream(&"intrigue"))
+				break
+	shell.show_tab("incidents")
+	await _settle()
+	await _capture("%s/incidents_intrigue.png" % _out_dir)
 
 
 ## 戦: a country divided down the middle so the war screens have something to

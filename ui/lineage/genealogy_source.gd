@@ -226,6 +226,17 @@ func detail(id: StringName) -> String:
 				"・政争で左遷" if String(record.get("why", "")) == "intrigue" else ""])
 		lines.append("[color=#9a9080]要職[/color]  %s" % "\n　　　".join(seats))
 
+	var works := Doctrines.works_of(p.person_id)
+	if not works.is_empty():
+		var written: Array[String] = []
+		for entry in works:
+			var d: Doctrine = entry[0]
+			var t: Dictionary = entry[1]
+			written.append("%d年 %s（%s%s）" % [int(int(t.get("tick", 0)) / SimConfig.TICKS_PER_YEAR),
+				String(t.get("work", "")), d.name,
+				"を創始" if String(t.get("kind", "")) == "founded" else "を改訂"])
+		lines.append("[color=#9a9080]思想家[/color]  %s" % "\n　　　".join(written))
+
 	if not p.falls.is_empty():
 		var fell: Array[String] = []
 		for f in p.falls:

@@ -848,7 +848,16 @@ func _draw_tree() -> void:
 			+ (ROW_HEIGHT - NODE_SIZE.y) * (LANE_FIRST + LANE_STEP * float(lane))
 		var mid_y := to_screen(Vector2(0.0, turn_world)).y
 		draw_polyline([start, Vector2(start.x, mid_y), Vector2(end.x, mid_y), end],
-			Palette.LINE, maxf(1.0, 2.0 * view_zoom))
+			source.edge_colour(edge[0], edge[1]) if source != null else Palette.LINE,
+			maxf(1.0, 2.0 * view_zoom))
+
+	if source != null:
+		for link in source.extra_links():
+			if not _positions.has(link[0]) or not _positions.has(link[1]):
+				continue
+			var a: Vector2 = to_screen(_positions[link[0]] + NODE_SIZE * 0.5)
+			var b: Vector2 = to_screen(_positions[link[1]] + NODE_SIZE * 0.5)
+			draw_dashed_line(a, b, link[2], maxf(1.0, 2.0 * view_zoom), 8.0 * view_zoom)
 
 	for id in _positions:
 		_draw_node(id)

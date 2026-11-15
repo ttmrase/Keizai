@@ -17,6 +17,7 @@ func run() -> void:
 	_check_parent_child_symmetry()
 	_check_referential_integrity()
 	_check_power_bounds()
+	check_doctrine_lineage(self, "after %d ticks" % TICKS)
 
 	# A run this long should actually have produced upheaval, otherwise the
 	# invariants above are passing over a world where nothing ever happened.
@@ -125,3 +126,45 @@ func _check_power_bounds() -> void:
 		check(sum >= org.power_score - 0.01,
 			"%s driver contributions (%.2f) should account for its score (%.2f)"
 				% [org.display_name, sum, org.power_score])
+
+
+## 思想 keep the same promise: none, or exactly one root, and every other doctrine
+## comes out of an earlier one by a recorded kind of descent, back to that root.
+## Static so the ideology spec can run it over the worlds it builds.
+static func check_doctrine_lineage(spec: Spec, context: String) -> void:
+	var all := Doctrines.all()
+	if all.is_empty():
+		return
+	var roots := 0
+	for d in all:
+		if d.parent_id == &"":
+			roots += 1
+			spec.check(d.derivation == "root" or d.derivation == "governance",
+				"%s: a root doctrine has no descent to record (%s)" % [context, d.derivation])
+			continue
+		var parent := Doctrines.get_doctrine(d.parent_id)
+		spec.check(parent != null, "%s: %s's parent exists" % [context, d.name])
+		if parent == null:
+			continue
+		spec.check(parent.born_tick <= d.born_tick, "%s: a doctrine is not older than its parent" % context)
+		spec.check(["development", "schism", "reaction", "synthesis", "revival", "governance"]
+			.has(d.derivation), "%s: %s came out of its parent in a known way" % [context, d.name])
+		if d.derivation == "synthesis":
+			spec.check(Doctrines.get_doctrine(d.second_parent_id) != null,
+				"%s: a synthesis has its second parent" % context)
+		if d.derivation == "revival":
+			spec.check(parent.state == "faded" or parent.state_tick <= d.born_tick,
+				"%s: a revival brings back a doctrine that had died" % context)
+		# The chain ends at the root, without going round.
+		var walk := d
+		var steps := 0
+		while walk != null and walk.parent_id != &"" and steps <= all.size():
+			walk = Doctrines.get_doctrine(walk.parent_id)
+			steps += 1
+		spec.check(walk != null and walk.parent_id == &"" and steps <= all.size(),
+			"%s: %s traces back to the root" % [context, d.name])
+	spec.check_eq(roots, 1, "%s: exactly one doctrine is a root" % context)
+	var names := {}
+	for d in all:
+		spec.check(not names.has(d.name), "%s: no two doctrines share a name (%s)" % [context, d.name])
+		names[d.name] = true

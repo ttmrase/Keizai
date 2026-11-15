@@ -128,6 +128,15 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 					if bool(e.payload.get("major", false)):
 						counts["intrigue_major"] = int(counts.get("intrigue_major", 0)) + 1
 					quarrels.append("  ⚔%d年 %s" % [int(e.tick / 4), e.description])
+			HistoryEvent.EventType.DOCTRINE:
+				var act := String(e.payload.get("action", ""))
+				counts["doctrine_" + act] = int(counts.get("doctrine_" + act, 0)) + 1
+				if act == "born":
+					var dk := String(e.payload.get("derivation", ""))
+					counts["derive_" + dk] = int(counts.get("derive_" + dk, 0)) + 1
+					if not counts.has("first_doctrine_year"):
+						counts["first_doctrine_year"] = int(e.tick / 4)
+					quarrels.append("  ✎%d年 %s" % [int(e.tick / 4), e.description])
 			HistoryEvent.EventType.CONFLICT_DECLARED:
 				if e.payload.has("war"):
 					var cause := String(e.payload["war"].get("cause", ""))
@@ -155,9 +164,64 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 	var live := {}
 	for g in Grudges.live():
 		live[g["kind"]] = int(live.get(g["kind"], 0)) + 1
-	print("  政争 %d件 / 生きている遺恨 %s" % [quarrels.size(), live])
-	for line in quarrels.slice(0, 6):
-		print(line)
+	print("  政争・思想 %d行 / 生きている遺恨 %s" % [quarrels.size(), live])
+	for line in quarrels.slice(0, 40):
+		if line.begins_with("  ✎") or quarrels.find(line) < 6:
+			print(line)
+	var alive := 0
+	var creeds: Array[String] = []
+	for d in Doctrines.all():
+		if d.is_alive():
+			alive += 1
+		for a in d.adoptions:
+			creeds.append("%s(%d-%s)" % [d.name, int(int(a["start"]) / 4),
+				"" if int(a["end"]) < 0 else str(int(int(a["end"]) / 4))])
+	print("  思想 %d（存命%d） 国是: %s" % [Doctrines.all().size(), alive, ", ".join(creeds)])
+	# How many were alive at once (each year since the first), and how far apart
+	# revisions came.
+	var now := SimClock.current_tick
+	var most := 0
+	var sum := 0
+	var years := 0
+	if not Doctrines.all().is_empty():
+		var first := Doctrines.all()[0].born_tick
+		for t in range(first, now, SimConfig.TICKS_PER_YEAR):
+			var n := 0
+			for d in Doctrines.all():
+				var end := d.state_tick if d.state == "faded" else now + 1
+				if d.born_tick <= t and t < end:
+					n += 1
+			most = maxi(most, n)
+			sum += n
+			years += 1
+	var gaps: Array[float] = []
+	for d in Doctrines.all():
+		for i in range(1, d.thinkers.size()):
+			gaps.append(float(int(d.thinkers[i]["tick"]) - int(d.thinkers[i - 1]["tick"])) / 4.0)
+	var gap_mean := 0.0
+	for g in gaps:
+		gap_mean += g
+	print("  思想の同時存命 最大%d 平均%.1f／改訂の間隔 平均%.0f年（%d回）" % [most,
+		float(sum) / maxf(1.0, float(years)), gap_mean / maxf(1.0, float(gaps.size())), gaps.size()])
+	# Seats: how long people held them.
+	var tenures := {}
+	for id in GameState.people:
+		for r in GameState.people[id].office_history:
+			var end := int(r.get("end", -1))
+			if end < 0:
+				continue
+			var key := String(r.get("office", ""))
+			var list: Array = tenures.get(key, [])
+			list.append(float(end - int(r.get("start", 0))) / 4.0)
+			tenures[key] = list
+	var tenure_text: Array[String] = []
+	for key in tenures:
+		var total := 0.0
+		for y in tenures[key]:
+			total += float(y)
+		tenure_text.append("%s %d回・平均%.0f年" % [Offices.LABELS.get(key, key), (tenures[key] as Array).size(),
+			total / float((tenures[key] as Array).size())])
+	print("  要職の在任: %s" % "、".join(tenure_text))
 	_report_rank()
 	for war in GameState.world.wars:
 		print("  (進行中) %d年〜 front %.2f" % [int(war.start_tick / 4), war.front])

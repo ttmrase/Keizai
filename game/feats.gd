@@ -92,8 +92,14 @@ const ALL := [
 		"text": "後の世に偉人と称えられる者が現れる"},
 	{"id": "great_pair", "title": "二つの殿堂", "glyph": &"laurel",
 		"text": "一人の者が二つの分野で偉人に列せられる"},
-	{"id": "all_fields", "title": "六つの殿堂", "glyph": &"laurel",
-		"text": "一つの世界で、六つの分野すべてに偉人が出る"},
+	{"id": "all_fields", "title": "七つの殿堂", "glyph": &"laurel",
+		"text": "一つの世界で、七つの分野すべてに偉人が出る"},
+	{"id": "first_doctrine", "title": "最初の思想", "glyph": &"scroll",
+		"text": "世界に初めて、国のあるべき姿を説く思想が生まれる"},
+	{"id": "creed", "title": "国是", "glyph": &"scroll",
+		"text": "国が一つの思想を国是として掲げる"},
+	{"id": "revival", "title": "思想の復興", "glyph": &"scroll",
+		"text": "廃れた思想が後の世の思想家の手で蘇る"},
 ]
 
 ## What a god is called, by how much it has witnessed. A name and nothing more:

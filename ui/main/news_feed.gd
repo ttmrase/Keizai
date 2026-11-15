@@ -210,6 +210,22 @@ static func classify(e: HistoryEvent) -> Dictionary:
 				"heirs":
 					if bool(e.payload.get("reordered", false)):
 						return _item(e, Weight.NOTABLE, "跡目", Palette.HOUSE, &"crown", "power")
+		HistoryEvent.EventType.DOCTRINE:
+			match String(e.payload.get("action", "")):
+				"born":
+					var item := _item(e, Weight.NOTABLE,
+						"思想の誕生" if GameState.doctrines.size() <= 1 else "新しい思想",
+						Palette.RELIGION, &"scroll", "lineage")
+					item["subject"] = StringName(e.payload.get("doctrine_id", ""))
+					return item
+				"adopted":
+					return _item(e, Weight.NOTABLE, "国是", Palette.POLITY, &"scroll", "power")
+				"suppressed":
+					return _item(e, Weight.NOTABLE, "思想弾圧", Palette.DANGER, &"scroll", "lineage")
+				"state":
+					if String(e.payload.get("state", "")) == "faded":
+						return _item(e, Weight.NOTABLE, "思想の衰退", Palette.TEXT_MUTED, &"scroll",
+							"lineage")
 		HistoryEvent.EventType.INTRIGUE:
 			if String(e.payload.get("action", "")) == "resolve":
 				var outcome := String(e.payload.get("outcome", ""))

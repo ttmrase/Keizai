@@ -28,9 +28,14 @@ const GROWTH := "growth"
 const DECLINE := "decline"
 const LONGEVITY := "longevity"
 const ASCENT := "ascent"
+const REGENT := "regent"
+const HEIR := "heir"
+const QUARREL := "quarrel"
+const CREED := "creed"
+const DOCTRINE_FADE := "doctrine_fade"
 
 const KINDS := [HEGEMONY, THRONE, EXTINCTION, NEW_FAITH, BRANCH, INCIDENT, REGIME,
-	FALL, GROWTH, DECLINE, LONGEVITY, ASCENT]
+	FALL, GROWTH, DECLINE, LONGEVITY, ASCENT, REGENT, HEIR, QUARREL, CREED, DOCTRINE_FADE]
 
 ## The kinds whose outcome the dials reach most directly. Every set of offers
 ## carries at least one, so there is always a prophecy the god can work toward
@@ -111,7 +116,99 @@ static func _candidate(kind: String, rng: RandomNumberGenerator, tick: int) -> D
 			return _offer_longevity(rng, tick)
 		ASCENT:
 			return _offer_ascent(rng, tick)
+		REGENT:
+			return _offer_regent(rng, tick)
+		HEIR:
+			return _offer_heir(rng, tick)
+		QUARREL:
+			return _offer_quarrel(rng, tick)
+		CREED, DOCTRINE_FADE:
+			return _offer_doctrine(kind, rng, tick)
 	return {}
+
+
+## A family that will give the crown its regent.
+static func _offer_regent(rng: RandomNumberGenerator, tick: int) -> Dictionary:
+	var realm := HouseRank.dominant_realm()
+	if realm == null or realm.ideology == null or not Offices.seats_for(realm).has("regent"):
+		return {}
+	var sitting := StringName(realm.offices.get("regent", {}).get("house", ""))
+	var houses: Array[Organization] = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.is_noble() and house.org_id != sitting \
+				and CivilWar.realm_of_house(house) == realm.org_id \
+				and HouseRank.precedence(house) >= Offices.min_rank_of("regent", realm) - 0.5:
+			houses.append(house)
+	if houses.is_empty():
+		return {}
+	houses.sort_custom(func(a, b): return HouseRank.precedence(a) > HouseRank.precedence(b))
+	var place := rng.randi_range(0, mini(2, houses.size() - 1))
+	var house: Organization = houses[place]
+	return _make(REGENT, String(house.org_id), house.formal_name(), 0.0, tick, 60, 60 + place * 15,
+		"%d年のうちに、%sが摂政を出す" % [60, house.formal_name()],
+		"摂政は幼い長、老いた長、強い外戚のもとで立つ。疫病と飢えは長を若くも弱くもする")
+
+
+## A family that will stand first among the houses next in line to the crown.
+static func _offer_heir(rng: RandomNumberGenerator, tick: int) -> Dictionary:
+	var realm := HouseRank.dominant_realm()
+	if realm == null or realm.ideology == null or realm.ideology.legitimacy_basis \
+			!= PoliticalSystemAxes.LegitimacyBasis.HEREDITARY:
+		return {}
+	var first := realm.heir_houses[0] if not realm.heir_houses.is_empty() else &""
+	var ruler := GameState.get_current_leader(realm.org_id)
+	var houses: Array[Organization] = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.is_noble() and house.org_id != first \
+				and (ruler == null or house.org_id != ruler.house_org_id) \
+				and CivilWar.realm_of_house(house) == realm.org_id:
+			houses.append(house)
+	if houses.is_empty():
+		return {}
+	houses.sort_custom(func(a, b): return HouseRank.precedence(a) > HouseRank.precedence(b))
+	var house: Organization = houses[rng.randi_range(0, mini(2, houses.size() - 1))]
+	return _make(HEIR, String(house.org_id), house.formal_name(), 0.0, tick, 40,
+		70 if realm.heir_houses.has(house.org_id) else 90,
+		"%d年のうちに、%sが跡目家の筆頭に立つ" % [40, house.formal_name()],
+		"跡目家は王家の分家と外戚から、家格の順に選ばれる。政争で順位を落とす家もある")
+
+
+## Which side of a quarrel under way at court comes out on top.
+static func _offer_quarrel(rng: RandomNumberGenerator, tick: int) -> Dictionary:
+	var states := Intrigue.active()
+	if states.is_empty():
+		return {}
+	var state: Dictionary = states[rng.randi_range(0, states.size() - 1)]
+	var side := "instigator" if rng.randf() < 0.5 else "target"
+	var house := GameState.get_organization(StringName(state[side]))
+	var other := GameState.get_organization(StringName(state["target" if side == "instigator"
+		else "instigator"]))
+	if house == null or other == null:
+		return {}
+	var years := maxi(3, int(ceil(float(int(state["resolve_tick"]) - tick) / float(Y))) + 2)
+	return _make(QUARREL, "%s|%s" % [state["id"], house.org_id], house.formal_name(), 0.0, tick,
+		years, 40 if side == "target" else 55,
+		"%d年のうちに、%sとの政争に%sが勝つ" % [years, other.formal_name(), house.formal_name()],
+		"政争は家格・役職・長との近さ・味方・富・運で決まる。体制の正統性と不満が宮廷を揺らす")
+
+
+static func _offer_doctrine(kind: String, rng: RandomNumberGenerator, tick: int) -> Dictionary:
+	var choices: Array[Doctrine] = []
+	for d in Doctrines.living():
+		if kind == CREED and d.adopted_by().is_empty():
+			choices.append(d)
+		elif kind == DOCTRINE_FADE and d.adopted_by().is_empty():
+			choices.append(d)
+	if choices.is_empty():
+		return {}
+	var d: Doctrine = choices[rng.randi_range(0, choices.size() - 1)]
+	if kind == CREED:
+		return _make(CREED, String(d.doctrine_id), d.name, 0.0, tick, 60, 70,
+			"%d年のうちに、%sがいずれかの国の国是となる" % [60, d.name],
+			"国は新しい体制や、議場を握った派閥の綱領を通じて思想を掲げる。国の向きが教えに近いほど")
+	return _make(DOCTRINE_FADE, String(d.doctrine_id), d.name, 0.0, tick, 80, 55,
+		"%d年のうちに、%sが廃れる" % [80, d.name],
+		"掲げる国も派閥もない思想は声望を失って廃れる。それを説く国が衰えれば")
 
 
 static func _make(kind: String, target: String, target_name: String, param: float,
@@ -331,6 +428,33 @@ static func notice(p: Dictionary, e: HistoryEvent) -> void:
 			if e.event_type == HistoryEvent.EventType.SCHISM \
 					and String(e.payload.get("schism_kind", "")) == "refounding":
 				p["met"] = true
+		REGENT:
+			if e.event_type == HistoryEvent.EventType.OFFICE \
+					and String(e.payload.get("action", "")) == "appoint" \
+					and String(e.payload.get("office", "")) == "regent" \
+					and String(e.payload.get("house", "")) == String(p["target"]):
+				p["met"] = true
+		QUARREL:
+			var parts := String(p["target"]).split("|")
+			if e.event_type == HistoryEvent.EventType.INTRIGUE and parts.size() == 2 \
+					and String(e.payload.get("action", "")) == "resolve" \
+					and String(e.payload.get("id", "")) == parts[0]:
+				var outcome := String(e.payload.get("outcome", ""))
+				var winner := String(e.payload.get("instigator", "")) if outcome == "won" else (
+					String(e.payload.get("target", "")) if outcome == "backfired" else "")
+				p["met"] = winner == parts[1]
+				p["settled"] = true
+		CREED:
+			if e.event_type == HistoryEvent.EventType.DOCTRINE \
+					and String(e.payload.get("action", "")) == "adopted" \
+					and String(e.payload.get("doctrine_id", "")) == String(p["target"]):
+				p["met"] = true
+		DOCTRINE_FADE:
+			if e.event_type == HistoryEvent.EventType.DOCTRINE \
+					and String(e.payload.get("action", "")) == "state" \
+					and String(e.payload.get("state", "")) == "faded" \
+					and String(e.payload.get("doctrine_id", "")) == String(p["target"]):
+				p["met"] = true
 
 
 static func judge(p: Dictionary, tick: int) -> int:
@@ -378,6 +502,18 @@ static func judge(p: Dictionary, tick: int) -> int:
 				return Verdict.FULFILLED
 			var org := GameState.get_organization(target)
 			if org == null or not org.is_active():
+				return Verdict.FAILED
+		HEIR:
+			var house := GameState.get_organization(target)
+			if house == null or not house.is_active():
+				return Verdict.FAILED
+			var realm := HouseRank.dominant_realm()
+			if realm != null and not realm.heir_houses.is_empty() and realm.heir_houses[0] == target:
+				return Verdict.FULFILLED
+		QUARREL:
+			if p["met"]:
+				return Verdict.FULFILLED
+			if bool(p.get("settled", false)):
 				return Verdict.FAILED
 		_:
 			if p["met"]:
@@ -450,6 +586,36 @@ static func progress(p: Dictionary, tick: int) -> String:
 		NEW_FAITH:
 			return "いま世にある信仰 %d" % GameState.organizations_of_kind(
 				Organization.OrgKind.RELIGION).size()
+		REGENT:
+			var realm := HouseRank.dominant_realm()
+			if realm == null:
+				return ""
+			var sitting := GameState.get_organization(StringName(realm.offices.get("regent", {})
+				.get("house", "")))
+			return "いまの摂政は%s" % sitting.formal_name() if sitting != null else "いま摂政は立っていない"
+		HEIR:
+			var realm := HouseRank.dominant_realm()
+			if realm == null:
+				return ""
+			var at := realm.heir_houses.find(target)
+			return "いま跡目家の第%d位" % (at + 1) if at >= 0 else "いまは跡目家に入っていない"
+		QUARREL:
+			var parts := String(p["target"]).split("|")
+			for state in Intrigue.active():
+				if parts.size() == 2 and String(state["id"]) == parts[0]:
+					var lead := 0.0
+					var factors := Intrigue.outlook(state)
+					for key in factors:
+						lead += float(factors[key])
+					var mine := lead if String(state["instigator"]) == parts[1] else -lead
+					return "形勢 %s（%+.2f）" % ["優勢" if mine > 0.2 else ("劣勢" if mine < -0.2 else "五分"), mine]
+			return "決着した"
+		CREED, DOCTRINE_FADE:
+			var d := Doctrines.get_doctrine(target)
+			if d == null:
+				return ""
+			return "%s・声望%d%%・国是%d国" % [Doctrines.state_label(d.state), int(d.prestige * 100.0),
+				d.adopted_by().size()]
 	return ""
 
 

@@ -171,6 +171,9 @@ const STANDING_LABELS := {
 @export var intrigue_won: int = 0
 @export var intrigue_lost: int = 0
 @export var last_intrigue_tick: int = -1
+## POLITICAL_SYSTEM: the doctrine held as the state's creed (国是). FACTION: the
+## one it marches under (綱領). Written only by apply. See Doctrines.
+@export var doctrine_id: StringName = &""
 
 
 func kind_name() -> String:
@@ -291,6 +294,8 @@ func to_dict() -> Dictionary:
 		d["blemishes"] = blemishes.duplicate(true)
 	if uji_chief_id != &"":
 		d["uji_chief_id"] = String(uji_chief_id)
+	if doctrine_id != &"":
+		d["doctrine_id"] = String(doctrine_id)
 	if intrigue_won > 0 or intrigue_lost > 0 or last_intrigue_tick >= 0:
 		d["intrigue"] = [intrigue_won, intrigue_lost, last_intrigue_tick]
 	return d
@@ -369,6 +374,7 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.merits = _numbers_settled_list((d.get("merits", []) as Array).duplicate(true))
 	o.blemishes = _numbers_settled_list((d.get("blemishes", []) as Array).duplicate(true))
 	o.uji_chief_id = StringName(d.get("uji_chief_id", ""))
+	o.doctrine_id = StringName(d.get("doctrine_id", ""))
 	var quarrels: Array = d.get("intrigue", [0, 0, -1])
 	if quarrels.size() >= 3:
 		o.intrigue_won = int(quarrels[0])

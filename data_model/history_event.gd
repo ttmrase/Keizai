@@ -45,6 +45,9 @@ enum EventType {
 	## through the ordinary records (an office vacated, an honour stripped); this
 	## is the account of the quarrel itself. Appended last, as above.
 	INTRIGUE,
+	## A doctrine — 思想: born, revised, taken up or let go by a state, put on a
+	## faction's banner, driven out, blessed or condemned, faded. Appended last.
+	DOCTRINE,
 }
 
 const TYPE_NAMES := {
@@ -68,6 +71,7 @@ const TYPE_NAMES := {
 	EventType.GREATNESS: "GREATNESS",
 	EventType.OFFICE: "OFFICE",
 	EventType.INTRIGUE: "INTRIGUE",
+	EventType.DOCTRINE: "DOCTRINE",
 }
 
 @export var event_id: StringName = &""

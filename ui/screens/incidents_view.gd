@@ -192,6 +192,9 @@ func _side_label(polity: Organization, colour: Color, align: int) -> Control:
 	var house := CivilWar.ruling_house_of(polity)
 	var under := Label.new()
 	under.text = "%s方" % house.formal_name() if house != null else "長は空位"
+	var creed := Doctrines.creed_of(polity)
+	if creed != null:
+		under.text += "・%s" % creed.name
 	under.horizontal_alignment = align
 	under.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	under.add_theme_color_override("font_color", Palette.TEXT_MUTED)

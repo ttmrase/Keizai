@@ -377,6 +377,14 @@ func _feats_from_event(e: HistoryEvent) -> void:
 		HistoryEvent.EventType.SUCCESSION:
 			if e.description.contains("跡目家の"):
 				_unlock("heir_succession")
+		HistoryEvent.EventType.DOCTRINE:
+			match String(e.payload.get("action", "")):
+				"born":
+					_unlock("first_doctrine")
+					if String(e.payload.get("derivation", "")) == "revival":
+						_unlock("revival")
+				"adopted":
+					_unlock("creed")
 		HistoryEvent.EventType.INTRIGUE:
 			var outcome := String(e.payload.get("outcome", ""))
 			if outcome == "won" or outcome == "backfired":

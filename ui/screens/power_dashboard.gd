@@ -110,6 +110,13 @@ func _rebuild() -> void:
 ## The great offices of a state as text: one line a seat, then the heir houses.
 static func office_lines(polity: Organization) -> String:
 	var lines: Array[String] = []
+	var creed := Doctrines.creed_of(polity)
+	if creed != null:
+		var since := 0
+		for a in creed.adoptions:
+			if StringName(a.get("polity", "")) == polity.org_id and int(a.get("end", -1)) < 0:
+				since = int(a.get("start", 0))
+		lines.append("国是　%s（%d年〜）" % [creed.name, int(since / SimConfig.TICKS_PER_YEAR)])
 	if Offices.is_regency_by_right(polity):
 		var regent := GameState.get_organization(StringName(polity.hereditary_offices["regent"]))
 		lines.append("摂関政治：実権は%sにある" % (regent.formal_name() if regent != null else "摂政家"))

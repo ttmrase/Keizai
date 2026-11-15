@@ -305,6 +305,18 @@ static func _loyalty_of_region(s: SettlementState, polity: Organization, winner:
 				score += 0.2
 	if winner.kind == Organization.OrgKind.RELIGION and s.religion_id == winner.org_id:
 		score -= 0.5
+	# And what the lord of the region believes: a family that shares the old
+	# state's creed stands by it, one that shares the challenger's goes over.
+	if lord != null and lord.is_active():
+		var belief := Doctrines.sympathy_of(lord)
+		if belief != null:
+			if belief.doctrine_id == polity.doctrine_id:
+				score += 0.2
+			var theirs := Doctrines.get_doctrine(winner.doctrine_id)
+			if theirs == null:
+				theirs = Doctrines.sympathy_of(winner)
+			if theirs != null and belief.doctrine_id == theirs.doctrine_id:
+				score -= 0.25
 	if ruler_house != null and ruler_house.faith_id != &"" and s.religion_id == ruler_house.faith_id:
 		score += 0.15
 	score -= (s.unrest - 0.3) * 0.9
@@ -427,6 +439,13 @@ static func split_country(polity: Organization, claimant: Dictionary, plan: Dict
 	var war := war_of(polity.org_id)
 	if war != null:
 		Offices.appoint_war_command(war, tick)
+	# The breakaway marches under its claimant's doctrine, if it has one: the
+	# two sides are told apart by what they believe as much as by who leads them.
+	var banner := Doctrines.get_doctrine(winner.doctrine_id)
+	if banner == null:
+		banner = Doctrines.sympathy_of(winner)
+	if banner != null and banner.is_alive() and polity.doctrine_id != banner.doctrine_id:
+		Doctrines._adopt(breakaway, banner, tick, "旗揚げした%sは" % breakaway.display_name)
 
 
 static func _region_list(ids: Array) -> String:

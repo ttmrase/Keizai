@@ -9,13 +9,15 @@ extends Control
 ## most of the tree, and putting it next to the guilds and faiths leaves those
 ## squeezed into a corner of a chart that is mostly surnames.
 
-enum Mode { INSTITUTIONS, HOUSES, PEOPLE, GREATS }
+enum Mode { INSTITUTIONS, HOUSES, PEOPLE, GREATS, DOCTRINES }
 
 var _institution_source := OrganizationLineageSource.new()
 var _house_source := OrganizationLineageSource.new()
 var _people_source := GenealogySource.new()
 ## The same family chart narrowed to one house. Empty means the whole world.
 var _house_tree_source := HouseGenealogySource.new()
+## 思想 — the lineage of doctrines, apart from any organization.
+var _doctrine_source := DoctrineLineageSource.new()
 var _focus_house: StringName = &""
 var _mode := Mode.INSTITUTIONS
 ## People view only: draw the heads of houses, without everyone who married in.
@@ -43,6 +45,7 @@ var _rename_dialog: RenameDialog
 var _uji_button: Button
 ## The fourth view: the hall of the people history keeps, shelf by field.
 var _greats_button: Button
+var _doctrine_button: Button
 var _hall: ScrollContainer
 var _hall_rows: VBoxContainer
 
@@ -53,6 +56,10 @@ func _ready() -> void:
 	_greats_button.text = "偉人"
 	_people_button.get_parent().add_child(_greats_button)
 	_greats_button.pressed.connect(_show_greats)
+	_doctrine_button = _people_button.duplicate()
+	_doctrine_button.text = "思想"
+	_people_button.get_parent().add_child(_doctrine_button)
+	_doctrine_button.pressed.connect(_show_doctrines)
 	_hall = ScrollContainer.new()
 	_hall.visible = false
 	_hall.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -120,6 +127,15 @@ func on_shown() -> void:
 
 func _show_greats() -> void:
 	_mode = Mode.GREATS
+	_sync_modes()
+	_rebuild()
+
+
+func _show_doctrines() -> void:
+	_mode = Mode.DOCTRINES
+	_graph.set_source(_doctrine_source)
+	_graph.spine_mode = false
+	_search.placeholder_text = "思想を探す"
 	_sync_modes()
 	_rebuild()
 
@@ -206,7 +222,8 @@ func _most_notable_living() -> StringName:
 
 func _sync_modes() -> void:
 	for entry in [[_org_button, Mode.INSTITUTIONS], [_house_button, Mode.HOUSES],
-			[_people_button, Mode.PEOPLE], [_greats_button, Mode.GREATS]]:
+			[_people_button, Mode.PEOPLE], [_greats_button, Mode.GREATS],
+			[_doctrine_button, Mode.DOCTRINES]]:
 		Palette.style_pill(entry[0], _mode == entry[1])
 	var hall := _mode == Mode.GREATS
 	_hall.visible = hall
@@ -217,7 +234,7 @@ func _sync_modes() -> void:
 		_detail.visible = false
 		_results.visible = false
 
-	_scope_button.visible = _mode != Mode.INSTITUTIONS \
+	_scope_button.visible = _mode != Mode.INSTITUTIONS and _mode != Mode.DOCTRINES \
 		and not (_mode == Mode.HOUSES and _house_source.uji_filter != &"")
 	_uji_button.visible = _mode == Mode.HOUSES
 	_uji_button.text = "氏" if _house_source.uji_filter == &"" \
@@ -268,6 +285,10 @@ func _update_focus_note() -> void:
 			% HouseNaming.uji_summary(_house_source.uji_filter)
 	elif _mode == Mode.HOUSES and not _house_source.include_retainers:
 		_focus_note.text = "主家のみ表示中：側近家は「側近家も」で開きます"
+	elif _mode == Mode.DOCTRINES and Doctrines.all().is_empty():
+		_focus_note.text = "まだ思想は生まれていない。ある程度自由な国か、優れた治世から生まれる"
+	elif _mode == Mode.DOCTRINES:
+		_focus_note.text = "線の色は生まれ方：灰=発展 橙=分派 赤=反動 緑=総合 金=復興 青=治世から。淡い札は廃れた思想"
 	else:
 		_focus_note.visible = false
 
@@ -278,6 +299,8 @@ func _current_source() -> LineageSource:
 			return _house_source
 		Mode.PEOPLE:
 			return _people_source if _focus_house == &"" else _house_tree_source
+		Mode.DOCTRINES:
+			return _doctrine_source
 	return _institution_source
 
 
@@ -319,7 +342,10 @@ func _on_result_chosen(id: StringName) -> void:
 ## they are talking about, so the reader never has to go and search for them.
 func reveal(id: StringName) -> void:
 	_results.visible = false
-	if GameState.get_person(id) != null:
+	if Doctrines.get_doctrine(id) != null:
+		_show_doctrines()
+		_graph.focus_on(id)
+	elif GameState.get_person(id) != null:
 		_focus_house = &""
 		_show_people()
 		_graph.focus_on_kin(id)
@@ -504,7 +530,12 @@ func _jump_to_root() -> void:
 		_graph.frame_all()
 		return
 	var root_id := &""
-	if _mode != Mode.PEOPLE:
+	if _mode == Mode.DOCTRINES:
+		var walk := Doctrines.get_doctrine(id)
+		while walk != null and walk.parent_id != &"":
+			walk = Doctrines.get_doctrine(walk.parent_id)
+		root_id = walk.doctrine_id if walk != null else &""
+	elif _mode != Mode.PEOPLE:
 		var root := GenealogyValidator.root_ancestor(id)
 		if root != null:
 			root_id = root.org_id
@@ -564,6 +595,6 @@ func _show_detail(id: StringName) -> void:
 	_detail_title.text = person.full_name if person != null \
 		else (org.formal_name() if org != null else source.label(id))
 	_detail_body.text = source.detail(id)
-	_rename_button.visible = _mode != Mode.PEOPLE
+	_rename_button.visible = _mode != Mode.PEOPLE and _mode != Mode.DOCTRINES
 	_house_tree_button.visible = _mode == Mode.HOUSES
 	_detail.visible = true

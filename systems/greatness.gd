@@ -24,7 +24,7 @@ extends RefCounted
 ##   変革  who brought a state down and put something lasting in its place
 ##   家門  heads who raised their families two ranks, for good
 
-const FIELDS := ["rule", "arms", "faith", "craft", "change", "house"]
+const FIELDS := ["rule", "arms", "faith", "craft", "change", "house", "thought"]
 
 const FIELD_LABELS := {
 	"rule": "統治",
@@ -33,6 +33,7 @@ const FIELD_LABELS := {
 	"craft": "富と技",
 	"change": "変革",
 	"house": "家門",
+	"thought": "思想",
 }
 
 const FIELD_GLYPHS := {
@@ -42,6 +43,7 @@ const FIELD_GLYPHS := {
 	"craft": &"coin",
 	"change": &"banner",
 	"house": &"seal",
+	"thought": &"scroll",
 }
 
 ## What it would take, for the shelves nobody stands on yet.
@@ -52,7 +54,17 @@ const FIELD_HINTS := {
 	"craft": "世で最初の商い・職人・魔術・討伐のギルドを興し、それが世で最も力ある組織になる",
 	"change": "体制を倒し、その新しい秩序を百三十年以上続かせる",
 	"house": "当主として家格を二段以上引き上げて公爵か王家に至らせ、五十年後もその家をそこに留める",
+	"thought": "興した思想が二つ以上の国の国是として長く続く、百五十年国是であり続ける、あるいは国是となって四つ以上の思想を生む",
 }
+
+# --- 思想 ---
+## A founder whose doctrine was the creed of this many countries, or of one for
+## this long, or that this many later doctrines came out of.
+const THOUGHT_CREEDS := 2
+const THOUGHT_CREEDS_YEARS := 60
+const THOUGHT_CREED_YEARS := 150
+const THOUGHT_DESCENDANTS := 4
+const THOUGHT_DESCENDANTS_YEARS := 30
 
 # --- 統治 ---
 const FOUNDER_YEARS := 120
@@ -152,6 +164,7 @@ static func step(tick: int) -> void:
 	_watch_offices(tick)
 	_judge_founders(tick)
 	_judge_pending(tick)
+	_judge_thinkers(tick)
 
 
 # -------------------------------------------------------------------- reigns
@@ -598,6 +611,36 @@ static func _most_powerful() -> Organization:
 		if best == null or org.power_score > best.power_score:
 			best = org
 	return best
+
+
+## 思想: the founder of a doctrine the textbooks cannot leave out — taken up by
+## several countries, held as a creed for generations, or the source of a whole
+## family of later doctrines. Judged only once the founder is dead.
+static func _judge_thinkers(tick: int) -> void:
+	for d in Doctrines.all():
+		var founder := d.founder()
+		if founder == null or founder.is_alive() or _already(founder.person_id, "thought"):
+			continue
+		var countries := {}
+		var years := 0
+		for a in d.adoptions:
+			countries[String(a.get("polity", ""))] = true
+			var end := int(a.get("end", -1))
+			years += int(((end if end >= 0 else tick) - int(a.get("start", 0))) / SimConfig.TICKS_PER_YEAR)
+		var heirs := Doctrines.descendants_count(d.doctrine_id)
+		var why := ""
+		# Textbook founders only: a doctrine that ruled, not merely one argued over.
+		if countries.size() >= THOUGHT_CREEDS and years >= THOUGHT_CREEDS_YEARS:
+			why = "その教えは%dつの国の国是となり、のべ%d年続いた" % [countries.size(), years]
+		elif years >= THOUGHT_CREED_YEARS:
+			why = "その教えは%d年にわたり国是であり続けた" % years
+		elif heirs >= THOUGHT_DESCENDANTS and years >= THOUGHT_DESCENDANTS_YEARS:
+			why = "その教えは国是となり、そこから%dの思想が生まれた" % heirs
+		if why == "":
+			continue
+		_recognise(founder, "thought", "%sの祖" % d.name,
+			"%sを著して%sを説き、%s。" % [String(d.thinkers[0].get("work", "")) if not d.thinkers.is_empty()
+				else "", d.name, why], [d.origin_event_id], tick)
 
 
 static func _recognise(person: NotableIndividual, field: String, title: String,

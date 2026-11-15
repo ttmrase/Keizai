@@ -232,6 +232,17 @@ static func _overturn(polity: Organization, claimant: Dictionary, tick: int) -> 
 	if winner.ideology != null:
 		for a in PoliticalSystemAxes.AXIS_NAMES:
 			axis_shift[String(a)] = winner.ideology.get_axis(a)
+	# A faction that marches under a doctrine builds the state that doctrine
+	# describes, as far as it can: the new order leans halfway to its picture,
+	# and rests on what the doctrine says makes rule right when nothing forces
+	# another answer.
+	var banner := Doctrines.get_doctrine(winner.doctrine_id)
+	if banner != null and banner.is_alive():
+		for a in PoliticalSystemAxes.AXIS_NAMES:
+			axis_shift[String(a)] = lerpf(float(axis_shift.get(String(a), 0.0)),
+				float(banner.claims.get(String(a), 0.0)), 0.5)
+		if int(claimant.get("basis", -1)) < 0:
+			basis = banner.basis
 
 	# Where enough of the country still stands by the old order — or the change
 	# was taken by force — the country does not fall, it divides, and the two

@@ -18,12 +18,16 @@ var people: Dictionary[StringName, NotableIndividual] = {}
 ## recognised: {person_id, field, title, text, tick, basis}. Written only by
 ## apply(), from GREATNESS events.
 var greats: Array[Dictionary] = []
+## 思想 — every doctrine the world has produced, living or faded. Written only
+## by apply(), from DOCTRINE events. See Doctrines.
+var doctrines: Dictionary[StringName, Doctrine] = {}
 
 # Deterministic id counters. Persisted, so ids stay stable across save/load.
 var _next_event_seq: int = 0
 var _next_org_seq: int = 0
 var _next_person_seq: int = 0
 var _next_disaster_seq: int = 0
+var _next_doctrine_seq: int = 0
 
 
 func _ready() -> void:
@@ -50,6 +54,11 @@ func mint_person_id() -> StringName:
 func mint_disaster_id() -> StringName:
 	_next_disaster_seq += 1
 	return StringName("dis_%05d" % _next_disaster_seq)
+
+
+func mint_doctrine_id() -> StringName:
+	_next_doctrine_seq += 1
+	return StringName("doc_%04d" % _next_doctrine_seq)
 
 
 # ------------------------------------------------------------------ queries
@@ -218,6 +227,8 @@ func _apply_by_type(e: HistoryEvent) -> void:
 			_apply_office(e)
 		HistoryEvent.EventType.INTRIGUE:
 			_apply_intrigue(e)
+		HistoryEvent.EventType.DOCTRINE:
+			_apply_doctrine(e)
 		_:
 			# IDEOLOGY_SHIFT, CONFLICT_*, RESOURCE_SHOCK and EPOCH_SUMMARY are
 			# chronicle markers for values their owning system already changed.
@@ -727,6 +738,84 @@ func _apply_greatness(e: HistoryEvent) -> void:
 	})
 
 
+func _doctrines_to_dict() -> Dictionary:
+	var out := {}
+	for id in doctrines:
+		out[String(id)] = doctrines[id].to_dict()
+	return out
+
+
+## A doctrine born, revised, adopted or let go, put on a banner, driven out,
+## judged by the faith, or faded.
+func _apply_doctrine(e: HistoryEvent) -> void:
+	var p: Dictionary = e.payload
+	var id := StringName(p.get("doctrine_id", ""))
+	if String(p.get("action", "")) == "born":
+		var born := Doctrine.from_dict(p.get("doctrine", {}))
+		born.origin_event_id = e.event_id
+		if born.origin_claims.is_empty():
+			born.origin_claims = born.claims.duplicate()
+		doctrines[born.doctrine_id] = born
+		return
+	var d: Doctrine = doctrines.get(id)
+	match String(p.get("action", "")):
+		"revised":
+			if d == null:
+				return
+			d.thinkers.append({"person": String(p.get("person", "")), "tick": e.tick,
+				"kind": "revised", "work": String(p.get("work", "")),
+				"teacher": String(p.get("teacher", ""))})
+			var claims: Dictionary = p.get("claims", {})
+			for axis in claims:
+				d.claims[String(axis)] = float(claims[axis])
+			d.maturity = float(p.get("maturity", d.maturity))
+		"adopted":
+			var polity: Organization = organizations.get(StringName(p.get("polity", "")))
+			if d == null or polity == null:
+				return
+			var held: Doctrine = doctrines.get(polity.doctrine_id)
+			if held != null:
+				_close_adoption(held, polity.org_id, e.tick)
+			d.adoptions.append({"polity": String(polity.org_id), "start": e.tick, "end": -1})
+			polity.doctrine_id = d.doctrine_id
+		"abandoned":
+			if d == null:
+				return
+			var polity_id := StringName(p.get("polity", ""))
+			_close_adoption(d, polity_id, e.tick)
+			var polity: Organization = organizations.get(polity_id)
+			if polity != null and polity.doctrine_id == d.doctrine_id:
+				polity.doctrine_id = &""
+		"platform":
+			var faction: Organization = organizations.get(StringName(p.get("faction", "")))
+			if faction != null:
+				faction.doctrine_id = id
+		"suppressed":
+			if d == null:
+				return
+			d.home_polity_id = StringName(p.get("home", d.home_polity_id))
+			d.state = String(p.get("state", d.state))
+			d.state_tick = e.tick
+			var victim: NotableIndividual = people.get(StringName(p.get("person", "")))
+			if victim != null:
+				victim.falls.append({"kind": String(p.get("fate", "exiled")), "tick": e.tick,
+					"polity": String(p.get("polity", "")), "office": "", "by": "",
+					"doctrine": String(id)})
+		"faith":
+			if d != null:
+				d.faith_stance = String(p.get("stance", ""))
+		"state":
+			if d != null:
+				d.state = String(p.get("state", d.state))
+				d.state_tick = e.tick
+
+
+func _close_adoption(d: Doctrine, polity_id: StringName, tick: int) -> void:
+	for a in d.adoptions:
+		if StringName(a.get("polity", "")) == polity_id and int(a.get("end", -1)) < 0:
+			a["end"] = tick
+
+
 func war_by_id(war_id: StringName) -> WarState:
 	for war in world.wars:
 		if war.war_id == war_id:
@@ -987,6 +1076,8 @@ func reset() -> void:
 	organizations.clear()
 	people.clear()
 	greats.clear()
+	doctrines.clear()
+	_next_doctrine_seq = 0
 	_next_event_seq = 0
 	_next_org_seq = 0
 	_next_person_seq = 0
@@ -1005,6 +1096,8 @@ func to_dict() -> Dictionary:
 		"organizations": orgs,
 		"people": folks,
 		"greats": greats.duplicate(true),
+		"doctrines": _doctrines_to_dict(),
+		"next_doctrine_seq": _next_doctrine_seq,
 		"next_event_seq": _next_event_seq,
 		"next_org_seq": _next_org_seq,
 		"next_person_seq": _next_person_seq,
@@ -1036,3 +1129,8 @@ func from_dict(d: Dictionary) -> void:
 	_next_org_seq = int(d.get("next_org_seq", 0))
 	_next_person_seq = int(d.get("next_person_seq", 0))
 	_next_disaster_seq = int(d.get("next_disaster_seq", 0))
+	# Saved before doctrines existed: none had been written yet.
+	doctrines.clear()
+	for id in d.get("doctrines", {}):
+		doctrines[StringName(id)] = Doctrine.from_dict(d["doctrines"][id])
+	_next_doctrine_seq = int(d.get("next_doctrine_seq", doctrines.size()))

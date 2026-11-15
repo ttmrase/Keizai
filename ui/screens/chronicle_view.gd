@@ -22,6 +22,7 @@ const FILTERS := [
 		HistoryEvent.EventType.POWER_TRANSFER, HistoryEvent.EventType.CONFLICT_RESOLVED,
 		HistoryEvent.EventType.OFFICE]},
 	{"label": "政争", "types": [HistoryEvent.EventType.INTRIGUE]},
+	{"label": "思想", "types": [HistoryEvent.EventType.DOCTRINE]},
 	{"label": "人物", "types": [HistoryEvent.EventType.BIRTH, HistoryEvent.EventType.DEATH,
 		HistoryEvent.EventType.MARRIAGE]},
 	{"label": "災厄", "types": [HistoryEvent.EventType.DISASTER_OCCURRED,
@@ -522,6 +523,10 @@ func _look_of(e: HistoryEvent) -> Dictionary:
 			return {"glyph": &"laurel", "colour": Palette.ACCENT, "ink": Palette.TEXT}
 		HistoryEvent.EventType.OFFICE:
 			return {"glyph": &"seal", "colour": Palette.POLITY, "ink": Palette.TEXT_MUTED}
+		HistoryEvent.EventType.DOCTRINE:
+			var born := String(e.payload.get("action", "")) in ["born", "adopted"]
+			return {"glyph": &"scroll", "colour": Palette.RELIGION if born else Palette.TEXT_DIM,
+				"ink": Palette.TEXT if born else Palette.TEXT_MUTED}
 		HistoryEvent.EventType.INTRIGUE:
 			var decided := String(e.payload.get("outcome", "")) in ["won", "backfired"]
 			return {"glyph": &"dagger", "colour": Palette.DANGER if decided else Palette.HOUSE,

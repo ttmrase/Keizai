@@ -94,3 +94,15 @@ func generation(_id: StringName) -> int:
 ## An empty array means there is no such reduction and everything is drawn.
 func spine_ids() -> Array[StringName]:
 	return []
+
+
+## The colour of the line from a parent to a child. Plain unless a source has
+## something to say about how the child came out of its parent.
+func edge_colour(_parent_id: StringName, _child_id: StringName) -> Color:
+	return Palette.LINE
+
+
+## Links beside the tree, drawn as broken lines: [from_id, to_id, colour]. For
+## a node with a second parent the tree cannot hang it from.
+func extra_links() -> Array:
+	return []

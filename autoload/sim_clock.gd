@@ -73,6 +73,8 @@ func _advance_one_tick() -> void:
 	CivilWar.step(current_tick)
 	# Quarrels at court move a season on, and once a year a new one may start.
 	Intrigue.step(current_tick)
+	# Once a year, thinkers write, states take up creeds or let them go.
+	Doctrines.step(current_tick)
 	# And once a year, history weighs who is to be remembered.
 	Greatness.step(current_tick)
 	HousePartition.step(current_tick)

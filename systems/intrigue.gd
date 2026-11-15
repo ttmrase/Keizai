@@ -80,6 +80,8 @@ const FALL_LABELS := {
 	"displaced": "左遷",
 	"demoted": "降格",
 	"retired": "隠居",
+	"exiled": "追放",
+	"jailed": "投獄",
 }
 
 
@@ -333,6 +335,12 @@ static func _opening(polity: Organization, a: Organization, b: Organization,
 		o -= 0.4
 	if _share_a_body(a, b):
 		o += 0.3
+	# What they believe: a family that thinks differently about how the country
+	# should be run is easier to move against, one that thinks the same harder.
+	var belief_a := Doctrines.sympathy_of(a)
+	var belief_b := Doctrines.sympathy_of(b)
+	if belief_a != null and belief_b != null:
+		o += 0.25 if belief_a != belief_b else -0.2
 	# Moving against the crown's own family is rare, and dangerous.
 	if ruler_house != null and b.org_id == ruler_house.org_id:
 		o *= 0.3
@@ -535,6 +543,7 @@ static func _case(polity: Organization, house: Organization, person: NotableIndi
 				favour += 0.4
 	c["favour"] = favour - disgrace(house)
 	var allies := 0.0
+	var belief := Doctrines.sympathy_of(house)
 	for other in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
 		if other.org_id == house.org_id or other.standing != Organization.Standing.NOBLE:
 			continue
@@ -542,6 +551,9 @@ static func _case(polity: Organization, house: Organization, person: NotableIndi
 			allies += 1.0
 		elif house.uji_id != &"" and other.uji_id == house.uji_id:
 			allies += 0.5
+		elif belief != null and Doctrines.sympathy_of(other) == belief:
+			# Those who think as it does count as friends.
+			allies += 0.4
 	for servant in Retainers.retainers_of(house.org_id):
 		if servant.loyalty > 0.5:
 			allies += 0.3

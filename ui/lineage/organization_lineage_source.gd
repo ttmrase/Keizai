@@ -326,6 +326,9 @@ static func fall_text(person: NotableIndividual, f: Dictionary, with_name := tru
 	var why := ""
 	if by != null:
 		why = "（%sとの政争）" % by.formal_name()
+	elif f.has("doctrine"):
+		var d := Doctrines.get_doctrine(StringName(f["doctrine"]))
+		why = "（%sの弾圧）" % d.name if d != null else "（思想の弾圧）"
 	return "%d年 %s%s%s" % [int(int(f.get("tick", 0)) / SimConfig.TICKS_PER_YEAR),
 		person.short_name + " " if with_name and person != null else "", what, why]
 
