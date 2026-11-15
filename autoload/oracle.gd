@@ -368,6 +368,15 @@ func _feats_from_event(e: HistoryEvent) -> void:
 			if bool(e.payload.get("regime_change", false)):
 				last_turmoil_tick = e.tick
 				_unlock("regime")
+		HistoryEvent.EventType.OFFICE:
+			if String(e.payload.get("action", "")) == "hereditary" \
+					and String(e.payload.get("house", "")) != "":
+				_unlock("hereditary_office")
+				if String(e.payload.get("office", "")) == "regent":
+					_unlock("regency")
+		HistoryEvent.EventType.SUCCESSION:
+			if e.description.contains("跡目家の"):
+				_unlock("heir_succession")
 		HistoryEvent.EventType.GREATNESS:
 			_unlock("first_great")
 			if Greatness.entries_of(e.subject_person_id).size() >= 2:

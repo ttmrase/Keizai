@@ -197,6 +197,19 @@ static func classify(e: HistoryEvent) -> Dictionary:
 				return item
 		HistoryEvent.EventType.GREATNESS:
 			return _item(e, Weight.NOTABLE, "偉人", Palette.ACCENT, &"laurel", "lineage")
+		HistoryEvent.EventType.OFFICE:
+			match String(e.payload.get("action", "")):
+				"appoint":
+					if String(e.payload.get("office", "")) == "regent":
+						return _item(e, Weight.NOTABLE, "摂政", Palette.POLITY, &"crown", "power")
+				"hereditary":
+					if String(e.payload.get("house", "")) != "":
+						return _item(e, Weight.NOTABLE,
+							"摂関政治" if String(e.payload.get("office", "")) == "regent" else "家職",
+							Palette.ACCENT, &"seal", "power")
+				"heirs":
+					if bool(e.payload.get("reordered", false)):
+						return _item(e, Weight.NOTABLE, "跡目", Palette.HOUSE, &"crown", "power")
 		HistoryEvent.EventType.DEATH:
 			if bool(e.payload.get("killed_in_battle", false)):
 				return _item(e, Weight.NOTABLE, "討死", Palette.DANGER, &"swords", "incidents")

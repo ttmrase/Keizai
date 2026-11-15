@@ -35,6 +35,11 @@ enum EventType {
 	## keep — 偉人. Appended last: events are saved by name, and nothing that
 	## reads a type by number may see the earlier ones move.
 	GREATNESS,
+	## A seat beside the head of a state: who was appointed to it or left it,
+	## a seat becoming a family's by right, the order of the houses next in line
+	## to a crown, the chief house of a 氏, a war's commanders and what they won
+	## or lost. Appended last for the same reason as GREATNESS.
+	OFFICE,
 }
 
 const TYPE_NAMES := {
@@ -56,6 +61,7 @@ const TYPE_NAMES := {
 	EventType.INCIDENT: "INCIDENT",
 	EventType.EPOCH_SUMMARY: "EPOCH_SUMMARY",
 	EventType.GREATNESS: "GREATNESS",
+	EventType.OFFICE: "OFFICE",
 }
 
 @export var event_id: StringName = &""

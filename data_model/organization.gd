@@ -146,6 +146,26 @@ const STANDING_LABELS := {
 ## got — so that when the seat changes hands, history can say what the reign
 ## amounted to. Cached, read by Greatness; reset with each new head.
 @export var reign_marks: Dictionary = {}
+## POLITICAL_SYSTEM: the seats beside its head, office key -> {person, house,
+## since, ...}. Written only by GameState.apply from OFFICE events. See Offices.
+@export var offices: Dictionary = {}
+## POLITICAL_SYSTEM: offices that have become one family's by right (家職),
+## office key -> house id.
+@export var hereditary_offices: Dictionary = {}
+## POLITICAL_SYSTEM: the houses that have held each office most recently, newest
+## last (office key -> [house ids]), for telling when a seat has become a family's.
+@export var office_lines: Dictionary = {}
+## POLITICAL_SYSTEM (hereditary): the houses named to take the crown if the
+## royal line fails (跡目家), first in line first.
+@export var heir_houses: Array[StringName] = []
+## HOUSE: what its people won and lost commanding in wars:
+## {war_id, office, result, tick}. Written only by apply.
+@export var merits: Array = []
+## HOUSE: the marks against its name — attainder, a fall from office, a lost
+## war's command: {kind, tick, weight, event_id}. Written only by apply.
+@export var blemishes: Array = []
+## HOUSE (founder of a 氏): the house currently chief among that 氏 (氏の長者).
+@export var uji_chief_id: StringName = &""
 
 
 func kind_name() -> String:
@@ -252,6 +272,20 @@ func to_dict() -> Dictionary:
 		d["fortune"] = fortune
 	if not reign_marks.is_empty():
 		d["reign_marks"] = reign_marks.duplicate()
+	if not offices.is_empty():
+		d["offices"] = offices.duplicate(true)
+	if not hereditary_offices.is_empty():
+		d["hereditary_offices"] = hereditary_offices.duplicate()
+	if not office_lines.is_empty():
+		d["office_lines"] = office_lines.duplicate(true)
+	if not heir_houses.is_empty():
+		d["heir_houses"] = _names_to_strings(heir_houses)
+	if not merits.is_empty():
+		d["merits"] = merits.duplicate(true)
+	if not blemishes.is_empty():
+		d["blemishes"] = blemishes.duplicate(true)
+	if uji_chief_id != &"":
+		d["uji_chief_id"] = String(uji_chief_id)
 	return d
 
 
@@ -321,7 +355,33 @@ static func from_dict(d: Dictionary) -> Organization:
 	o.honour = float(d.get("honour", 0.0))
 	o.fortune = float(d.get("fortune", 0.0))
 	o.reign_marks = (d.get("reign_marks", {}) as Dictionary).duplicate()
+	o.offices = _numbers_settled((d.get("offices", {}) as Dictionary).duplicate(true))
+	o.hereditary_offices = (d.get("hereditary_offices", {}) as Dictionary).duplicate()
+	o.office_lines = (d.get("office_lines", {}) as Dictionary).duplicate(true)
+	o.heir_houses = _strings_to_names(d.get("heir_houses", []))
+	o.merits = _numbers_settled_list((d.get("merits", []) as Array).duplicate(true))
+	o.blemishes = _numbers_settled_list((d.get("blemishes", []) as Array).duplicate(true))
+	o.uji_chief_id = StringName(d.get("uji_chief_id", ""))
 	return o
+
+
+## JSON gives every number back as a float; the ticks in these records are
+## compared as ints, so they are put back.
+static func _numbers_settled(d: Dictionary) -> Dictionary:
+	for key in d:
+		if d[key] is Dictionary:
+			var entry: Dictionary = d[key]
+			for field in ["since", "tick"]:
+				if entry.has(field):
+					entry[field] = int(entry[field])
+	return d
+
+
+static func _numbers_settled_list(list: Array) -> Array:
+	for entry in list:
+		if entry is Dictionary and entry.has("tick"):
+			entry["tick"] = int(entry["tick"])
+	return list
 
 
 static func _standing_from_name(n: String) -> Standing:

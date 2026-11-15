@@ -207,6 +207,8 @@ func apply(e: HistoryEvent) -> void:
 			_apply_war_resolved(e)
 		HistoryEvent.EventType.GREATNESS:
 			_apply_greatness(e)
+		HistoryEvent.EventType.OFFICE:
+			_apply_office(e)
 		_:
 			# IDEOLOGY_SHIFT, CONFLICT_*, RESOURCE_SHOCK and EPOCH_SUMMARY are
 			# chronicle markers for values their owning system already changed.
@@ -313,12 +315,16 @@ func _apply_death(e: HistoryEvent) -> void:
 	for tenure in p.open_tenures():
 		tenure.end_tick = e.tick
 		tenure.end_event_id = e.event_id
-	# The seat is left empty; a SUCCESSION event fills it.
-	var org: Organization = organizations.get(p.house_org_id)
+	# The seat is left empty; a SUCCESSION event fills it. So is any great
+	# office they held beside a head of state; Offices fills those.
 	for id in organizations:
 		var o: Organization = organizations[id]
 		if o.leader_person_id == p.person_id:
 			o.leader_person_id = &""
+		if o.kind == Organization.OrgKind.POLITICAL_SYSTEM and not o.offices.is_empty():
+			for key in o.offices.keys():
+				if StringName(o.offices[key].get("person", "")) == p.person_id:
+					_close_office(o, key, e.tick)
 
 
 func _apply_succession(e: HistoryEvent) -> void:
@@ -481,6 +487,9 @@ func _apply_dissolution(e: HistoryEvent) -> void:
 	org.dissolved_tick = e.tick
 	org.power_score = 0.0
 	org.power_drivers.clear()
+	# A state that ends ends its offices with it; who held them stays recorded.
+	for key in org.offices.keys():
+		_close_office(org, key, e.tick)
 	var leader: NotableIndividual = people.get(org.leader_person_id)
 	if leader != null:
 		var tenure := leader.tenure_in(org.org_id)
@@ -556,6 +565,76 @@ func _apply_war_resolved(e: HistoryEvent) -> void:
 		if war.war_id != war_id:
 			still.append(war)
 	world.wars = still
+
+
+# ---------------------------------------------------------------- offices
+
+func _apply_office(e: HistoryEvent) -> void:
+	var p: Dictionary = e.payload
+	var polity: Organization = organizations.get(StringName(p.get("polity", "")))
+	var key := String(p.get("office", ""))
+	match String(p.get("action", "")):
+		"appoint":
+			var person: NotableIndividual = people.get(e.subject_person_id)
+			if polity == null or person == null or key == "":
+				return
+			_close_office(polity, key, e.tick)
+			var house := String(p.get("house", ""))
+			var entry := {"person": String(person.person_id), "house": house, "since": e.tick}
+			for extra in ["people", "wealth", "low"]:
+				if p.has(extra):
+					entry[extra] = p[extra]
+			polity.offices[key] = entry
+			var line: Array = polity.office_lines.get(key, [])
+			line.append(house)
+			while line.size() > 3:
+				line.pop_front()
+			polity.office_lines[key] = line
+			person.office_history.append({"office": key, "polity": String(polity.org_id),
+				"house": house, "start": e.tick, "end": -1})
+		"vacate":
+			if polity != null:
+				_close_office(polity, key, e.tick)
+		"hereditary":
+			if polity == null:
+				return
+			var house := String(p.get("house", ""))
+			if house == "":
+				polity.hereditary_offices.erase(key)
+			else:
+				polity.hereditary_offices[key] = house
+		"heirs":
+			if polity != null:
+				polity.heir_houses = Organization._strings_to_names(p.get("houses", []))
+		"uji_chief":
+			var founder: Organization = organizations.get(StringName(p.get("uji", "")))
+			if founder != null:
+				founder.uji_chief_id = StringName(p.get("house", ""))
+		"merit":
+			var house: Organization = organizations.get(e.subject_org_id)
+			if house != null:
+				house.merits.append({"war_id": String(p.get("war_id", "")), "office": key,
+					"result": String(p.get("result", "")), "tick": e.tick})
+		"blemish":
+			var house: Organization = organizations.get(e.subject_org_id)
+			if house != null:
+				house.blemishes.append({"kind": String(p.get("kind", "")), "tick": e.tick,
+					"weight": float(p.get("weight", 0.3)), "event_id": String(e.event_id)})
+
+
+## Ends whoever holds an office: their record of it closes, the seat empties.
+func _close_office(polity: Organization, key: String, tick: int) -> void:
+	var entry: Dictionary = polity.offices.get(key, {})
+	if entry.is_empty():
+		return
+	var holder: NotableIndividual = people.get(StringName(entry.get("person", "")))
+	if holder != null:
+		for record in holder.office_history:
+			if String(record.get("office", "")) == key \
+					and String(record.get("polity", "")) == String(polity.org_id) \
+					and int(record.get("end", -1)) < 0:
+				record["end"] = tick
+	polity.offices.erase(key)
 
 
 func _apply_greatness(e: HistoryEvent) -> void:

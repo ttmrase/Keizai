@@ -107,6 +107,34 @@ func _rebuild() -> void:
 			_list.add_child(_breakdown(org))
 
 
+## The great offices of a state as text: one line a seat, then the heir houses.
+static func office_lines(polity: Organization) -> String:
+	var lines: Array[String] = []
+	if Offices.is_regency_by_right(polity):
+		var regent := GameState.get_organization(StringName(polity.hereditary_offices["regent"]))
+		lines.append("摂関政治：実権は%sにある" % (regent.formal_name() if regent != null else "摂政家"))
+	var keys := polity.offices.keys()
+	keys.sort_custom(func(x, y): return float(Offices.WEIGHT.get(String(x), 0.0)) > float(Offices.WEIGHT.get(String(y), 0.0)))
+	for key in keys:
+		var entry: Dictionary = polity.offices[key]
+		var person := GameState.get_person(StringName(entry.get("person", "")))
+		var house := GameState.get_organization(StringName(entry.get("house", "")))
+		var hereditary := StringName(polity.hereditary_offices.get(key, "")) == StringName(entry.get("house", ""))
+		lines.append("%s　%s（%s・%d年〜%s）" % [Offices.label_of(String(key), polity),
+			person.full_name if person != null else "?",
+			house.formal_name() if house != null else "家なし",
+			int(int(entry.get("since", 0)) / SimConfig.TICKS_PER_YEAR),
+			"・家職" if hereditary else ""])
+	if not polity.heir_houses.is_empty():
+		var names: Array[String] = []
+		for i in polity.heir_houses.size():
+			var house := GameState.get_organization(polity.heir_houses[i])
+			if house != null:
+				names.append("%d.%s" % [i + 1, house.formal_name()])
+		lines.append("跡目家　%s" % "　".join(names))
+	return "\n".join(lines)
+
+
 ## The families added up by 氏: how much of the world each great house of the
 ## first day still stands behind, through every line that came out of it.
 func _build_uji_table() -> void:
@@ -247,6 +275,17 @@ func _government_banner(polity: Organization) -> Control:
 	line.add_theme_font_size_override("font_size", 17)
 	line.add_theme_color_override("font_color", Palette.TEXT)
 	rows.add_child(line)
+
+	# The seats beside the head: who holds them, from which family, since when,
+	# and whether they have become that family's by right.
+	var offices := office_lines(polity)
+	if not offices.is_empty():
+		var held := Label.new()
+		held.text = offices
+		held.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		held.add_theme_font_size_override("font_size", 15)
+		held.add_theme_color_override("font_color", Palette.TEXT)
+		rows.add_child(held)
 
 	# The division of the chamber is what a faction amounts to under a regime that
 	# has one, and it is also what the next upheaval will be decided on.

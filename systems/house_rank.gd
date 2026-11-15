@@ -32,7 +32,7 @@ const SERVICE_PRECEDENCE_STEP := 0.5
 ## Composite standing needed to reach each tier, highest first.
 const TIER_THRESHOLDS: Array[float] = [2.35, 1.70, 1.05, 0.55, 0.0]
 
-## What each strand of standing is worth.
+## What each strand of standing is worth. (See grounds_of for the rest.)
 const LAND_WEIGHT := 0.85
 const POWER_WEIGHT := 1.0
 const CROWN_WEIGHT := 1.15
@@ -73,18 +73,14 @@ static func refresh_all(tick: int) -> void:
 	if houses.is_empty():
 		return
 
-	var strongest := 1.0
-	for h in houses:
-		strongest = maxf(strongest, h.power_score)
-
 	_rank_service_houses(tick)
 
-	var crowned := _crowned_houses()
-	var officed := _houses_holding_office()
-
+	# What each family's standing rests on, counted ground by ground. The
+	# context is built fresh: appointments made this season count this season.
+	var ctx := context(true)
 	var standings: Array = []
 	for house in houses:
-		standings.append([_standing_of(house, strongest, crowned, officed, tick), house])
+		standings.append([standing_from(grounds_of(house, ctx)), house])
 	# Order matters: a peerage is comparative. Ties break on org id so a replay of
 	# the same world produces the same order of precedence.
 	standings.sort_custom(func(a, b):
@@ -118,22 +114,185 @@ static func _quota_tier(position: int) -> int:
 	return TIER_QUOTA[position] if position < TIER_QUOTA.size() else 0
 
 
-## 0..~3.2. Deliberately unnormalized: the thresholds are absolute, so a world
-## where every house is poor has no dukes rather than crowning its least poor.
-static func _standing_of(house: Organization, strongest: float, crowned: Dictionary,
-		officed: Dictionary, tick: int) -> float:
-	var standing := POWER_WEIGHT * clampf(house.power_score / strongest, 0.0, 1.0)
-	standing += LAND_WEIGHT * clampf(house.held_settlement_ids.size() / LAND_SATURATION, 0.0, 1.0)
-	if crowned.has(house.org_id):
-		standing += CROWN_WEIGHT
-	if officed.has(house.org_id):
-		standing += OFFICE_WEIGHT
+# --------------------------------------------------------- the grounds of rank
+
+## What a family's standing rests on, item by item, so that "why is this house
+## a marquess?" has an answer anyone can read: three regents, first of the heir
+## houses, a war won in command, two counties, two centuries, the chief house of
+## its 氏 — and the marks against it. The standing is exactly the sum.
+##
+## Deliberately unnormalized: the thresholds are absolute, so a world where every
+## house is poor has no dukes rather than crowning its least poor.
+const PRESENCE_WEIGHT := 0.6
+const HISTORY_PER_TERM := 0.12
+const HISTORY_CAP := 0.45
+const HISTORY_FADE_YEARS := 200.0
+const HEREDITARY_WEIGHT := 0.3
+const HEIR_WEIGHTS: Array[float] = [0.45, 0.3, 0.2]
+const IN_LAW_WEIGHT := 0.35
+const UJI_CHIEF_WEIGHT := 0.25
+const TITLE_WEIGHT := 0.06
+const MERIT := {"general": {"victory": 0.35, "defeat": -0.25},
+	"strategist": {"victory": 0.25, "defeat": -0.12}}
+const MERIT_FADE_YEARS := 150.0
+const BLEMISH_FADE_YEARS := 100.0
+
+const ROMAN_COUNT := ["", "一代", "二代", "三代", "四代", "五代", "六代", "七代", "八代", "九代"]
+
+static var _ctx: Dictionary = {}
+static var _ctx_tick := -1
+static var _ctx_world: WorldState = null
+
+
+## Everything the grounds of every house are read from, gathered in one pass.
+static func context(fresh := false) -> Dictionary:
+	var tick := SimClock.current_tick
+	if not fresh and _ctx_tick == tick and _ctx_world == GameState.world and not _ctx.is_empty():
+		return _ctx
+	var strongest := 1.0
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			strongest = maxf(strongest, house.power_score)
+	var current := {}
+	var heirs := {}
+	var in_laws := {}
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		for key in polity.offices:
+			var holder: StringName = StringName(polity.offices[key].get("house", ""))
+			var list: Array = current.get(holder, [])
+			list.append([String(key), polity])
+			current[holder] = list
+		for i in polity.heir_houses.size():
+			var id: StringName = polity.heir_houses[i]
+			heirs[id] = mini(int(heirs.get(id, 99)), i)
+		if polity.ideology != null \
+				and polity.ideology.legitimacy_basis == PoliticalSystemAxes.LegitimacyBasis.HEREDITARY:
+			for id in Offices.in_law_houses(GameState.get_current_leader(polity.org_id)):
+				in_laws[id] = true
+	var history := {}
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		for record in p.office_history:
+			var house_id := StringName(record.get("house", ""))
+			var list: Array = history.get(house_id, [])
+			list.append(record)
+			history[house_id] = list
+	_ctx = {
+		"tick": tick,
+		"strongest": strongest,
+		"crowned": _crowned_houses(),
+		"officed": _houses_holding_office(),
+		"current": current,
+		"history": history,
+		"heirs": heirs,
+		"in_laws": in_laws,
+	}
+	_ctx_tick = tick
+	_ctx_world = GameState.world
+	return _ctx
+
+
+static func standing_from(grounds: Array) -> float:
+	var total := 0.0
+	for g in grounds:
+		total += float(g["value"])
+	return total
+
+
+## The grounds of a family's standing: [{label, value, kind}], largest first.
+## kind is one of presence, land, crown, organization, office, history,
+## hereditary, heir, in_law, merit, uji, age, honour, title, blemish.
+static func grounds_of(house: Organization, ctx: Dictionary = {}) -> Array:
+	if ctx.is_empty():
+		ctx = context()
+	var out: Array = []
+	if house == null:
+		return out
+	var tick: int = ctx["tick"]
+	var add := func(kind: String, label: String, value: float) -> void:
+		if not is_zero_approx(value):
+			out.append({"kind": kind, "label": label, "value": value})
+
+	add.call("presence", "家勢", PRESENCE_WEIGHT * clampf(house.power_score / float(ctx["strongest"]), 0.0, 1.0))
+	add.call("land", "所領%d" % house.held_settlement_ids.size(),
+		LAND_WEIGHT * clampf(house.held_settlement_ids.size() / LAND_SATURATION, 0.0, 1.0))
+	if (ctx["crowned"] as Dictionary).has(house.org_id):
+		add.call("crown", "国の長を出している", CROWN_WEIGHT)
+	if (ctx["officed"] as Dictionary).has(house.org_id):
+		add.call("organization", "ギルド・派閥の長", OFFICE_WEIGHT)
+	for entry in ctx["current"].get(house.org_id, []):
+		var key: String = entry[0]
+		var polity: Organization = entry[1]
+		add.call("office", "%s（現任）" % Offices.label_of(key, polity), Offices.weight_of(key, polity))
+
+	# What its people held before: a seat counted once per holder, older terms
+	# fading but never gone.
+	var terms := {}
+	for record in ctx["history"].get(house.org_id, []):
+		var key := String(record.get("office", ""))
+		if Offices.WAR_SEATS.has(key):
+			continue
+		var ended := int(record.get("end", -1))
+		if ended < 0:
+			continue
+		var age := float(tick - ended) / SimConfig.TICKS_PER_YEAR
+		var fade := 0.4 + 0.6 * exp(-age / HISTORY_FADE_YEARS)
+		var t: Dictionary = terms.get(key, {"n": 0, "value": 0.0})
+		t["n"] = int(t["n"]) + 1
+		t["value"] = float(t["value"]) + HISTORY_PER_TERM * float(Offices.WEIGHT.get(key, 0.3)) * fade
+		terms[key] = t
+	var term_keys := terms.keys()
+	term_keys.sort()
+	for key in term_keys:
+		var t: Dictionary = terms[key]
+		var n := int(t["n"])
+		add.call("history", "%s %s" % [Offices.LABELS.get(key, key),
+			ROMAN_COUNT[n] if n < ROMAN_COUNT.size() else "%d代" % n],
+			minf(float(t["value"]) * 4.0, HISTORY_CAP))
+
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		for key in polity.hereditary_offices:
+			if StringName(polity.hereditary_offices[key]) == house.org_id:
+				add.call("hereditary", "家職：%s" % Offices.label_of(String(key), polity), HEREDITARY_WEIGHT)
+	if (ctx["heirs"] as Dictionary).has(house.org_id):
+		var rank: int = ctx["heirs"][house.org_id]
+		add.call("heir", "跡目家 第%s位" % ["一", "二", "三"][clampi(rank, 0, 2)],
+			HEIR_WEIGHTS[clampi(rank, 0, HEIR_WEIGHTS.size() - 1)])
+	if (ctx["in_laws"] as Dictionary).has(house.org_id):
+		add.call("in_law", "国の長の外戚", IN_LAW_WEIGHT)
+
+	var won := 0.0
+	var lost := 0.0
+	for merit in house.merits:
+		var table: Dictionary = MERIT.get(String(merit.get("office", "")), {})
+		var value: float = float(table.get(String(merit.get("result", "")), 0.0))
+		var age := float(tick - int(merit.get("tick", tick))) / SimConfig.TICKS_PER_YEAR
+		value *= 0.3 + 0.7 * exp(-age / MERIT_FADE_YEARS)
+		if value > 0.0:
+			won += value
+		else:
+			lost += value
+	add.call("merit", "武功", won)
+	add.call("merit", "敗戦の責", lost)
+
+	if Offices.is_uji_chief(house):
+		add.call("uji", "%sの長者" % HouseNaming.uji_label(house.uji_id), UJI_CHIEF_WEIGHT)
 	var years := float(tick - house.founding_tick) / SimConfig.TICKS_PER_YEAR
-	standing += AGE_WEIGHT * clampf(years / AGE_SATURATION, 0.0, 1.0)
-	# And what the crown has said about them, which is worth something for as
-	# long as anyone still remembers the reign that said it.
-	standing += house.honour
-	return standing
+	add.call("age", "家の古さ %d年" % int(years), AGE_WEIGHT * clampf(years / AGE_SATURATION, 0.0, 1.0))
+	# What the crown has said about them, worth something for as long as anyone
+	# remembers the reign that said it — and the title itself, a little.
+	add.call("honour", "叙勲" if house.honour > 0.0 else "咎め", house.honour)
+	if house.standing == Organization.Standing.NOBLE:
+		add.call("title", "爵位（%s）" % tier_name(house.rank_tier), TITLE_WEIGHT * float(house.rank_tier))
+
+	var marks := 0.0
+	for mark in house.blemishes:
+		var age := float(tick - int(mark.get("tick", tick))) / SimConfig.TICKS_PER_YEAR
+		marks -= float(mark.get("weight", 0.3)) * (0.3 + 0.7 * exp(-age / BLEMISH_FADE_YEARS))
+	add.call("blemish", "汚点", marks)
+
+	out.sort_custom(func(x, y): return absf(float(x["value"])) > absf(float(y["value"])))
+	return out
 
 
 ## Favour above which a family in service is worth a rung, per rung. Almost

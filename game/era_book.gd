@@ -120,6 +120,8 @@ static func _empty_tally(index: int) -> Dictionary:
 		"blessings": {},
 		"wars": [],
 		"greats": [],
+		"hereditary": [],
+		"regencies": 0,
 		"war_ends": [],
 		"battles": 0,
 		"births": 0,
@@ -139,6 +141,16 @@ static func _tally(t: Dictionary, e: HistoryEvent) -> void:
 			t["incidents"].append([Incidents.label_of(StringName(e.payload.get("incident_kind", ""))),
 				int(e.tick / SimConfig.TICKS_PER_YEAR)])
 			moment = true
+		HistoryEvent.EventType.OFFICE:
+			var action := String(e.payload.get("action", ""))
+			if action == "hereditary" and String(e.payload.get("house", "")) != "":
+				var house := GameState.get_organization(StringName(e.payload.get("house", "")))
+				var polity := GameState.get_organization(StringName(e.payload.get("polity", "")))
+				t["hereditary"].append("%sの%s" % [house.formal_name() if house != null else "ある家",
+					Offices.label_of(String(e.payload.get("office", "")), polity)])
+				moment = String(e.payload.get("office", "")) == "regent"
+			elif action == "appoint" and String(e.payload.get("office", "")) == "regent":
+				t["regencies"] += 1
 		HistoryEvent.EventType.GREATNESS:
 			var who := GameState.get_person(e.subject_person_id)
 			t["greats"].append("%s「%s」" % [who.full_name if who != null else "ある者",
@@ -287,6 +299,10 @@ static func _lines(t: Dictionary) -> Array[String]:
 
 	if not t["greats"].is_empty():
 		lines.append("%sが歴史に名を刻んだ" % _some(t["greats"], "人"))
+	if not t["hereditary"].is_empty():
+		lines.append("%sが家職となった" % _some(t["hereditary"], "座"))
+	elif int(t["regencies"]) > 0:
+		lines.append("摂政が%d度立った" % t["regencies"])
 
 	if not t["incidents"].is_empty():
 		var parts: Array[String] = []

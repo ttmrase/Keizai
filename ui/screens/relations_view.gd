@@ -317,6 +317,10 @@ func _draw_house(house: Organization, font: Font) -> void:
 	# 氏, so the field gives it its own name only; the sheet gives the whole.
 	var label := "%s　%s" % [house.formal_name(), HouseRank.title_of_house(house)] if noble \
 		else house.short_name()
+	# And its first seat beside a head of state, if it has one.
+	var held := Offices.held_by(house.org_id)
+	if noble and not held.is_empty():
+		label += "・" + Offices.label_of(held[0]["key"], held[0]["polity"])
 	var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	_canvas.draw_string(font, centre + Vector2(-width * 0.5, radius + 20.0 * _canvas.view_zoom),
 		label, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
@@ -376,6 +380,9 @@ func _show_detail(id: StringName) -> void:
 	var uji := OrganizationLineageSource.uji_lines(house)
 	if not uji.is_empty():
 		lines.append(uji)
+	var grounds := OrganizationLineageSource.grounds_lines(house)
+	if not grounds.is_empty():
+		lines.append(grounds)
 
 	# Why this family exists at all, for every family that was not simply always
 	# here. The founding houses came out of nothing and have nothing to say.

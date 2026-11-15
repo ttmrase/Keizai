@@ -214,6 +214,17 @@ func detail(id: StringName) -> String:
 			roles.append("%s%s（%s）" % [org.formal_name(), t.title, years])
 		lines.append("[color=#9a9080]履歴[/color]  %s" % "\n　　　".join(roles))
 
+	if not p.office_history.is_empty():
+		var seats: Array[String] = []
+		for record in p.office_history:
+			var polity := GameState.get_organization(StringName(record.get("polity", "")))
+			var ended := int(record.get("end", -1))
+			seats.append("%s%s（%d年〜%s）" % [polity.formal_name() if polity != null else "",
+				Offices.label_of(String(record.get("office", "")), polity),
+				int(int(record.get("start", 0)) / SimConfig.TICKS_PER_YEAR),
+				"現在" if ended < 0 else "%d年" % int(ended / SimConfig.TICKS_PER_YEAR)])
+		lines.append("[color=#9a9080]要職[/color]  %s" % "\n　　　".join(seats))
+
 	if not p.personality_tags.is_empty():
 		var traits: Array[String] = []
 		for tag in p.personality_tags:

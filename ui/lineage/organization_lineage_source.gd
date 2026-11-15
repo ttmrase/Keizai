@@ -88,6 +88,13 @@ func sublabel(id: StringName) -> String:
 		return ""
 	if not org.is_active():
 		return "%s・断絶" % Palette.kind_label(org.kind)
+	if org.kind == Organization.OrgKind.HOUSE:
+		var seat := ""
+		var held := Offices.held_by(org.org_id)
+		if not held.is_empty():
+			seat = "・" + Offices.label_of(held[0]["key"], held[0]["polity"])
+		return "%s%s・%d名・力%d" % [HouseRank.title_of_house(org), seat, org.member_count,
+			int(org.power_score)]
 	return "%s・%d名・力%d" % [Palette.kind_label(org.kind), org.member_count, int(org.power_score)]
 
 
@@ -151,6 +158,9 @@ func detail(id: StringName) -> String:
 		var uji_text := uji_lines(org)
 		if not uji_text.is_empty():
 			lines.append(uji_text)
+		var grounds_text := grounds_lines(org)
+		if not grounds_text.is_empty():
+			lines.append(grounds_text)
 		lines.append("[color=#9a9080]家格[/color]  %s・%s%s" % [
 			org.standing_label(),
 			HouseRank.tier_name(org.rank_tier) if org.is_noble() else "位なし",
@@ -198,6 +208,32 @@ func detail(id: StringName) -> String:
 		lines.append("[color=#9a9080]歴代の%s[/color]\n%s" % [org.leadership_title, roll])
 
 	return "\n".join(lines)
+
+
+## What a family's rank rests on, ground by ground, with the total: the reason
+## it is what it is, readable at a glance.
+static func grounds_lines(house: Organization) -> String:
+	if house == null or house.standing == Organization.Standing.COMMONER:
+		return ""
+	var grounds := HouseRank.grounds_of(house)
+	if grounds.is_empty():
+		return ""
+	var parts: Array[String] = []
+	for g in grounds:
+		var value := float(g["value"])
+		var colour := "c85a4a" if value < 0.0 else ("d4a748" if value >= 0.4 else "e8e0d0")
+		parts.append("[color=#%s]%s %s%.2f[/color]" % [colour, g["label"],
+			"+" if value >= 0.0 else "", value])
+	var text := "[color=#9a9080]家格の根拠[/color]  計%.2f\n　　%s" % [
+		HouseRank.standing_from(grounds), "、".join(parts)]
+	var held := Offices.held_by(house.org_id)
+	if not held.is_empty():
+		var seats: Array[String] = []
+		for entry in held:
+			seats.append("%s（%s）" % [Offices.label_of(entry["key"], entry["polity"]),
+				entry["person"].given_name if entry["person"] != null else "?"])
+		text = "[color=#9a9080]要職[/color]  %s\n%s" % ["、".join(seats), text]
+	return text
 
 
 ## The 氏 a family belongs to and every other family of it: where it came from,

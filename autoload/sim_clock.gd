@@ -35,6 +35,9 @@ func _advance_one_tick() -> void:
 	current_tick += 1
 	GameState.step_resources(current_tick)
 	Demography.step(current_tick)
+	# The seats beside each head of state, once a year, before the standings
+	# they feed are read.
+	Offices.step(current_tick)
 	if current_tick % SimConfig.POWER_RECALC_EPOCH_TICKS == 0:
 		PowerCalculator.recalculate_all(current_tick)
 		# Standing decides the rest, in the order the answers depend on each

@@ -96,6 +96,17 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 				counts["great_" + field] = int(counts.get("great_" + field, 0)) + 1
 				greats.append("  ★%d年 [%s] %s" % [int(e.tick / 4),
 					Greatness.field_label(field), e.description])
+			HistoryEvent.EventType.OFFICE:
+				var action := String(e.payload.get("action", ""))
+				var office := String(e.payload.get("office", ""))
+				if action == "appoint":
+					counts["appoint_" + office] = int(counts.get("appoint_" + office, 0)) + 1
+				elif action == "hereditary" and String(e.payload.get("house", "")) != "":
+					counts["hereditary_" + office] = int(counts.get("hereditary_" + office, 0)) + 1
+				elif action == "heirs" and bool(e.payload.get("reordered", false)):
+					counts["heirs_reordered"] = int(counts.get("heirs_reordered", 0)) + 1
+				elif action == "uji_chief":
+					counts["uji_chief"] = int(counts.get("uji_chief", 0)) + 1
 			HistoryEvent.EventType.CONFLICT_DECLARED:
 				if e.payload.has("war"):
 					var cause := String(e.payload["war"].get("cause", ""))
@@ -120,5 +131,43 @@ func _report(world_seed: int, ms: int, ticks: int) -> void:
 	print("  偉人 %d人 / 役職経験者 %d人" % [greats.size(), officers])
 	for line in greats:
 		print(line)
+	_report_rank()
 	for war in GameState.world.wars:
 		print("  (進行中) %d年〜 front %.2f" % [int(war.start_tick / 4), war.front])
+
+
+
+## What the top of the peerage rests on: for the five highest houses, their
+## grounds by kind; and the same summed over every census run.
+static var rank_kinds_total := {}
+
+
+func _report_rank() -> void:
+	var ctx := HouseRank.context(true)
+	var ranked: Array = []
+	for house in GameState.organizations_of_kind(Organization.OrgKind.HOUSE):
+		if house.standing == Organization.Standing.NOBLE:
+			var grounds := HouseRank.grounds_of(house, ctx)
+			ranked.append([HouseRank.standing_from(grounds), house, grounds])
+	ranked.sort_custom(func(x, y): return x[0] > y[0])
+	var kinds := {}
+	for entry in ranked.slice(0, 5):
+		for g in entry[2]:
+			var k := String(g["kind"])
+			kinds[k] = snappedf(float(kinds.get(k, 0.0)) + float(g["value"]), 0.01)
+			rank_kinds_total[k] = float(rank_kinds_total.get(k, 0.0)) + float(g["value"])
+	print("  上位5家の家格の根拠（合計）: %s" % [kinds])
+	for entry in ranked.slice(0, 3):
+		var parts: Array[String] = []
+		for g in (entry[2] as Array).slice(0, 5):
+			parts.append("%s %.2f" % [g["label"], g["value"]])
+		print("    %s %s %.2f: %s" % [entry[1].formal_name(), HouseRank.title_of_house(entry[1]),
+			entry[0], "、".join(parts)])
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		var seats: Array[String] = []
+		for key in polity.offices:
+			var holder := GameState.get_person(StringName(polity.offices[key].get("person", "")))
+			seats.append("%s=%s" % [Offices.label_of(String(key), polity),
+				holder.full_name if holder != null else "?"])
+		print("  %s 要職: %s 家職:%s 跡目:%d家" % [polity.formal_name(), ", ".join(seats),
+			polity.hereditary_offices.keys(), polity.heir_houses.size()])

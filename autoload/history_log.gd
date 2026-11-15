@@ -31,6 +31,8 @@ const _LINEAGE_CRITICAL_TYPES := [
 	# A war's beginning and its end: the states it made and unmade hang on them.
 	HistoryEvent.EventType.CONFLICT_DECLARED,
 	HistoryEvent.EventType.CONFLICT_RESOLVED,
+	# Who held the great offices is what a family's standing is counted from.
+	HistoryEvent.EventType.OFFICE,
 ]
 
 

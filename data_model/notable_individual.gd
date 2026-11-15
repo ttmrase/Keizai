@@ -74,6 +74,9 @@ var short_name: String:
 ## the chronicle can say what became of somebody rather than losing them.
 @export var fate: StringName = &""
 @export var fate_tick: int = -1
+## The great offices this person held beside a head of state:
+## {office, polity, house, start, end}. Written only by GameState.apply.
+@export var office_history: Array = []
 
 
 func has_retired_from(org_id: StringName) -> bool:
@@ -173,6 +176,8 @@ func to_dict() -> Dictionary:
 	if fate != &"":
 		d["fate"] = String(fate)
 		d["fate_tick"] = fate_tick
+	if not office_history.is_empty():
+		d["office_history"] = office_history.duplicate(true)
 	return d
 
 
@@ -203,4 +208,12 @@ static func from_dict(d: Dictionary) -> NotableIndividual:
 	p.deposed_from = Organization._strings_to_names(d.get("deposed_from", []))
 	p.fate = StringName(d.get("fate", ""))
 	p.fate_tick = int(d.get("fate_tick", -1))
+	var held: Array = []
+	for entry in d.get("office_history", []):
+		if entry is Dictionary:
+			var copy: Dictionary = entry.duplicate()
+			copy["start"] = int(copy.get("start", 0))
+			copy["end"] = int(copy.get("end", -1))
+			held.append(copy)
+	p.office_history = held
 	return p

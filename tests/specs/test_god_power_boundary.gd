@@ -27,6 +27,17 @@ const FORBIDDEN := [
 	"SuccessionResolver.",
 	"Demography.",
 	"WorldGenerator.generate(",
+	# Wars, offices and greatness are decided by the world, never by a screen.
+	"CivilWar.step(",
+	"CivilWar.try_split(",
+	"CivilWar.split_country(",
+	"Offices.step(",
+	"Offices._appoint(",
+	"Offices.appoint_war_command(",
+	"Offices.settle_war_command(",
+	"Greatness.step(",
+	"Greatness._recognise(",
+	"Greatness.consider_war(",
 ]
 
 ## Anything on GodPowerAPI naming one of these would be a way to command society

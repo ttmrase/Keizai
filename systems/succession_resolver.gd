@@ -54,6 +54,11 @@ static func resolve(org: Organization, tick: int) -> void:
 			"幼い直子を差し置いて、" if minority else "",
 			org.formal_name(), org.leadership_title, winner.full_name,
 			fallout.get("text", "")]
+	elif org.kind == Organization.OrgKind.POLITICAL_SYSTEM and previous != null \
+			and winner.house_org_id != previous.house_org_id \
+			and org.heir_houses.has(winner.house_org_id):
+		text = "%sの血が絶え、跡目家の%sが%sの%sを継いだ。" % [
+			previous.full_name, winner.full_name, org.formal_name(), org.leadership_title]
 	elif inherited:
 		text = "%sの%sを%sが継いだ。" % [org.formal_name(), org.leadership_title, winner.full_name]
 	elif winner.was_deposed_from(org.org_id):
@@ -295,10 +300,10 @@ static func _bloodline_heirs(org: Organization, tick: int) -> Array[NotableIndiv
 static func _ruling_house_candidates(org: Organization, tick: int) -> Array[NotableIndividual]:
 	var previous := GameState.get_person(_previous_leader_id(org))
 	if previous == null or previous.house_org_id == &"":
-		return []
+		return _heir_house_claimant(org, tick)
 	var house := GameState.get_organization(previous.house_org_id)
 	if house == null or not house.is_active():
-		return []
+		return _heir_house_claimant(org, tick)
 	# The crown follows whoever now heads the house that held it.
 	var head := GameState.get_person(house.leader_person_id)
 	if head != null and head.is_alive():
@@ -307,7 +312,19 @@ static func _ruling_house_candidates(org: Organization, tick: int) -> Array[Nota
 	for member in GameState.house_members(house.org_id):
 		if member.is_adult(tick):
 			out.append(member)
+	if out.is_empty():
+		return _heir_house_claimant(org, tick)
 	return out
+
+
+## A crown whose house has failed goes to the first of its heir houses
+## (跡目家) that has a head to send — no quarrel, because the order was named
+## beforehand. Only with no heir house does the crown fall to whoever can take it.
+static func _heir_house_claimant(org: Organization, tick: int) -> Array[NotableIndividual]:
+	var heir := Offices.heir_claimant(org, tick)
+	if heir == null:
+		return []
+	return [heir]
 
 
 static func _open_candidates(org: Organization, tick: int) -> Array[NotableIndividual]:

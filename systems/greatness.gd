@@ -149,6 +149,7 @@ static func step(tick: int) -> void:
 	if tick % SimConfig.TICKS_PER_YEAR != 3:
 		return
 	_watch_reigns(tick)
+	_watch_offices(tick)
 	_judge_founders(tick)
 	_judge_pending(tick)
 
@@ -185,6 +186,9 @@ static func _watched(org: Organization) -> bool:
 static func _open_marks(org: Organization, ruler: String, tick: int) -> void:
 	var kept: Array = org.reign_marks.get("judged", [])
 	var marks := {"ruler": ruler, "judged": kept}
+	for key in org.reign_marks:
+		if String(key).begins_with("office:"):
+			marks[key] = org.reign_marks[key]
 	if ruler != "":
 		marks["start"] = tick
 		marks["low"] = org.legitimacy
@@ -213,6 +217,77 @@ static func _update_marks(org: Organization, marks: Dictionary, tick: int) -> vo
 				if Incidents.last_tick(kind) >= start:
 					marks["calm"] = false
 					break
+
+
+# ------------------------------------------------------------------ offices
+
+const REGENT_YEARS := 20
+const TREASURER_YEARS := 25
+const TREASURER_GROWTH := 1.6
+
+## The regency and the treasury are judged like reigns: the year a holder is
+## seen to have gone, from what the realm was when they came.
+static func _watch_offices(tick: int) -> void:
+	for polity in GameState.organizations_of_kind(Organization.OrgKind.POLITICAL_SYSTEM):
+		for key: String in ["regent", "treasurer"]:
+			var mk := "office:" + key
+			var marks: Dictionary = polity.reign_marks.get(mk, {})
+			var holder := String(polity.offices.get(key, {}).get("person", ""))
+			if String(marks.get("person", "")) != holder:
+				if String(marks.get("person", "")) != "":
+					_judge_office(polity, key, marks, tick)
+				marks = {"person": holder, "since": tick, "people": _people_of(polity),
+					"wealth": _wealth_of_realm(polity), "min": polity.legitimacy, "calm": true}
+			elif holder != "":
+				marks["min"] = minf(float(marks.get("min", 1.0)), polity.legitimacy)
+				var start := int(marks.get("since", tick))
+				if CivilWar.is_at_war(polity.org_id) \
+						or int(polity.last_fired_tick.get(&"regime_shift", -999999)) >= start:
+					marks["calm"] = false
+			polity.reign_marks[mk] = marks
+
+
+static func _judge_office(polity: Organization, key: String, marks: Dictionary, tick: int) -> void:
+	var person := GameState.get_person(StringName(marks.get("person", "")))
+	if person == null or not polity.is_active():
+		return
+	var years := int((tick - int(marks.get("since", tick))) / SimConfig.TICKS_PER_YEAR)
+	if key == "regent":
+		var grew := _people_of(polity) / maxf(1.0, float(marks.get("people", 0.0)))
+		if years >= REGENT_YEARS and bool(marks.get("calm", false)) \
+				and float(marks.get("min", 0.0)) >= GOOD_REIGN_FLOOR and grew >= 1.2:
+			_recognise(person, "rule", "名摂政",
+				"%d年にわたり%sの摂政として国を執り、民は%d%%増え、乱は一度も起きなかった。" % [
+					years, polity.formal_name(), int((grew - 1.0) * 100.0)],
+				[polity.origin_event_id], tick)
+	elif key == "treasurer":
+		var richer := _wealth_of_realm(polity) / maxf(1.0, float(marks.get("wealth", 0.0)))
+		if years >= TREASURER_YEARS and richer >= TREASURER_GROWTH \
+				and float(marks.get("min", 0.0)) >= 0.5:
+			_recognise(person, "craft", "名財務官",
+				"%d年にわたり%sの財務官を務め、国の富を%d%%増やした。" % [years,
+					polity.formal_name(), int((richer - 1.0) * 100.0)],
+				[polity.origin_event_id], tick)
+
+
+static func _wealth_of_realm(polity: Organization) -> float:
+	var total := 0.0
+	for id in polity.governs_settlement_ids:
+		var s: SettlementState = GameState.world.settlements.get(id)
+		if s != null:
+			total += s.wealth
+	return total
+
+
+## Who commanded a state's armies in the war that ended this season.
+static func _commander(polity_id: String, key: String, tick: int) -> NotableIndividual:
+	for id in GameState.people:
+		var p: NotableIndividual = GameState.people[id]
+		for record in p.office_history:
+			if String(record.get("office", "")) == key and String(record.get("polity", "")) == polity_id \
+					and int(record.get("end", -1)) == tick:
+				return p
+	return null
 
 
 static func _people_of(org: Organization) -> float:
@@ -436,6 +511,22 @@ static func consider_war(ending: HistoryEvent, tick: int) -> void:
 	if person == null:
 		return
 	var winner_id := StringName(ending.payload.get("winner", ""))
+	if bool(ending.payload.get("underdog", false)):
+		# The ruler's own share of the war is not what is judged here.
+		var loser_first := GameState.get_organization(StringName(ending.payload.get("loser", "")))
+		var general := _commander(String(winner_id), "general", tick)
+		if general != null:
+			_recognise(general, "arms", "名将",
+				"劣勢から%sを打ち破り、%d年の戦を勝利に導いた。" % [
+					loser_first.formal_name() if loser_first != null else "敵", years],
+				[ending.event_id], tick)
+			var strategist := _commander(String(winner_id), "strategist", tick)
+			if strategist != null:
+				_recognise(strategist, "arms", "名参謀",
+					"劣勢の陣営の参謀として策を立て、%sを破る%d年の戦を勝ちに導いた。" % [
+						loser_first.formal_name() if loser_first != null else "敵", years],
+					[ending.event_id], tick)
+			return
 	var started := tick - years * SimConfig.TICKS_PER_YEAR
 	var seat_from := tick
 	for t in person.role_history:
@@ -446,6 +537,7 @@ static func consider_war(ending: HistoryEvent, tick: int) -> void:
 	var loser := GameState.get_organization(StringName(ending.payload.get("loser", "")))
 	var loser_name := loser.formal_name() if loser != null else "敵"
 	if bool(ending.payload.get("underdog", false)):
+		# Won from behind with no commander of its own: the ruler led it.
 		_recognise(person, "arms", "名将",
 			"劣勢から%sを打ち破り、%d年の戦を勝利に導いた。" % [loser_name, years],
 			[ending.event_id], tick)

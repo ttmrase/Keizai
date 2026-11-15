@@ -167,7 +167,15 @@ func _check_forced_wars() -> void:
 				continue
 			check(house.honour < float(honour_before.get(house.org_id, 0.0)),
 				"seed %d: %s, attainted, stands lower" % [world_seed, house.display_name])
-			check(house.held_settlement_ids.size() == 0
+			# Read off the record of the ending, not the map a few seasons on: a
+			# family stripped of everything can inherit somebody else's seat by
+			# blood before the test next looks, and that is a later story.
+			var stripped := 0
+			for ev in HistoryLog.backbone:
+				if ev.tick == ending.tick and bool(ev.payload.get("estate", false)) \
+						and StringName(ev.payload.get("from_house_id", "")) == house.org_id:
+					stripped += 1
+			check(house.held_settlement_ids.size() == 0 or stripped > 0
 				or house.held_settlement_ids.size() < int(land_before.get(house.org_id, 0)),
 				"seed %d: %s, attainted, has lost its land" % [world_seed, house.display_name])
 		for raw_id in ending.payload.get("rewarded", []):

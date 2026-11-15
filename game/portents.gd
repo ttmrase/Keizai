@@ -34,6 +34,7 @@ static func current(tick: int) -> Array[Dictionary]:
 	_ruptures(out)
 	_challenge(out)
 	_old_ruler(out, tick)
+	_offices(out, tick)
 	_thin_blood(out)
 	_restless_land(out)
 	_divided_faith(out)
@@ -135,6 +136,30 @@ static func _challenge(out: Array[Dictionary]) -> void:
 			"体制が倒れれば、%d地方が旧体制に付く（民の%d%%）。割れれば内戦になる" % [
 				(outlook["loyal"] as Array).size(), int(share * 100.0)],
 			&"split", Palette.DANGER, 0.4 + 0.4 * hold, "incidents"))
+
+
+## The seats beside the throne: a regency about to end as its king comes of
+## age, and an heir house that is on the worst of terms with the crown it is
+## named to inherit.
+static func _offices(out: Array[Dictionary], tick: int) -> void:
+	var realm := HouseRank.dominant_realm()
+	if realm == null:
+		return
+	var ruler := GameState.get_current_leader(realm.org_id)
+	if realm.offices.has("regent") and ruler != null and not Offices.is_regency_by_right(realm):
+		var left := SimConfig.ADULT_AGE_YEARS - ruler.age_years(tick)
+		if left > 0 and left <= 3:
+			var regent := GameState.get_person(StringName(realm.offices["regent"].get("person", "")))
+			out.append(_item("兆し", "摂政位が空く",
+				"%sはあと%d年で成年。%sの摂政も終わる" % [ruler.full_name, left,
+					regent.full_name if regent != null else "いまの"],
+				&"crown", Palette.POLITY, 0.42, "power"))
+	if not realm.heir_houses.is_empty() and ruler != null:
+		var first := GameState.get_organization(realm.heir_houses[0])
+		if first != null and HouseRelations.relation(first.org_id, ruler.house_org_id) <= -0.35:
+			out.append(_item("兆し", "跡目の順位に異論",
+				"跡目家の第一位%sは王家と険悪だ" % first.formal_name(),
+				&"crown", Palette.HOUSE, 0.36, "power", first.org_id))
 
 
 static func _old_ruler(out: Array[Dictionary], tick: int) -> void:

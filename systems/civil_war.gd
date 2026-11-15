@@ -422,6 +422,9 @@ static func split_country(polity: Organization, claimant: Dictionary, plan: Dict
 		polity.origin_event_id,
 		[] as Array[StringName])
 	_note_war_start(tick)
+	var war := war_of(polity.org_id)
+	if war != null:
+		Offices.appoint_war_command(war, tick)
 
 
 static func _region_list(ids: Array) -> String:
@@ -544,7 +547,8 @@ static func strength(polity: Organization, war: WarState) -> Dictionary:
 		worn = 1.0 - 0.3 * clampf(exhausted, 0.0, 1.0)
 		if war.cause == "split" and war.side_of(polity.org_id) == "a":
 			incumbent = INCUMBENCY
-	var total := (land + houses + bodies) * food * standing * calm * monsters * worn * incumbent
+	var command := Offices.command_bonus(polity) if war != null else 0.0
+	var total := (land + houses + bodies + command) * food * standing * calm * monsters * worn * incumbent
 	return {
 		"total": total,
 		"land": land,
@@ -556,6 +560,7 @@ static func strength(polity: Organization, war: WarState) -> Dictionary:
 		"monsters": monsters,
 		"worn": worn,
 		"incumbent": incumbent,
+		"command": command,
 	}
 
 
@@ -773,6 +778,7 @@ static func _make_peace(war: WarState, tick: int) -> void:
 	var b := GameState.get_organization(war.side_b)
 	var lines: Array[String] = ["国は%sと%sの二つに分かれたまま、境が定まった" % [
 		a.formal_name(), b.formal_name()]]
+	Offices.settle_war_command(war, "", tick)
 	for polity in [a, b]:
 		polity.legitimacy = maxf(0.1, polity.legitimacy - 0.05)
 		polity.last_fired_tick[&"war"] = tick
@@ -929,6 +935,9 @@ static func _settle_victory(war: WarState, winner_side: String, tick: int) -> vo
 		winner.leader_person_id,
 		winner.origin_event_id)
 
+	# Its commanders' deeds go to their families, while both states still stand.
+	Offices.settle_war_command(war, winner_side, tick)
+
 	# The losing state's regions go to the winner.
 	var annexed: Array = Organization._names_to_strings(loser.governs_settlement_ids)
 	if not annexed.is_empty():
@@ -958,6 +967,7 @@ static func _settle_victory(war: WarState, winner_side: String, tick: int) -> vo
 			_transfer_estate(war, house, recipient, held[i], i == held.size() - 1, tick,
 				"%sは改易され、%sは%sに与えられた。")
 		house.honour = clampf(house.honour - ATTAINDER_HONOUR, -2.0, 2.0)
+		_mark(house, "attainder", 0.5, war, tick, "%sは改易の汚名を負った。")
 	for house in reduced:
 		if house.held_settlement_ids.size() < 2 or merit.is_empty():
 			house.honour = clampf(house.honour - REDUCTION_HONOUR, -2.0, 2.0)
@@ -969,6 +979,7 @@ static func _settle_victory(war: WarState, winner_side: String, tick: int) -> vo
 				house.held_settlement_ids[house.held_settlement_ids.size() - 1], false, tick,
 				"%sは減封され、%sは%sに移された。")
 		house.honour = clampf(house.honour - REDUCTION_HONOUR, -2.0, 2.0)
+		_mark(house, "reduction", 0.2, war, tick, "%sは減封の汚名を負った。")
 	for house in merit.slice(0, 2):
 		house.honour = clampf(house.honour + MERIT_HONOUR, -2.0, Honours.HONOUR_CEILING)
 		HistoryLog.emit_event(
@@ -1048,6 +1059,20 @@ static func _settle_victory(war: WarState, winner_side: String, tick: int) -> vo
 		loser.origin_event_id)
 	# Whoever won it may be one the histories keep.
 	Greatness.consider_war(ending, tick)
+
+
+## A mark against a family's name, for its grounds of rank (HouseRank).
+static func _mark(house: Organization, kind: String, weight: float, war: WarState, tick: int,
+		template: String) -> void:
+	HistoryLog.emit_event(
+		HistoryEvent.EventType.OFFICE,
+		tick,
+		template % house.formal_name(),
+		{"action": "blemish", "kind": kind, "weight": weight, "war_id": String(war.war_id),
+			"polity": ""},
+		house.org_id,
+		house.leader_person_id,
+		house.origin_event_id)
 
 
 static func _opening_of(war: WarState, side: String) -> float:
@@ -1190,6 +1215,9 @@ static func _declare_renewal(a: Organization, b: Organization, tick: int) -> voi
 		a.origin_event_id,
 		[] as Array[StringName])
 	_note_war_start(tick)
+	var war := war_of(a.org_id)
+	if war != null:
+		Offices.appoint_war_command(war, tick)
 
 
 # =================================================================== ledger
