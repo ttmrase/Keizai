@@ -1318,3 +1318,106 @@ about wars ("a civil war will break out", "this side will win") — the oracle's
 offers are built from readings that settle within decades, and a war's
 probability does not reduce to one honestly; and per-realm regard for birth,
 which would make the peerage of a divided country two peerages.
+
+## Fourteenth iteration: offices, grudges, and doctrines
+
+Three more additions, in the order the brief recommended: the seats that make a
+family great, the quarrels fought over them, and the doctrines that argue what a
+state should be. As before, the god touches four dials and seven calamities and
+nothing else; none of this can be appointed, started or written by hand.
+
+**要職 and 家格の根拠 — rank as the sum of grounds anyone can list.** A family's
+rank used to be read off land, influence, crown and age, which said *how
+strong* a house was and not *why it was great*. Now each state keeps seats
+beside its head, chosen by the kind of state it is (`Offices.seats_for`): a
+regent (摂政) where the crown is inherited and the ruler is a child, old, or
+overshadowed by in-laws; a treasurer everywhere, weightiest where wealth rules;
+a marshal; two aides (執政補佐, or 側近 under one ruler); a high priest where the
+altar rules; and in war a general (総大将) and a strategist (参謀) for each side.
+Who fills a seat is scored the way the state decides things — favour and rank
+under one ruler, the chamber's seats in a council or assembly, money in a
+plutocracy, faith in a theocracy — with a floor of rank per seat. Three of one
+family in a row makes a seat theirs by right (家職); a regency held that way is
+摂関政治, and the regent is treated as the power. Hereditary crowns name up to
+three heir houses (跡目家) — cadet lines of the royal 氏 first, then in-laws —
+and when the blood fails, `SuccessionResolver` crowns the head of the first of
+them before any contest is considered. Every 氏 has a chief house (氏の長者).
+All of it is OFFICE events applied by `GameState`: appointments, vacancies,
+rights, the order of heirs, the chief of a 氏, a commander's merit or blame.
+
+`HouseRank.grounds_of` lists the grounds — present seats, seats held before
+("財務官 三代", fading slowly but never to nothing), seats by right, place among
+the heirs, in-law of the crown, war merit and blame, chief of the 氏, land,
+age, honours as a title, blemishes — and the standing *is* their sum
+(`standing_from`), which `test_offices` checks for every house. Because a seat
+needs rank and a seat gives rank, great families stay great; the ways up
+(war merit, wealth, a regime change, a ruler's favour, marriage) and down
+(a fall at court, extinction, defeat, losing a seat by right) are all grounds.
+
+**遺恨 and 政争 — the quarrels a war is too big for.** A grudge is a fact with a
+cause, written by `GameState.apply` from the event that caused it (`Grudges`):
+the loser of a disputed succession against the winner (the commonest and the
+strongest), a family pushed down the order of heirs against those that went
+past, a family displaced from a seat, an attainted family against the one given
+its land, a family stripped of honours against the crown's house, the
+excommunicated against the head of the faith, a family whose head was murdered
+against the accused, and the loser of a quarrel at court against the winner.
+Each keeps who, against whom, why, since when, and the event ids, so it can be
+followed back. Only how much it still burns is computed on reading — about half
+in sixty years, a little less again each time the holding house changes head —
+so the record is never rewritten because a year went by. A quarrel inside one
+family is held by the person who lost it until they, or a descendant, found a
+house of their own; the grudge then becomes one house's against another, which
+is how a succession lost by a grandfather becomes a grandson's quarrel.
+
+`Intrigue` looks once a year for a family with a grudge and an opening at the
+same court — a crown that has lost its grip or is new to it, a seat worth
+taking, a house above its own, an ambitious head, a guild, faction or faith both
+belong to, a doctrine they disagree about — and, rarely, for plain ambition.
+The instigator weighs its own chances before moving, so hopeless attempts are
+mostly not made. A quarrel then runs for a few seasons to a few years
+(仕掛け → 工作 → 決着), and is settled by eleven separately recorded lines:
+rank, offices, closeness to the head of state, allies, the chamber, faith,
+money, character, reputation from earlier quarrels, the defender's edge and
+luck, weighted by the kind of state (favour counts most under one ruler, allies
+and seats in an assembly). The loser is put out of its seat (左遷) — the
+winner taking it if it is of the rank — loses its seat by right, its place among
+the heirs and its honours (降格), carries a blemish that counts against its rank
+and keeps it out of favour at that court for a generation, and in a heavy defeat
+its head is made to stand down (隠居). Found out, the instigator suffers the same.
+Every outcome leaves grudges, deeper on the losing side, and a grudge feeds back
+into relations, a lord's choice of side in a civil war and the chance of going
+over, a retainer's loyalty, and the conditions for an assassination.
+
+**思想の系譜 — a lineage of thought apart from states.** `Doctrine` is its own kind
+of record (no members, treasury or head): a name, a parent, how it came out of
+the parent, its founder and later thinkers with their books and teachers, when
+and where it was born, the state it believes in on `PoliticalSystemAxes`' axes
+plus what makes rule right and who decides, how it meets change, how finished
+it is, how admired and how widely shared, and whether it is rising, underground
+or faded. There are none when the world begins. The first comes from a country
+loose enough to argue in (`Doctrines.freedom_of`: a council or assembly, a basis
+other than blood or the sword, a reforming and trading temper) with towns rich
+enough to keep writers, or from a reign long, calm and legitimate enough — or
+called great by history — to be written up as a model; from then on every new
+doctrine comes out of an existing one: 発展 (carried on), 分派 (split over; a
+revision that drifts too far also splits), 反動 (written against the parent),
+総合 (two made one, with a second parent), 復興 (one dead sixty years brought
+back, once), or 治世から (set down from a reign, naming the state and ruler it
+took as its model). Unrest breeds radical doctrines, a long calm conservative
+ones, a fallen regime its mourners. `test_lineage_invariants` now checks that
+doctrines have exactly one root and every chain reaches it.
+
+States take a doctrine as their creed when a new regime reaches for the nearest
+one, when a faction marching under one holds the chamber, or when the ruler
+wrote or was taught it; a creed pulls the country's ideals toward its picture a
+little every year, adds to the regime's legitimacy when the great families share
+that picture and takes from it when they do not, and a faction's doctrine shapes
+the regime it brings in. A doctrine is admired when the countries holding it do
+well and discredited when they fall; one nobody holds or marches under fades.
+A closed regime that cannot stomach one drives its thinkers into exile or jail
+and the doctrine abroad or underground. The dominant faith blesses or condemns.
+In a civil war the breakaway marches under its claimant's doctrine and lords
+side by belief; at court, those who think alike count as allies and those who
+do not are easier to move against; history can now remember a doctrine's
+founder in a seventh field, 思想.
